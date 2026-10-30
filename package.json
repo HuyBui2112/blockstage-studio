@@ -1,0 +1,37 @@
+{
+  "name": "blockstage-studio",
+  "private": true,
+  "version": "0.0.0",
+  "packageManager": "pnpm@11.20.0",
+  "engines": { "node": ">=24.19.0 <25" },
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "lint": "oxlint",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "test:browser": "node scripts/smoke-browser.mjs",
+    "prepare:game": "node scripts/prepare-game-profile.mjs",
+    "typecheck": "tsc -b",
+    "check": "pnpm typecheck && pnpm lint && pnpm test && pnpm build"
+  },
+  "dependencies": {
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "three": "^0.180.0",
+    "fflate": "^0.8.2",
+    "zod": "^4.1.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.19.2",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^6.1.2",
+    "oxlint": "^1.88.0",
+    "typescript": "~6.0.3",
+    "vite": "^8.3.4",
+    "@types/three": "^0.180.0",
+    "vitest": "^4.0.0"
+  }
+}

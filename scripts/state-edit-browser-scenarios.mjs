@@ -1,0 +1,108 @@
+import assert from 'node:assert/strict'
+import { readFile, writeFile } from 'node:fs/promises'
+import { join } from 'node:path'
+
+export async function runStateEditScenarios({ command, evaluate, until, click, aria, input, upload, key, screenshot, directory, profilePath }) {
+  await command('Emulation.setDeviceMetricsOverride', { width:1500, height:1000, deviceScaleFactor:1, mobile:false })
+  await click(aria('Architecture workspace'))
+  if (!await evaluate(`Boolean(document.querySelector('.editor-inspector'))`)) await click(aria('Toggle editor inspector'))
+  const profile = JSON.parse(await readFile(profilePath, 'utf8'))
+  const cell = (name, pos, properties = {}) => ({ pos, state: { name: `minecraft:${name}`, properties: { ...profile.blocks.find(block => block.id === `minecraft:${name}`).defaults, ...properties } } })
+  const object = (id, name, pos, properties = {}) => ({ id, name:id, kind:'block', cells:[cell(name,pos,properties)], children:[], pivot2:pos.map(n=>n*2+1), orientation:0 })
+  const bed = (id, pos) => ({ ...object(id,'red_bed',pos), kind:'multiblock', cells:[cell('red_bed',pos,{part:'foot'}),cell('red_bed',[pos[0],pos[1],pos[2]-1],{part:'head'})] })
+  const snapshot = () => evaluate(`JSON.parse(document.querySelector('.editor-diagnostics').dataset.snapshot)`)
+  const history = () => evaluate(`Number(document.querySelector('.editor-diagnostics').dataset.history)`)
+  const field = property => `.selection-state [aria-label="State ${property}"]`
+  async function load(name, objects) {
+    const path = join(directory, 'batch-state.json')
+    await writeFile(path,JSON.stringify({schemaVersion:2,id:name,name,workspace:'architecture',target:{gameVersion:'26.2',dataVersion:4903},objects,entities:[]}))
+    await upload(aria('Import editor document'),path)
+    await until(`document.querySelector('[aria-label="Document name"]').value === ${JSON.stringify(name)}`)
+    await click(aria('Select tool'))
+    await click(aria('Frame editor scene'))
+    for (let index=0;index<2;index++) {
+      await evaluate(`document.querySelectorAll('.outliner-object > button')[${index}].scrollIntoView({block:'nearest'})`)
+      const point = await evaluate(`(()=>{const r=document.querySelectorAll('.outliner-object > button')[${index}].getBoundingClientRect();return {x:r.x+r.width/2,y:r.y+r.height/2}})()`)
+      for(const type of ['mousePressed','mouseReleased']) await command('Input.dispatchMouseEvent',{type,...point,button:'left',buttons:type==='mousePressed'?1:0,clickCount:1,modifiers:index?8:0})
+    }
+    await until(`document.querySelector('canvas').dataset.selectionCount === '2'`)
+  }
+  async function values(property, expected) {
+    await until(`JSON.parse(document.querySelector('.editor-diagnostics').dataset.snapshot).cells.filter(c=>c.owner==='a'||c.owner==='b').every(c=>c.state.properties[${JSON.stringify(property)}]===${JSON.stringify(expected)})`)
+  }
+  await load('Batch same logs',[object('a','oak_log',[0,0,0],{axis:'x'}),object('b','oak_log',[3,0,0],{axis:'z'})])
+  const logsBefore=await snapshot(), logsHistory=await history()
+  assert.equal(await evaluate(`document.querySelector(${JSON.stringify(field('axis'))}).selectedOptions[0].textContent`),'Mixed')
+  await evaluate(`document.querySelector(${JSON.stringify(field('axis'))}).focus()`)
+  await key('KeyG','g')
+  assert.equal(await evaluate(`Boolean(document.querySelector('.transform-hud'))`),false,'Typing in state controls must not start a viewport transform')
+  assert.deepEqual(await snapshot(),logsBefore)
+  await input(field('axis'),'y'); await values('axis','y')
+  assert.equal(await history(),logsHistory+1)
+  await input(field('axis'),'y'); assert.equal(await history(),logsHistory+1,'A no-op must not create another command')
+  await click(aria('Undo editor')); await until(`document.querySelector('.editor-diagnostics').dataset.history === '${logsHistory}'`)
+  assert.deepEqual(await snapshot(),logsBefore)
+  assert.equal(await evaluate(`document.querySelector(${JSON.stringify(field('axis'))}).selectedOptions[0].textContent`),'Mixed')
+  await click(aria('Redo editor')); await values('axis','y')
+
+  await load('Batch mixed log IDs',[object('a','oak_log',[0,0,0],{axis:'x'}),object('b','birch_log',[3,0,0],{axis:'z'})])
+  await input(field('axis'),'y'); await values('axis','y')
+  assert.deepEqual((await snapshot()).cells.map(c=>c.state.name),['minecraft:oak_log','minecraft:birch_log'])
+
+  await load('Batch stairs',[object('a','oak_stairs',[0,0,0],{facing:'north',shape:'inner_left',waterlogged:'false'}),object('b','oak_stairs',[3,0,0],{facing:'west',half:'top',waterlogged:'true'})])
+  const stairsBefore=await snapshot(), stairsHistory=await history()
+  assert.equal(await evaluate(`document.querySelector(${JSON.stringify(field('waterlogged'))}).indeterminate`),true)
+  assert.equal(await evaluate(`document.querySelector(${JSON.stringify(field('waterlogged'))}).getAttribute('aria-checked')`),'mixed')
+  await evaluate(`document.querySelector('.selection-state').scrollIntoView({block:'center'})`)
+  await screenshot('editor-batch-states-mixed')
+  await evaluate(`document.querySelector(${JSON.stringify(field('waterlogged'))}).scrollIntoView({block:'center'})`)
+  const checkbox=await evaluate(`(()=>{const r=document.querySelector(${JSON.stringify(field('waterlogged'))}).getBoundingClientRect();return {x:r.x+r.width/2,y:r.y+r.height/2}})()`)
+  for(const type of ['mousePressed','mouseReleased']) await command('Input.dispatchMouseEvent',{type,...checkbox,button:'left',buttons:type==='mousePressed'?1:0,clickCount:1})
+  await values('waterlogged','true')
+  assert.equal(await history(),stairsHistory+1)
+  assert.equal(await evaluate(`document.querySelector(${JSON.stringify(field('waterlogged'))}).indeterminate`),false)
+  await click(aria('Undo editor'))
+  await until(`document.querySelector(${JSON.stringify(field('waterlogged'))}).indeterminate`)
+  assert.deepEqual(await snapshot(),stairsBefore)
+  await click(aria('Redo editor')); await values('waterlogged','true')
+  await input(field('facing'),'south'); await values('facing','south')
+  await input(field('half'),'top'); await values('half','top')
+  assert.equal((await snapshot()).cells[0].state.properties.shape,'inner_left','Batch edit must retain unrelated fields')
+  await evaluate(`document.querySelector('.selection-state').scrollIntoView({block:'center'})`)
+  await screenshot('editor-batch-states')
+
+  await load('Batch incompatible selection',[object('a','oak_log',[0,0,0]),object('b','stone',[3,0,0])])
+  assert.equal(await evaluate(`document.querySelectorAll('.selection-state input,.selection-state select').length`),0)
+  assert.ok(await evaluate(`document.querySelector('.selection-state').textContent.includes('No compatible')`))
+  const group={...object('group','oak_log',[0,0,0]),kind:'group',cells:[],children:[object('child-a','oak_log',[0,0,0]),object('child-b','oak_log',[1,0,0])]}
+  await load('Batch group scope',[group,object('b','oak_log',[3,0,0])])
+  assert.equal(await evaluate(`document.querySelectorAll('.selection-state input,.selection-state select').length`),0)
+  assert.ok(await evaluate(`document.querySelector('.selection-state').textContent.includes('scope')`))
+
+  await load('Batch bed collision',[bed('a',[0,0,0]),bed('b',[3,0,0]),object('wall','stone',[4,0,0])])
+  assert.equal(await evaluate(`Boolean(document.querySelector(${JSON.stringify(field('part'))}))`),false)
+  const bedsBefore=await snapshot(), bedsHistory=await history()
+  await input(field('facing'),'east')
+  await until(`document.querySelector('.editor-feedback')?.textContent.toLowerCase().includes('collision')`)
+  assert.deepEqual(await snapshot(),bedsBefore)
+  assert.equal(await history(),bedsHistory)
+  assert.equal(await evaluate(`document.querySelector(${JSON.stringify(field('facing'))}).value`),'north','Rejected batch must restore the controlled Inspector value')
+  await input(field('facing'),'west'); await values('facing','west')
+  assert.equal(await history(),bedsHistory+1)
+  for(const id of ['a','b']) {
+    const cells=(await snapshot()).cells.filter(c=>c.owner===id)
+    const foot=cells.find(c=>c.state.properties.part==='foot'), head=cells.find(c=>c.state.properties.part==='head')
+    assert.deepEqual(head.pos,[foot.pos[0]-1,foot.pos[1],foot.pos[2]])
+  }
+  await click(aria('Undo editor')); await until(`document.querySelector('.editor-diagnostics').dataset.history === '${bedsHistory}'`)
+  assert.deepEqual(await snapshot(),bedsBefore)
+  await click(aria('Redo editor')); await values('facing','west')
+  const saved=await snapshot()
+  await evaluate(`document.querySelector('canvas').focus()`); await key('KeyS','s',2)
+  await until(`document.querySelector('.document-saved')`)
+  const origin=await evaluate('performance.timeOrigin')
+  await command('Page.reload')
+  await until(`performance.timeOrigin !== ${origin} && document.querySelector('.editor-workspace')?.dataset.editorReady === 'true'`)
+  assert.deepEqual(await snapshot(),saved,'Bulk state edit must survive explicit Save and reload')
+  console.log(JSON.stringify({batchStateResult:'passed',checks:['same-ID Mixed','cross-ID semantic intersection','indeterminate boolean and undo/redo','field keyboard focus','unrelated states retained','group scope and incompatible selection','paired bed footprints and atomic collision rejection','single history action and no-op','explicit save/reload']}))
+}

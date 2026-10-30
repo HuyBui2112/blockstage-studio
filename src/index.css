@@ -1,0 +1,235 @@
+:root {
+  font-family: "Segoe UI",system-ui,sans-serif;
+  color: #e9e5de;
+  background: #1b1d20;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  font-size: 12px;
+  --surface: #1b1d20;
+  --panel: #242629;
+  --input: #1e2023;
+  --border: #36383b;
+  --hover: #343638;
+  --text: #e9e5de;
+  --soft: #c6c5c1;
+  --muted: #94989c;
+  --accent: #c99d79;
+  --accent-bright: #e7c5a4;
+  --green: #9bb29c;
+  --mono: Consolas,monospace;
+  color-scheme: dark
+}
+
+* {
+  box-sizing: border-box
+}
+
+body {
+  margin: 0;
+  min-width: 360px
+}
+
+button,input,select,textarea {
+  font: inherit
+}
+
+button,.button {
+  border: 1px solid #424448;
+  background: #2c2e31;
+  color: var(--text);
+  border-radius: 5px;
+  cursor: pointer;
+  padding: 8px 11px;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  line-height: 1.3;
+  transition: background .12s,border-color .12s,color .12s
+}
+
+button:hover,.button:hover {
+  background: #393b3e;
+  border-color: #535457
+}
+
+button:disabled {
+  opacity: .38;
+  cursor: default
+}
+
+button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible,a:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px
+}
+
+input,select,textarea {
+  min-width: 0;
+  border: 1px solid #3b3d40;
+  background: var(--input);
+  color: var(--text);
+  border-radius: 4px;
+  padding: 8px;
+  line-height: 1.3
+}
+
+input::placeholder {
+  color: #858a8f
+}
+
+input[type=checkbox] {
+  accent-color: var(--accent)
+}
+
+input[type=number] {
+  width: 70px
+}
+
+select option,select optgroup {
+  background: #242629;
+  color: var(--text)
+}
+
+svg {
+  flex-shrink: 0;
+  vertical-align: middle
+}
+
+small {
+  font-size: 10px
+}
+
+strong {
+  font-weight: 550
+}
+
+kbd {
+  font: 9px var(--mono);
+  background: #2d2f32;
+  border: 1px solid #424448;
+  border-bottom-color: #55575a;
+  border-radius: 3px;
+  padding: 2px 5px;
+  color: #c8cacb;
+  white-space: nowrap
+}
+
+.muted {
+  color: var(--muted)
+}
+
+.tiny {
+  font-size: 10px;
+  line-height: 1.7
+}
+
+.primary {
+  color: #241e19;
+  background: var(--accent);
+  border-color: #d4ac8b;
+  font-weight: 600
+}
+
+.primary:hover {
+  background: #dcb593;
+  border-color: #e5c6a7;
+  color: #241e19
+}
+
+.wide {
+  width: 100%;
+  margin-top: 8px
+}
+
+.subtle {
+  border-color: transparent;
+  background: transparent;
+  color: var(--muted)
+}
+
+.dashed {
+  border-style: dashed;
+  background: transparent
+}
+
+.danger {
+  color: #e5a194
+}
+
+.accent {
+  color: var(--accent-bright)
+}
+
+.status-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--green);
+  display: inline-block;
+  flex-shrink: 0
+}
+
+.icon-button {
+  width: 32px;
+  height: 32px;
+  min-width: 26px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--muted)
+}
+
+.icon-button:hover {
+  background: var(--hover);
+  border-color: transparent;
+  color: var(--text)
+}
+
+.icon-button.active,.icon-button[aria-pressed=true] {
+  background: #3c322a;
+  border-color: #66503f;
+  color: var(--accent-bright)
+}
+
+.icon-button.danger:hover {
+  background: #53332e;
+  color: #efb4a7
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0,0,0,0);
+  white-space: nowrap;
+  border: 0
+}
+
+::-webkit-scrollbar {
+  width: 5px;
+  height: 5px
+}
+
+::-webkit-scrollbar-thumb {
+  background: #4d4f52;
+  border-radius: 5px
+}
+
+::-webkit-scrollbar-track {
+  background: transparent
+}
+
+::selection {
+  background: #775b45;
+  color: #fff0df
+}
