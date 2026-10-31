@@ -136,8 +136,10 @@ Unknown properties/NBT bị từ chối rõ ràng khi chưa có schema/adapter, 
 
 ### 4.2 Lưu trữ và lifecycle
 
-IndexedDB `blockstage-studio` v5 giữ các stores cũ `projects/packs/catalogs/profiles/
-preferences`, thêm `editorDocuments/componentAssets`. Legacy project v1 không bị
+IndexedDB `blockstage-studio` v6 giữ các stores cũ `projects/packs/catalogs/profiles/
+preferences/editorDocuments/componentAssets`, thêm `editorRevisions` làm sidecar.
+Upgrade chỉ tạo store còn thiếu, không ghi lại snapshot, không đổi document v2.
+Legacy project v1 không bị
 migrate ngầm; chỉ chuyển khi người dùng Open JSON, coalesce pair đầy đủ và báo lỗi
 nếu thiếu/mismatch. Transaction chỉ thành công tại `oncomplete`; version change
 đóng handle, blocked upgrade yêu cầu đóng tab cũ và giữ dữ liệu.
@@ -147,6 +149,21 @@ document nguồn; Assets preview hoàn toàn tách khỏi công trình. Save lư
 New/Open/Import/Edit component lưu draft trước khi chuyển và kiểm document chưa
 đổi trong lúc await. Chọn asset, camera, ghost hoặc mở export không tạo history.
 Chưa có autosave/crash recovery hoặc Undo journal qua reload; xem backlog tài liệu 03.
+
+`src/io/editor-repository.ts` là đường đọc/ghi editor documents. Save nhận snapshot
+và expected token `{generation, version}`; `null` chỉ cho ID chưa từng tồn tại.
+Record v5 chưa có sidecar được đọc bằng token `legacy/0`, chỉ nhận generation mới
+khi Save rõ ràng. So token, ghi snapshot/revision và active preference trong cùng
+readwrite transaction; chỉ ack tại `oncomplete`. Không tự retry conflict bằng token
+mới. Phiên mở có epoch riêng; ack chỉ đánh dấu snapshot đã gửi, edit trong await
+vẫn Unsaved. Save chồng trong một workspace bị từ chối để retry sau khi Save xong.
+
+Repository có remove CAS: xóa snapshot, giữ tombstone và chỉ bỏ preference đang
+trỏ đúng ID trong cùng transaction; không xóa asset/copy/workspace khác. Token cũ
+và `null` không thể ghi lại ID đã xóa. Chưa có UI Delete/Restore hoặc tự dọn
+tombstone; đây là nền D01 cho D04, không phải catalogue đã hoàn thành.
+Conflict giữ document local, hướng dẫn xuất JSON backup rồi reload/mở bản lưu.
+Chưa có live invalidation/màn hình merge giữa tab; controller D02/D03/D07 sẽ bổ sung.
 
 ## 5. Tương tác, transform và placement
 
@@ -481,13 +498,19 @@ Blockstage đã triển khai toàn bộ hành vi được mô tả hoặc các t
 Chi tiết luật Minecraft ưu tiên classes/profile/oracle của đúng phiên bản. Manual
 Blender là nguyên lý UX, không đổi Minecraft Y-up hoặc cho phép float-scale voxel.
 
-## 10. Hợp đồng dự kiến cho roadmap song song — chưa triển khai
+## 10. Hợp đồng roadmap và phần đã triển khai
 
 Các điểm dưới là **đề xuất cần freeze/review qua task K02–K06 trong tài liệu 03**,
-không phải API đang có, không cho phép tự nâng schema hay ghi lại dữ liệu cũ.
+trừ subset repository K04/D01 mô tả ở §4.2 đã triển khai và kiểm thử.
+Các phần còn lại chưa phải API đang có, không cho phép tự ghi lại dữ liệu cũ.
 Tách từng contract nhỏ để module có thể làm riêng; không đổi toàn bộ nền cùng lúc.
 
 ### 10.1 Revision, draft và saved records — K04
+
+**31/10/2026:** đã chốt/triển khai token storage, transaction Save/remove,
+tombstone, legacy read và Save acknowledgement theo epoch/snapshot (§4.2).
+Committed revision tăng đơn điệu, draft base/ack/scheduler, catalogue và conflict
+resolution UI bên dưới vẫn là hợp đồng dự kiến; không coi toàn bộ K04 đã hoàn tất.
 
 - Phân biệt `documentId`, `sessionEpoch` của lần mở, committed `revision`,
   `savedRevision`, draft base/ack và persistent record `generation` khi delete/recreate.
@@ -514,7 +537,8 @@ Tách từng contract nhỏ để module có thể làm riêng; không đổi to
   Catalogue phải phân biệt bản trùng tên bằng ID/metadata và có rename/delete.
 - Xóa active doc phải nhất quán với preference, phần sửa chưa lưu và doc kế tiếp;
   mọi Save/autosave/save-before-switch cũ phải bị invalidated, kể cả từ tab khác.
-  Chỉ bỏ mục khỏi UI sau transaction thành công. Đây là proposal, chưa có API/UI xóa.
+  Chỉ bỏ mục khỏi UI sau transaction thành công. API remove CAS đã có; UI và
+  controller vòng đời này chưa triển khai.
 - Multi-tab có invalidation/conflict UI; Web Locks/BroadcastChannel nếu dùng cần
   feature detect, nhưng transactional compare-and-set vẫn là nền đảm bảo.
 - Store wrapper/version mới phải đọc records v5 cũ không phá hủy; migration test

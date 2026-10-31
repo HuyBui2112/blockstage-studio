@@ -40,6 +40,9 @@ Banner base-color/static pose and inactive conduit are partial special renderers
 do not claim banner patterns, cloth animation, active conduit or payload export.
 Documentation is consolidated; future implementation starts from a user-authorized
 slice. Do not treat the proposed next slice as already active.
+Editor document Save uses the CAS repository with v6 revision sidecars; never
+restore an unguarded snapshot writer. Save/remove and matching preference changes
+are transactional. Tombstoned IDs cannot be reused; catalogue/recovery UI remains planned.
 
 - Reuse the existing React/TypeScript/Three.js base and verified asset pipeline.
 - Keep existing project data and import/export/domain code intact during changes.

@@ -7,6 +7,7 @@ import assert from 'node:assert/strict'
 import { strToU8, zipSync, zlibSync } from 'fflate'
 import { runEditorScenarios } from './editor-browser-scenarios.mjs'
 import { runAnimationPixelScenario } from './animation-browser-scenarios.mjs'
+import { runRepositoryScenarios } from './repository-browser-scenarios.mjs'
 
 // Reuse an installed browser and an isolated profile. No browser download or personal data.
 const browser = process.env.BLOCKSTAGE_BROWSER ?? [
@@ -173,10 +174,11 @@ try {
   // A pre-existing project is a canary: resource operations must never touch its data.
   const preserved = { id: 'resource-test-preserved-project', arbitraryLegacyPayload: ['do', 'not', 'rewrite'], blocks: [{ unusual: true }] }
   // This is the disposable browser profile above, never the user's origin/profile.
-  // Seed the actual old database version to exercise the additive v4 -> v5 upgrade.
+  // Seed the actual old database version to exercise the additive v4 -> v6 upgrade.
   await evaluate(`new Promise((resolve,reject) => { const removal=indexedDB.deleteDatabase('blockstage-studio'); removal.onerror=()=>reject(removal.error); removal.onsuccess=()=>{ const request=indexedDB.open('blockstage-studio',4); request.onerror=()=>reject(request.error); request.onupgradeneeded=()=>{for(const name of ['projects','packs','catalogs','profiles','preferences']) request.result.createObjectStore(name,{keyPath:'id'})}; request.onsuccess=()=>{const db=request.result;const tx=db.transaction('projects','readwrite');tx.objectStore('projects').put(${JSON.stringify(preserved)});tx.oncomplete=()=>{db.close();resolve()};tx.onerror=()=>reject(tx.error)}; }; })`)
   await reload()
-  assert.equal(await evaluate(`new Promise((resolve,reject)=>{const request=indexedDB.open('blockstage-studio');request.onerror=()=>reject(request.error);request.onsuccess=()=>{const db=request.result;resolve(db.version);db.close()}})`), 5, 'Legacy storage must upgrade without rewriting the project canary')
+  assert.equal(await evaluate(`new Promise((resolve,reject)=>{const request=indexedDB.open('blockstage-studio');request.onerror=()=>reject(request.error);request.onsuccess=()=>{const db=request.result;resolve(db.version);db.close()}})`), 6, 'Legacy storage must upgrade without rewriting the project canary')
+  const repositoryChecks = await runRepositoryScenarios({ evaluate })
 
   const orange = solidPng(222, 111, 48), blue = solidPng(51, 122, 219)
   const copperPath = join(directory, 'copper-test.zip'), bluePath = join(directory, 'blue-test.zip')
@@ -371,8 +373,8 @@ try {
   }
   assert.deepEqual(errors, [], 'Browser must have no runtime exceptions')
   console.log(JSON.stringify({
-    result: 'passed', resourcePack: basename(basePath), gameProfile: profilePath,
-    checks: ['empty workspace', 'v4 to v5 additive storage upgrade', 'worker import', 'actual textured 3D', 'MMB orbit', 'axis views stay orthographic', 'projection toggle', 'keyboard/button camera parity', 'legal state/camera retention', 'input focus', 'pixel-verified precedence/toggle', 'duplicate/invalid recovery', 'order/toggle/removal persistence', 'dialog keyboard', 'compact layout', 'existing project preservation', ...(profilePath && process.env.BLOCKSTAGE_RESOURCE_PACK ? ['bounded library/creative tabs', 'stairs state', 'animation cache and idle frame stop', 'unsupported fallback', 'static entity/yaw'] : [])],
+    result: 'passed', resourcePack: basename(basePath), gameProfile: profilePath, repositoryChecks,
+    checks: ['empty workspace', 'v4 to v6 additive storage upgrade', 'worker import', 'actual textured 3D', 'MMB orbit', 'axis views stay orthographic', 'projection toggle', 'keyboard/button camera parity', 'legal state/camera retention', 'input focus', 'pixel-verified precedence/toggle', 'duplicate/invalid recovery', 'order/toggle/removal persistence', 'dialog keyboard', 'compact layout', 'existing project preservation', ...(profilePath && process.env.BLOCKSTAGE_RESOURCE_PACK ? ['bounded library/creative tabs', 'stairs state', 'animation cache and idle frame stop', 'unsupported fallback', 'static entity/yaw'] : [])],
     screenshots: ['resource-workspace', 'resource-manager', 'resource-compact'],
   }, null, 2))
   await send('Browser.close')

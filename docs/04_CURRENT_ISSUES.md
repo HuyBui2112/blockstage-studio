@@ -163,6 +163,13 @@ backup để bảo vệ công trình; (3) duplicate/repeat/dựng vùng và thay
 
 ## BUG-07 — Bản làm dở trong Open saved không có cách xóa
 
+**Tiến độ 31/10/2026:** đã có nền D01 (repository CAS, remove + tombstone,
+preference cleanup atomic và legacy read), đã nối Save hiện tại qua repository.
+Native-browser kiểm pending Save không resurrect ID đã xóa và xóa document không
+xóa component asset cùng ID. **Issue vẫn OPEN:** chưa có nút catalogue/delete/
+discard và chưa sửa save-before-switch của placeholder; không gọi API nền là UX
+đã hoàn tất. Tiếp tục D02–D04/D07 theo tài liệu 03.
+
 **Người dùng thấy:** dropdown có hai mục Untitled component cùng mục Column;
 không tìm thấy nút xóa những bản chưa đưa vào thư viện component/công trình.
 Các mục tồn tại gây rối danh sách. Ảnh xác nhận tên trùng và thiếu thao tác quản lý;

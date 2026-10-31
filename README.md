@@ -94,6 +94,9 @@ Document, component, pack/profile lưu trong IndexedDB theo origin. Đổi IP/c�
 trình duyệt hoặc xóa storage có thể làm mất quyền truy cập dữ liệu cũ. **Chưa có
 autosave/crash recovery**; lưu thường xuyên và xuất JSON backup. JSON không nhúng
 resource pack/profile; giữ file nguồn để nhập lại khi chuyển máy.
+Save có kiểm tra phiên bản lưu để tránh ghi đè từ phiên khác. Nếu gặp conflict,
+xuất JSON giữ chỉnh sửa local trước khi reload/mở lại bản đã lưu. Chưa có UI
+quản lý/xóa bản làm dở; nền repository đã sẵn sàng cho bước đó trong roadmap.
 
 ```powershell
 fnm exec --using 24.19.0 pnpm.cmd check
@@ -104,4 +107,4 @@ Code gate, production browser smoke và game oracle có hướng dẫn tập tru
 chưa kiểm chứng nằm trong [hiện trạng](docs/03_STATUS_AND_ROADMAP.md).
 
 Không đóng gói game JAR, extracted textures/profile, secrets, cache, world thử
-hoặc browser storage vào Git/build. Git chưa có commit/remote/push ở mốc tổng hợp.
+hoặc browser storage vào Git/build. Không tự commit/push khi chưa được yêu cầu.

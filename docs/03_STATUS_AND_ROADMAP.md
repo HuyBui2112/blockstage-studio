@@ -231,8 +231,8 @@ Các rủi ro tìm thấy từ source, **chưa phải lỗi đã tái hiện ho�
   NBT vào field tùy ý. Opaque preservation không đồng nghĩa hiểu cách transform.
 - Cap 100k là giới hạn document; 1M cần thiết kế dữ liệu/work budget riêng. Export
   cap 48 lặp ở preflight/writer là policy, không phải giới hạn chung của NBT.
-- Chưa có HEAD commit; plain `git diff` không đủ review untracked files. Lập
-  manifest/hash baseline trước implementation; không tự commit/reset/push.
+- Baseline nay đã có HEAD (đối chiếu lại 31/10/2026); plain `git diff` vẫn không
+  đủ review untracked files. Kiểm cả status/file mới; không tự commit/reset/push.
 
 ## 2. Định nghĩa hoàn thiện theo release
 
@@ -338,11 +338,33 @@ chu trình ở lần kiểm tài liệu này. Đây là kiểm tra cấu trúc k
 minh task đã được triển khai hoặc thời gian hoàn tất. Đọc §5 để chọn wave đầu,
 không giao toàn bộ catalogue cùng lúc.
 
-**Tất cả task là TODO**. `—` chỉ cần nền M0. Dependency phải đã tích hợp/review,
+**Task mặc định TODO**, trừ phần đã ghi nhận dưới đây. `—` chỉ cần nền M0. Dependency phải đã tích hợp/review,
 không chỉ agent báo xong. Path mới dưới đây là **dự kiến** để phân ownership, chưa
 tồn tại hoặc chưa được quyết định. Integrator giữ shared UI/schema/session.
 Mỗi dòng là đầu ra review được; dòng ghi rõ “chia theo family” phải tách ID con
 trước khi giao, không đưa nguyên cả hệ thống cho một agent.
+
+### Tiến độ triển khai — 31/10/2026
+
+- **D01 VERIFIED trong scope repository editor hiện tại:** IndexedDB v6 thêm
+  revision sidecar, không rewrite records v5; đọc legacy, bỏ qua và báo record sai,
+  Save CAS + snapshot/revision/preference atomic, remove CAS + tombstone.
+  Đường Save hiện tại đã dùng repository, epoch/snapshot ack và báo conflict giữ
+  local edits; không bypass CAS qua storage API cũ. Không có dependency mới.
+- **K04 subset repository REVIEWED**, **K07a một phần:** epoch và repository seam
+  đã nối; local committed revision/draft controller còn thiếu. K04 chưa VERIFIED
+  toàn bộ. K02/K03/K05/K06 và các task khác giữ TODO như catalogue.
+- Kiểm chứng: code gate **262/262 test, 25 file**, typecheck/lint/build; native
+  browser dùng hai connection IDB độc lập, Save đảo thứ tự, tombstone chống
+  resurrection, rollback lỗi quota giả lập, upgrade v5/abort giữ dữ liệu và invalid
+  records không bị ghi đè. Production UI kiểm Save/Undo/reload và edit-during-await,
+  conflict giữ local data. Đây chưa phải hai tab app/live invalidation hoặc
+  crash recovery/quota thật; D07 vẫn TODO. Smoke script tự bundle fixture riêng
+  trong memory, không thêm test code/game assets vào bản phân phối.
+- **Tiếp theo:** hoàn thiện contract K04 còn lại cho D02/D03, đưa D04 quản lý/xóa
+  saved documents và discard bản làm dở vào slice UI đầu tiên. BUG-07 vẫn OPEN;
+  chưa có nút xóa, vẫn còn save-before-switch tạo Saved cho placeholder rỗng.
+  Chưa bật autosave trước khi hoàn thành lifecycle/delete/discard và kiểm thử.
 
 ### K — Hợp đồng và baseline
 
@@ -558,7 +580,7 @@ rộng vẫn portable. Q07 lặp đường này với pinned linked dependency c
   Consumer có thể viết từ
   contract duyệt, nhưng không VERIFIED trước integration thực với producer.
   Mock không thay browser/game verification cuối.
-- Workspace chưa có HEAD: disjoint paths và manifest/hash baseline trước. Chỉ cân
+- Khi workspace chưa có HEAD: disjoint paths và manifest/hash baseline trước. Chỉ cân
   nhắc worktrees sau checkpoint được user yêu cầu; không tự commit/reset/push.
 - Đọc file ngoài ownership được; sửa phải xin integrator điều phối. Contract thay
   đổi thì dừng consumer phụ thuộc, version contract và gửi diff cho các agent.

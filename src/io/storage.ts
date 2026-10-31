@@ -2,13 +2,19 @@ import { projectSchema, type Project } from '../core/schema'
 import type { ResourcePack } from './resources'
 import type { Material } from '../core/catalog'
 import type { GameProfile } from '../core/profile'
-import { componentAssetSchema, editorDocumentSchema, type ComponentAsset, type EditorDocument } from '../editor/model'
+import { componentAssetSchema, type ComponentAsset } from '../editor/model'
 
 let opened: Promise<IDBDatabase> | undefined
-function db() {
+export const STORAGE_VERSION = 6
+export function upgradeStorageDatabase(database: IDBDatabase) {
+  for (const name of ['projects', 'packs', 'catalogs', 'profiles', 'preferences', 'editorDocuments', 'componentAssets', 'editorRevisions']) {
+    if (!database.objectStoreNames.contains(name)) database.createObjectStore(name, { keyPath: 'id' })
+  }
+}
+export function openStorageDatabase() {
   opened ??= new Promise((resolve, reject) => {
-    const req = indexedDB.open('blockstage-studio', 5)
-    req.onupgradeneeded = () => { for (const name of ['projects', 'packs', 'catalogs','profiles','preferences','editorDocuments','componentAssets']) if (!req.result.objectStoreNames.contains(name)) req.result.createObjectStore(name, { keyPath: 'id' }) }
+    const req = indexedDB.open('blockstage-studio', STORAGE_VERSION)
+    req.onupgradeneeded = () => upgradeStorageDatabase(req.result)
     let blocked = false
     req.onblocked = () => { blocked = true; opened = undefined; reject(new Error('Close older Blockstage tabs, then reload to upgrade local storage. Your data is preserved.')) }
     req.onsuccess = () => {
@@ -21,7 +27,7 @@ function db() {
   return opened
 }
 async function operation<T>(store: string, mode: IDBTransactionMode, work: (s: IDBObjectStore) => IDBRequest): Promise<T> {
-  const database = await db()
+  const database = await openStorageDatabase()
   return new Promise((resolve, reject) => {
     const tx = database.transaction(store, mode), req = work(tx.objectStore(store))
     tx.oncomplete = () => resolve(req.result as T)
@@ -35,7 +41,7 @@ export const storage = {
   packs: () => operation<ResourcePack[]>('packs', 'readonly', s => s.getAll()),
   savePack: (p: ResourcePack) => operation('packs', 'readwrite', s => s.put(p)),
   savePacks: async (packs: ResourcePack[]) => {
-    const database = await db()
+    const database = await openStorageDatabase()
     await new Promise<void>((resolve, reject) => {
       const tx = database.transaction('packs', 'readwrite')
       tx.oncomplete = () => resolve()
@@ -50,8 +56,6 @@ export const storage = {
   saveProfile: (value: GameProfile) => operation('profiles','readwrite',s=>s.put({id:'26.2',value})),
   activeProject: () => operation<{id:string;value:string}|undefined>('preferences','readonly',s=>s.get('active-project')),
   setActiveProject: (value:string) => operation('preferences','readwrite',s=>s.put({id:'active-project',value})),
-  editorDocuments: () => operation<unknown[]>('editorDocuments', 'readonly', s => s.getAll()),
-  saveEditorDocument: (document: EditorDocument) => operation('editorDocuments', 'readwrite', s => s.put(editorDocumentSchema.parse(document))),
   componentAssets: () => operation<unknown[]>('componentAssets', 'readonly', s => s.getAll()),
   saveComponentAsset: (asset: ComponentAsset) => operation('componentAssets', 'readwrite', s => s.put(componentAssetSchema.parse(asset))),
   removeComponentAsset: (id: string) => operation('componentAssets', 'readwrite', s => s.delete(id)),
