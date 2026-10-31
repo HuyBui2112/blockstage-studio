@@ -146,8 +146,10 @@ nếu thiếu/mismatch. Transaction chỉ thành công tại `oncomplete`; versi
 
 Architecture và Component có document/history/selection riêng. Preview chỉ đọc
 document nguồn; Assets preview hoàn toàn tách khỏi công trình. Save lưu snapshot;
-New/Open/Import/Edit component lưu draft trước khi chuyển và kiểm document chưa
-đổi trong lúc await. Chọn asset, camera, ghost hoặc mở export không tạo history.
+New/Open/Import/Edit component lưu bản có sửa trước khi chuyển; placeholder mới
+chưa sửa và checkpoint sạch không tạo thêm Saved. `pristine` theo identity/history,
+không suy từ tên Untitled hoặc số cell; Save chủ động vẫn lưu bản rỗng.
+Chọn asset, camera, ghost hoặc mở export không tạo history.
 Chưa có autosave/crash recovery hoặc Undo journal qua reload; xem backlog tài liệu 03.
 
 `src/io/editor-repository.ts` là đường đọc/ghi editor documents. Save nhận snapshot
@@ -160,10 +162,32 @@ vẫn Unsaved. Save chồng trong một workspace bị từ chối để retry s
 
 Repository có remove CAS: xóa snapshot, giữ tombstone và chỉ bỏ preference đang
 trỏ đúng ID trong cùng transaction; không xóa asset/copy/workspace khác. Token cũ
-và `null` không thể ghi lại ID đã xóa. Chưa có UI Delete/Restore hoặc tự dọn
-tombstone; đây là nền D01 cho D04, không phải catalogue đã hoàn thành.
+và `null` không thể ghi lại ID đã xóa. Chưa có restore document đã xóa hoặc tự dọn
+tombstone. `activate` so token khi mở/restore checkpoint rồi ghi preference trong
+transaction để thao tác mở đến muộn không phục hồi pointer đã xóa. Save metadata
+ngoài document hiện tại dùng `activate:false`, không đổi active preference.
+
+`DocumentManager.tsx` lazy-load từ nút Documents: tìm theo tên/ID, lọc workspace,
+40 hàng mỗi trang, trạng thái Current/Saved/Not saved, cell count/version/ID và
+thời điểm lưu nếu có. `updatedAt` chỉ để hiển thị/sắp xếp, không dùng làm CAS;
+record cũ không có timestamp vẫn đọc được, không dựng ngày giả. Đổi tên active
+chỉ khi sạch; dirty document đổi tên tại thanh chính rồi Save hoặc discard trước.
+Xóa/discard có xác nhận theo snapshot đã xem. Lỗi transaction giữ hàng và local
+data; active delete chuyển sang placeholder mới, xóa matching preference, reset
+selection/history. Discard trở lại Saved checkpoint hoặc bỏ document chưa Save;
+không delete Saved. Đây là IO/lifecycle, không tạo command để Undo phục hồi file.
+
+New/open/import/edit component/publish/rename/delete/discard khóa workspace trong
+lúc await; Save riêng vẫn cho sửa tiếp. Ref slot đồng bộ cùng state update để
+callback tiếp theo không dùng token đã cũ trong cùng tab. Component asset và bản
+làm việc mới dùng ID khác nhau; `componentAssetId` tùy chọn trong revision sidecar
+giữ nguồn thư viện qua reload, không tạo linked instance. Binding cũ doc ID bằng
+asset ID vẫn đọc được; không rewrite ngầm. JSON document v2 không mang binding
+thư viện local; portable definitions sẽ do D05 xử lý. Publish thư viện và Save
+document là hai IO riêng: Save lỗi không rollback asset đã xuất bản.
 Conflict giữ document local, hướng dẫn xuất JSON backup rồi reload/mở bản lưu.
-Chưa có live invalidation/màn hình merge giữa tab; controller D02/D03/D07 sẽ bổ sung.
+Chưa có live invalidation/màn hình merge giữa tab; Documents Refresh đọc lại list,
+CAS từ chối stale rename/delete/save. Controller D02/D03/D07 sẽ bổ sung recovery.
 
 ## 5. Tương tác, transform và placement
 
@@ -537,8 +561,8 @@ resolution UI bên dưới vẫn là hợp đồng dự kiến; không coi toàn
   Catalogue phải phân biệt bản trùng tên bằng ID/metadata và có rename/delete.
 - Xóa active doc phải nhất quán với preference, phần sửa chưa lưu và doc kế tiếp;
   mọi Save/autosave/save-before-switch cũ phải bị invalidated, kể cả từ tab khác.
-  Chỉ bỏ mục khỏi UI sau transaction thành công. API remove CAS đã có; UI và
-  controller vòng đời này chưa triển khai.
+  Chỉ bỏ mục khỏi UI sau transaction thành công. Catalogue/delete/explicit discard
+  cho v2 hiện tại đã có (§4.2); draft recovery/scheduler chưa triển khai.
 - Multi-tab có invalidation/conflict UI; Web Locks/BroadcastChannel nếu dùng cần
   feature detect, nhưng transactional compare-and-set vẫn là nền đảm bảo.
 - Store wrapper/version mới phải đọc records v5 cũ không phá hủy; migration test

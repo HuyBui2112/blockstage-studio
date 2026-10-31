@@ -2,7 +2,10 @@ import type { CSSProperties } from 'react'
 
 export type IconName = 'cube' | 'blocks' | 'entity' | 'search' | 'close' | 'plus' | 'check' | 'chevron' | 'chevron-up' | 'chevron-down' | 'arrow-up' | 'arrow-down' | 'folder' | 'layers' | 'settings' | 'help' | 'grid' | 'frame' | 'orbit' | 'pan' | 'zoom-in' | 'zoom-out' | 'perspective' | 'sun' | 'eye' | 'eye-off' | 'trash' | 'upload' | 'file' | 'warning' | 'info' | 'refresh' | 'external' | 'menu' | 'sliders' | 'keyboard' | 'select' | 'box-select' | 'ungroup' | 'architecture' | 'save' | 'undo' | 'redo'
 
+  | 'rename'
+
 const paths: Record<IconName, React.ReactNode> = {
+  rename: <><path d="m15 4 5 5M4 20l5-1L21 7a2 2 0 0 0-5-5L4 14v6Z" /></>,
   select: <path d="m5 3 15 10-8 1-4 7-3-18Z" />,
   'box-select': <><path d="M8 3H3v5m13-5h5v5M3 16v5h5m13-5v5h-5M11 3h2M3 11v2m18-2v2m-10 8h2" /><path d="m9 9 10 6-5 1-2 4-3-11Z" /></>,
   ungroup: <><rect x="3" y="3" width="7" height="7" rx="1" /><rect x="14" y="14" width="7" height="7" rx="1" /><path d="m5 15-3 3 3 3m13-18 3 3-3 3M2 18h7m6-12h6" /></>,

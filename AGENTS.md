@@ -42,7 +42,11 @@ Documentation is consolidated; future implementation starts from a user-authoriz
 slice. Do not treat the proposed next slice as already active.
 Editor document Save uses the CAS repository with v6 revision sidecars; never
 restore an unguarded snapshot writer. Save/remove and matching preference changes
-are transactional. Tombstoned IDs cannot be reused; catalogue/recovery UI remains planned.
+are transactional. Tombstoned IDs cannot be reused. Documents provides saved
+catalogue/rename/delete and explicit discard; recovery/autosave remains planned.
+Lifecycle operations lock their workspace; Save alone still permits editing.
+Never auto-save pristine placeholders on switch or reuse a component asset ID
+as its new working document ID. Library provenance lives in revision metadata.
 
 - Reuse the existing React/TypeScript/Three.js base and verified asset pipeline.
 - Keep existing project data and import/export/domain code intact during changes.

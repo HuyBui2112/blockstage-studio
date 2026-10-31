@@ -111,6 +111,27 @@ try {
     throw new Error(`Timeout: ${expression}\n${JSON.stringify({ errors, editor: await evaluate(`(()=>{const e=document.querySelector('.editor-diagnostics'),c=document.querySelector('canvas');return {snapshot:{...e?.dataset},canvas:{...c?.dataset},feedback:document.querySelector('.editor-feedback')?.textContent}})()`), body: await evaluate('document.body.innerText.slice(-2500)') })}`)
   }
   const ready = `document.querySelector('.app-shell')?.dataset.ready === 'true' && document.querySelector('canvas')`
+  async function createPeer() {
+    const { targetId } = await send('Target.createTarget', { url: 'about:blank' })
+    const { sessionId } = await send('Target.attachToTarget', { targetId, flatten: true })
+    const peerCommand = (method, params) => send(method, params, sessionId)
+    const peerEvaluate = async expression => {
+      const result = await peerCommand('Runtime.evaluate', { expression, returnByValue: true, awaitPromise: true })
+      if (result.exceptionDetails) throw new Error(JSON.stringify(result.exceptionDetails))
+      return result.result.value
+    }
+    const peerUntil = async expression => {
+      for (let i = 0; i < 200; i++) {
+        if (await peerEvaluate(`Boolean(${expression})`)) return
+        await delay(100)
+      }
+      throw new Error(`Peer timeout: ${expression}`)
+    }
+    await peerCommand('Runtime.enable')
+    await peerCommand('Page.navigate', { url: process.env.BLOCKSTAGE_URL ?? 'http://127.0.0.1:5173/' })
+    await peerUntil(ready)
+    return { evaluate: peerEvaluate, until: peerUntil, close: () => send('Target.closeTarget', { targetId }) }
+  }
   const click = selector => evaluate(`(() => { const element = document.querySelector(${JSON.stringify(selector)}); if (!element || element.disabled) throw new Error('Missing/enabled control: ' + ${JSON.stringify(selector)}); element.click(); })()`)
   const aria = label => `[aria-label=${JSON.stringify(label)}]`
   async function input(selector, value) {
@@ -369,7 +390,7 @@ try {
   const actualProject = await evaluate(`new Promise((resolve,reject) => { const request=indexedDB.open('blockstage-studio'); request.onerror=()=>reject(request.error); request.onsuccess=()=>{ const db=request.result; const query=db.transaction('projects').objectStore('projects').get(${JSON.stringify(preserved.id)}); query.onsuccess=()=>{db.close();resolve(query.result)}; query.onerror=()=>reject(query.error); }; })`)
   assert.deepEqual(actualProject, preserved, 'Resource workflow must not rewrite existing projects')
   if (profilePath && process.env.BLOCKSTAGE_RESOURCE_PACK) {
-    await runEditorScenarios({ command, evaluate, until, click, aria, input, upload, key, screenshot, directory, profilePath, closeManager })
+    await runEditorScenarios({ command, evaluate, until, click, aria, input, upload, key, screenshot, directory, profilePath, closeManager, createPeer })
   }
   assert.deepEqual(errors, [], 'Browser must have no runtime exceptions')
   console.log(JSON.stringify({

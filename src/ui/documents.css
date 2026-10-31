@@ -1,0 +1,25 @@
+.documents-dialog .documents-content { display:flex; flex-direction:column; gap:18px }
+.document-current { display:flex; align-items:center; gap:12px; padding-bottom:17px; border-bottom:1px solid var(--border) }
+.document-current>div { flex:1; min-width:0 }
+.document-current strong,.saved-document strong { display:block; overflow-wrap:anywhere; font-size:12px; font-weight:550 }
+.document-current small,.saved-document small { display:block; color:var(--muted); font-size:10px; margin-top:6px }
+.document-current>svg { color:var(--accent); flex-shrink:0 }
+.document-search { display:flex; align-items:center; gap:10px }
+.document-search input { flex:1; min-width:0; padding:10px 12px }
+.document-list { display:flex; flex-direction:column; gap:5px; min-height:90px }
+.saved-document { display:flex; align-items:center; gap:5px; padding:6px; border:1px solid var(--border); border-radius:6px }
+.saved-document.current { border-color:var(--accent) }
+.saved-document-open { display:flex; align-items:center; justify-content:flex-start; gap:12px; flex:1; min-width:0; padding:8px; background:transparent; border:0; text-align:left }
+.saved-document-open>div { min-width:0 }
+.saved-document-open>svg { flex-shrink:0; color:var(--muted) }
+.saved-document strong>span { margin-left:9px; font-size:9px; font-weight:400; color:var(--accent) }
+.saved-document code { font-size:10px }
+.documents-empty { display:flex; align-items:center; justify-content:center; gap:12px; padding:28px 10px; color:var(--muted); font-size:12px }
+.document-confirm { padding:16px; border:1px solid var(--accent); border-radius:6px; background:var(--panel) }
+.document-confirm strong { font-size:12px; overflow-wrap:anywhere }
+.document-confirm p { color:var(--soft); font-size:11px; line-height:1.6; margin:10px 0 14px }
+.document-confirm input { display:block; width:100%; margin:12px 0; padding:9px }
+.document-confirm>div { display:flex; justify-content:flex-end; gap:8px }
+.document-manager-error { color:var(--accent); font-size:11px; line-height:1.6; overflow-wrap:anywhere }
+.documents-footer>span { color:var(--muted); font-size:11px }
+@media (max-width:620px) { .document-current { flex-wrap:wrap } .document-current>.button { margin-left:31px } .saved-document { gap:0 } .saved-document-open { padding:6px; gap:8px } }

@@ -1,10 +1,10 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type { Material } from '../core/catalog'
 import type { NeighborRules } from '../core/profile'
 import { planNeighborConnections } from './neighbors'
 import { projectSchema, type Vec3 } from '../core/schema'
 import { storage } from '../io/storage'
-import { editorRepository, type RepositoryToken } from '../io/editor-repository'
+import { editorRepository, RepositoryConflict, type RepositoryToken, type StoredEditorDocument } from '../io/editor-repository'
 import { createHistory, executeHistory, redoHistory, undoHistory, type EditorHistory } from './history'
 import { componentAssetSchema, editorDocumentSchema, fromLegacyProject, newEditorDocument, validateDocument, type ComponentAsset, type CoordinateSpace, type EditorDocument, type PivotMode, type QuarterTurn } from './model'
 import { componentFromSelection, groupObjects, insertObject, moveObjects, previewTransform, removeObjects, rotateObjects, setObjectPivot, ungroupObjects, updateObjectsState } from './operations'
@@ -13,23 +13,38 @@ import type { BlockState } from '../core/schema'
 
 export type EditorScope = 'architecture' | 'component'
 export type TransformIntent = { kind: 'move'; delta: Vec3 } | { kind: 'rotate'; turns: number }
-type Slot = { history: EditorHistory; selection: string[]; saved: EditorDocument | null; editingAssetId: string | null; epoch: string; token: RepositoryToken | null }
+type Slot = { history: EditorHistory; selection: string[]; saved: EditorDocument | null; editingAssetId: string | null; epoch: string; token: RepositoryToken | null; pristine: boolean }
 type Preview = { scope: EditorScope; result: ReturnType<typeof previewTransform> }
 const messageOf = (error: unknown) => error instanceof Error ? error.message : String(error)
-const makeSlot = (scope: EditorScope): Slot => ({ history: createHistory(newEditorDocument(scope)), selection: [], saved: null, editingAssetId: null, epoch: crypto.randomUUID(), token: null })
+const makeSlot = (scope: EditorScope): Slot => ({ history: createHistory(newEditorDocument(scope)), selection: [], saved: null, editingAssetId: null, epoch: crypto.randomUUID(), token: null, pristine: true })
+const sameToken = (a: RepositoryToken | null, b: RepositoryToken) => a?.generation === b.generation && a.version === b.version
 
 export function useEditorSession(catalog: Material[], neighborRules?: NeighborRules) {
   const [autoConnections, setAutoConnections] = useState<Record<EditorScope,boolean>>({architecture:false,component:false})
   const [connectionNotes, setConnectionNotes] = useState<{scope:EditorScope;document:EditorDocument;notes:string[]}|null>(null)
-  const [slots, setSlots] = useState<Record<EditorScope, Slot>>(() => ({ architecture: makeSlot('architecture'), component: makeSlot('component') }))
-  const [documents, setDocuments] = useState<EditorDocument[]>([])
+  const [slots, setSlotState] = useState<Record<EditorScope, Slot>>(() => ({ architecture: makeSlot('architecture'), component: makeSlot('component') }))
+  const [busy, setBusy] = useState<Record<EditorScope, boolean>>({ architecture: false, component: false })
   const [components, setComponents] = useState<ComponentAsset[]>([])
   const [ready, setReady] = useState(false)
   const [error, setError] = useState('')
   const [preview, setPreview] = useState<Preview | null>(null)
   const currentSlots = useRef(slots)
   const saving = useRef(new Set<EditorScope>())
-  useEffect(() => { currentSlots.current = slots }, [slots])
+  const lifecycle = useRef(new Set<EditorScope>())
+  function setSlots(update: (previous: Record<EditorScope, Slot>) => Record<EditorScope, Slot>) {
+    const next = update(currentSlots.current)
+    currentSlots.current = next
+    setSlotState(next)
+  }
+  async function exclusive(scope: EditorScope, work: () => Promise<void>) {
+    if (lifecycle.current.has(scope) || saving.current.has(scope)) { setError('An operation is in progress. Retry when it finishes.'); return false }
+    lifecycle.current.add(scope)
+    setBusy(previous => ({ ...previous, [scope]: true }))
+    setPreview(null)
+    try { await work(); setError(''); return true }
+    catch (error) { setError(messageOf(error)); return false }
+    finally { lifecycle.current.delete(scope); setBusy(previous => ({ ...previous, [scope]: false })) }
+  }
 
   useEffect(() => {
     let active = true
@@ -48,7 +63,6 @@ export function useEditorSession(catalog: Material[], neighborRules?: NeighborRu
         else issues.push('An invalid component asset was left untouched in storage.')
       }
       else issues.push(messageOf(results[1].reason))
-      setDocuments(restoredDocuments)
       setComponents(restoredComponents)
       setSlots(previous => {
         const next = { ...previous }
@@ -59,7 +73,9 @@ export function useEditorSession(catalog: Material[], neighborRules?: NeighborRu
           if (doc) {
             const history = createHistory(doc)
             const token = results[0].status === 'fulfilled' ? results[0].value.records.find(record => record.document.id === doc.id)!.token : null
-            next[scope] = { history, selection: [], saved: history.document, editingAssetId: scope === 'component' && restoredComponents.some(asset => asset.id === doc.id) ? doc.id : null, epoch: crypto.randomUUID(), token }
+            const record = results[0].status === 'fulfilled' ? results[0].value.records.find(record => record.document.id === doc.id)! : null
+            const assetId = record?.componentAssetId ?? doc.id
+            next[scope] = { history, selection: [], saved: history.document, editingAssetId: scope === 'component' && restoredComponents.some(asset => asset.id === assetId) ? assetId : null, epoch: crypto.randomUUID(), token, pristine: false }
           }
         }
         return next
@@ -70,6 +86,7 @@ export function useEditorSession(catalog: Material[], neighborRules?: NeighborRu
   }, [])
 
   function commit(scope: EditorScope, next: EditorDocument, label: string, selection?: string[]) {
+    if (lifecycle.current.has(scope)) throw new Error('A document operation is in progress')
     const before = slots[scope].history.document
     const plan=autoConnections[scope] && neighborRules ? planNeighborConnections(before,next,neighborRules) : {document:next,notes:[]}
     next=plan.document
@@ -79,7 +96,8 @@ export function useEditorSession(catalog: Material[], neighborRules?: NeighborRu
       const slot = previous[scope]
       if (slot.history.document !== before) return previous
       const available = new Set(next.objects.map(object => object.id))
-      return { ...previous, [scope]: { ...slot, history: executeHistory(slot.history, next, label), selection: (selection ?? slot.selection).filter(id => available.has(id)) } }
+      const history = executeHistory(slot.history, next, label)
+      return { ...previous, [scope]: { ...slot, history, pristine: slot.pristine && history === slot.history, selection: (selection ?? slot.selection).filter(id => available.has(id)) } }
     })
     setPreview(null)
     setError('')
@@ -89,6 +107,7 @@ export function useEditorSession(catalog: Material[], neighborRules?: NeighborRu
     catch (error) { setError(messageOf(error)); return false }
   }
   function select(scope: EditorScope, ids: string[], toggle: boolean) {
+    if (lifecycle.current.has(scope)) return
     setPreview(null)
     setSlots(previous => {
       const slot = previous[scope], available = new Set(slot.history.document.objects.map(object => object.id))
@@ -98,6 +117,7 @@ export function useEditorSession(catalog: Material[], neighborRules?: NeighborRu
     })
   }
   function history(scope: EditorScope, redo: boolean) {
+    if (lifecycle.current.has(scope)) return
     setPreview(null)
     setError('')
     setSlots(previous => {
@@ -106,6 +126,7 @@ export function useEditorSession(catalog: Material[], neighborRules?: NeighborRu
     })
   }
   function transform(scope: EditorScope, intent: TransformIntent, phase: 'preview' | 'commit' | 'cancel', space: CoordinateSpace, pivot: PivotMode) {
+    if (lifecycle.current.has(scope)) return
     if (phase === 'cancel') { setPreview(null); setError(''); return }
     const slot = slots[scope]
     const result = previewTransform(slot.history.document, slot.selection, intent, space, pivot, catalog, autoConnections[scope]?neighborRules:undefined)
@@ -143,85 +164,118 @@ export function useEditorSession(catalog: Material[], neighborRules?: NeighborRu
   function rename(scope: EditorScope, name: string) {
     perform(scope, 'Rename document', document => ({ ...document, name: name.trim() || 'Untitled' }))
   }
-  async function save(scope: EditorScope) {
-    if (saving.current.has(scope)) { setError('A save is already in progress. Retry when it finishes.'); return false }
+  async function persist(scope: EditorScope) {
+    if (saving.current.has(scope)) throw new Error('A save is already in progress. Retry when it finishes.')
     saving.current.add(scope)
     const slot = currentSlots.current[scope], snapshot = slot.history.document
     try {
-      const record = await editorRepository.save(snapshot, slot.token)
-      setDocuments(previous => [...previous.filter(document => document.id !== snapshot.id), snapshot])
+      const record = await editorRepository.save(snapshot, slot.token, { componentAssetId: slot.editingAssetId ?? undefined })
       setSlots(previous => previous[scope].epoch === slot.epoch ? ({ ...previous, [scope]: { ...previous[scope], saved: snapshot, token: record.token } }) : previous)
       setError('')
       return true
-    } catch (error) { setError(messageOf(error)); return false }
+    } catch (error) { setError(messageOf(error)); throw error }
     finally { saving.current.delete(scope) }
   }
+  async function save(scope: EditorScope) {
+    if (lifecycle.current.has(scope)) { setError('A document operation is in progress. Retry when it finishes.'); return false }
+    try { return await persist(scope) } catch (error) { setError(messageOf(error)); return false }
+  }
+  async function preserve(scope: EditorScope) {
+    const slot = currentSlots.current[scope]
+    if ((slot.pristine && !slot.saved) || slot.saved === slot.history.document) return
+    await persist(scope)
+  }
   async function newDocument(scope: EditorScope) {
-    const startingDocument = slots[scope].history.document
-    if (!await save(scope)) return
-    if (currentSlots.current[scope].history.document !== startingDocument) { setError('The document changed during save. Retry New when the save finishes.'); return }
-    setPreview(null)
-    setSlots(previous => previous[scope].history.document === startingDocument ? ({ ...previous, [scope]: makeSlot(scope) }) : previous)
+    return exclusive(scope, async () => {
+      if (currentSlots.current[scope].pristine && !currentSlots.current[scope].saved) return
+      await preserve(scope)
+      await editorRepository.activate(scope, null, null)
+      setSlots(previous => ({ ...previous, [scope]: makeSlot(scope) }))
+    })
   }
   async function open(scope: EditorScope, document: EditorDocument) {
-    const startingDocument = slots[scope].history.document
-    if (!await save(scope)) return
-    if (currentSlots.current[scope].history.document !== startingDocument) { setError('The document changed during save. Retry Open after saving.'); return }
-    try {
+    return exclusive(scope, async () => {
+      await preserve(scope)
       const record = await editorRepository.load(document.id)
       if (!record || record.document.workspace !== scope) throw new Error('This saved document is no longer available. Your current document was kept.')
-      if (currentSlots.current[scope].history.document !== startingDocument) throw new Error('The document changed while opening. Retry after saving.')
-      await storage.setEditorPreference(scope, document.id)
-      setPreview(null)
+      await editorRepository.activate(scope, document.id, record.token)
       setSlots(previous => {
-        if (previous[scope].history.document !== startingDocument) return previous
         const history = createHistory(record.document)
-        return { ...previous, [scope]: { history, selection: [], saved: history.document, token: record.token, epoch: crypto.randomUUID(), editingAssetId: scope === 'component' && components.some(asset => asset.id === document.id) ? document.id : null } }
+        const assetId = record.componentAssetId ?? record.document.id
+        return { ...previous, [scope]: { history, selection: [], saved: history.document, token: record.token, epoch: crypto.randomUUID(), pristine: false, editingAssetId: scope === 'component' && components.some(asset => asset.id === assetId) ? assetId : null } }
       })
-    } catch (error) { setError(messageOf(error)) }
+    })
   }
   async function importDocument(scope: EditorScope, file: File) {
-    const startingDocument = slots[scope].history.document
-    try {
+    return exclusive(scope, async () => {
       if (file.size > 32 * 1024 ** 2) throw new Error('Editor JSON must be at most 32 MiB')
       const raw = JSON.parse(await file.text()) as { schemaVersion?: number }
       const document = raw.schemaVersion === 2 ? editorDocumentSchema.parse(raw) : fromLegacyProject(projectSchema.parse(raw))
       validateDocument(document, catalog)
-      if (!await save(scope)) return
-      if (currentSlots.current[scope].history.document !== startingDocument) { setError('The document changed while importing. Retry after saving.'); return }
+      await preserve(scope)
       const imported = { ...document, id: crypto.randomUUID(), workspace: scope }
-      setPreview(null)
-      setSlots(previous => previous[scope].history.document === startingDocument ? ({ ...previous, [scope]: { history: createHistory(imported), selection: [], saved: null, editingAssetId: null, token: null, epoch: crypto.randomUUID() } }) : previous)
-    } catch (error) { setError(messageOf(error)) }
+      await editorRepository.activate(scope, null, null)
+      setSlots(previous => ({ ...previous, [scope]: { history: createHistory(imported), selection: [], saved: null, editingAssetId: null, token: null, epoch: crypto.randomUUID(), pristine: false } }))
+    })
   }
   async function saveComponent(scope: EditorScope, selectionOnly = true) {
-    try {
-      const slot = slots[scope], doc = slot.history.document
+    return exclusive(scope, async () => {
+      const slot = currentSlots.current[scope], doc = slot.history.document
       const ids = selectionOnly ? slot.selection : doc.objects.map(object => object.id)
       const asset = componentFromSelection(doc, ids, scope === 'component' ? doc.name : `Component ${components.length + 1}`)
-      if (scope === 'component') asset.id = slot.editingAssetId ?? doc.id
+      if (scope === 'component') asset.id = slot.editingAssetId ?? crypto.randomUUID()
       await storage.saveComponentAsset(asset)
       setComponents(previous => [...previous.filter(component => component.id !== asset.id), asset])
       if (scope === 'component') {
         setSlots(previous => previous.component.history.document.id === doc.id ? ({ ...previous, component: { ...previous.component, editingAssetId: asset.id } }) : previous)
-        if (!await save('component')) return
+        await persist('component')
       }
       setError('')
-      return asset
-    } catch (error) { setError(messageOf(error)) }
+    })
+  }
+  const refreshDocuments = useCallback(async () => {
+    return editorRepository.list()
+  }, [])
+  async function renameSaved(record: StoredEditorDocument, name: string, expectedCurrent: EditorDocument) {
+    const scope = record.document.workspace
+    return exclusive(scope, async () => {
+      const slot = currentSlots.current[scope], active = slot.history.document.id === record.document.id
+      if (active && (slot.history.document !== expectedCurrent || slot.saved !== slot.history.document)) throw new Error('Save or discard current edits before renaming this saved document.')
+      if (active && !sameToken(slot.token, record.token)) throw new RepositoryConflict()
+      if (name.trim() === record.document.name) return
+      const next = editorDocumentSchema.parse({ ...record.document, name: name.trim() })
+      const updated = await editorRepository.save(next, record.token, { activate: false })
+      if (active) setSlots(previous => ({ ...previous, [scope]: { ...previous[scope], history: executeHistory(previous[scope].history, next, 'Rename document'), saved: next, token: updated.token } }))
+    })
+  }
+  async function deleteDocument(record: StoredEditorDocument, expectedCurrent: EditorDocument) {
+    const scope = record.document.workspace
+    return exclusive(scope, async () => {
+      const slot = currentSlots.current[scope], active = slot.history.document.id === record.document.id
+      if (active && slot.history.document !== expectedCurrent) throw new Error('The current document changed. Review the delete confirmation again.')
+      if (active && !sameToken(slot.token, record.token)) throw new RepositoryConflict()
+      await editorRepository.remove(record.document.id, record.token, scope)
+      if (active) setSlots(previous => ({ ...previous, [scope]: makeSlot(scope) }))
+    })
+  }
+  async function discardChanges(scope: EditorScope, expectedCurrent: EditorDocument) {
+    return exclusive(scope, async () => {
+      const slot = currentSlots.current[scope]
+      if (slot.history.document !== expectedCurrent) throw new Error('The current document changed. Review the discard confirmation again.')
+      await editorRepository.activate(scope, slot.saved?.id ?? null, slot.token)
+      if (slot.saved) {
+        const history = createHistory(slot.saved)
+        setSlots(previous => ({ ...previous, [scope]: { ...slot, history, saved: history.document, selection: [], epoch: crypto.randomUUID() } }))
+      } else setSlots(previous => ({ ...previous, [scope]: makeSlot(scope) }))
+    })
   }
   async function editComponent(asset: ComponentAsset) {
-    const startingDocument = slots.component.history.document
-    if (!await save('component')) return false
-    if (currentSlots.current.component.history.document !== startingDocument) { setError('The component draft changed during save. Retry after saving.'); return false }
-    let token: RepositoryToken | null
-    try { token = (await editorRepository.load(asset.id))?.token ?? null }
-    catch (error) { setError(messageOf(error)); return false }
-    if (currentSlots.current.component.history.document !== startingDocument) { setError('The component changed while opening. Retry after saving.'); return false }
-    const document = { ...newEditorDocument('component'), id: asset.id, name: asset.name, objects: structuredClone(asset.objects) }
-    setPreview(null)
-    setSlots(previous => previous.component.history.document === startingDocument ? ({ ...previous, component: { history: createHistory(document), selection: [], saved: null, editingAssetId: asset.id, token, epoch: crypto.randomUUID() } }) : previous)
-    return true
+    return exclusive('component', async () => {
+      await preserve('component')
+      const document = { ...newEditorDocument('component'), name: asset.name, objects: structuredClone(asset.objects) }
+      await editorRepository.activate('component', null, null)
+      setSlots(previous => ({ ...previous, component: { history: createHistory(document), selection: [], saved: null, editingAssetId: asset.id, token: null, epoch: crypto.randomUUID(), pristine: false } }))
+    })
   }
   function placeComponent(scope: EditorScope, asset: ComponentAsset, pos: Vec3, turns: QuarterTurn = 0) {
     try {
@@ -247,7 +301,7 @@ export function useEditorSession(catalog: Material[], neighborRules?: NeighborRu
     } catch (error) { setError(messageOf(error)) }
   }
   function configureConnections(scope:EditorScope,enabled:boolean){setPreview(null);setConnectionNotes(null);setAutoConnections(previous=>({...previous,[scope]:enabled}))}
-  return { autoConnections, connectionNotes, configureConnections, slots, documents, components, ready, error, setError, preview, cancelPreview: () => setPreview(null), select, history, transform, place, group, ungroup, remove, updateState, setPivot, move, rotate, rename, save, newDocument, open, importDocument, saveComponent, editComponent, placeComponent, importComponent, removeComponent }
+  return { busy, refreshDocuments, renameSaved, deleteDocument, discardChanges, autoConnections, connectionNotes, configureConnections, slots, components, ready, error, setError, preview, cancelPreview: () => setPreview(null), select, history, transform, place, group, ungroup, remove, updateState, setPivot, move, rotate, rename, save, newDocument, open, importDocument, saveComponent, editComponent, placeComponent, importComponent, removeComponent }
 }
 
 export type EditorSession = ReturnType<typeof useEditorSession>

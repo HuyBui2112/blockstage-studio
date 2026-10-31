@@ -22,7 +22,7 @@ sót nền tảng, nhưng chưa được gom thành một nguyên nhân khi chư
 | BUG-04 | Fence/wall phải chỉnh connection state bằng tay | **RESOLVED trong static scene scope:** opt-in fence/wall/gate auto connections, cùng preview/commit và Undo; dynamic shapes có reason giữ state | 521 actual-world fixtures; không full simulation/auto-pane | G02c/G02e, G04a/G04c, G07; pane khi mở rộng |
 | BUG-05 | Đặt đèn treo vào chain khó/sai vị trí hoặc bị đè | **PARTIAL / bounded fix:** mặt ô chain + Context hanging dọc + cảnh báo support hữu hạn; còn side fallback/fluid/support khác | Đã kiểm tra vanilla 26.2; Fabric chưa kiểm chứng | K05/K03, G01/G05/G07, V02 |
 | BUG-06 | Block mảnh/nhỏ khó click để chọn | **RESOLVED trong editor hiện hành:** click theo occupied cell gần nhất, không phụ thuộc mesh mảnh | Theo dõi scene lớn; chưa có GPU/performance claim | K05, V01/V02/V06, P02/P04 |
-| BUG-07 | Open saved tích tụ Untitled component/bản làm dở, không có nút xóa | **OPEN:** thiếu quản lý vòng đời document/draft; saved document khác component asset trong thư viện | Ưu tiên trong milestone quản lý dữ liệu/autosave, không để sau autosave | K04, D01–D04, D07 |
+| BUG-07 | Open saved tích tụ Untitled component/bản làm dở, không có nút xóa | **RESOLVED cho quản lý v2 hiện tại:** Documents mở/rename/delete, explicit discard, không Save placeholder pristine; recovery/live invalidation vẫn chưa có | Tiếp tục controller/recovery, không bật autosave ngầm | K04, D01–D04, D07 |
 
 BUG-05 đã có oracle lantern/chain riêng; fixture block khác không chứng minh luật
 treo đèn. Không tự gán mọi renderer hoặc block chức năng là lỗi. Nội dung “đã đọc
@@ -163,24 +163,39 @@ backup để bảo vệ công trình; (3) duplicate/repeat/dựng vùng và thay
 
 ## BUG-07 — Bản làm dở trong Open saved không có cách xóa
 
-**Tiến độ 31/10/2026:** đã có nền D01 (repository CAS, remove + tombstone,
-preference cleanup atomic và legacy read), đã nối Save hiện tại qua repository.
-Native-browser kiểm pending Save không resurrect ID đã xóa và xóa document không
-xóa component asset cùng ID. **Issue vẫn OPEN:** chưa có nút catalogue/delete/
-discard và chưa sửa save-before-switch của placeholder; không gọi API nền là UX
-đã hoàn tất. Tiếp tục D02–D04/D07 theo tài liệu 03.
+**Tiến độ 31/10/2026 — RESOLVED cho workflow document v2 hiện tại:** Documents
+thay dropdown Open saved, có search/open/rename/delete theo workspace, metadata
+phân biệt cùng tên; Discard changes giữ Saved checkpoint hoặc bỏ bản chưa Save.
+New pristine không tạo thêm Saved; Save rỗng chủ động được giữ. Xóa active có
+xác nhận gồm unsaved changes, xóa matching preference và reset history; Undo
+editing không phục hồi document đã xóa. Xóa không cascade sang component asset.
+ID bản làm việc của component mới độc lập với asset, binding thư viện giữ qua
+reload để xóa rồi mở lại/sửa component vẫn được. Không migrate records cũ ngầm.
+
+**Đã kiểm:** code gate 262/262 test, typecheck/lint/build; production browser mở/
+rename active/inactive, hai bản trùng tên khác ID, cancel, lỗi delete giả lập giữ
+row/storage, discard có/không Saved, Untitled có nội dung khi chuyển, Undo/reload,
+xóa rồi sửa lại component và publish sau reload. Hai app pages cùng origin kiểm
+stale delete bị chặn, peer Save không resurrect ID và giữ local edits. Ảnh
+`artifacts/editor-documents.png`, `artifacts/editor-documents-compact.png` (620px).
+Native repository còn thử late write/delete và activate đến muộn không phục hồi
+preference. Lỗi quota là fault injection, không tuyên bố đã làm đầy disk thật.
+
+**Còn ngoài scope:** D02/D03 recovery store/scheduler, autosave nền, live
+invalidation/merge và D07 recovery/portable suite. Dùng Refresh để đọc list tab
+khác; conflict hướng dẫn JSON backup rồi reload. Tài liệu 03 giữ thứ tự tiếp theo.
 
 **Người dùng thấy:** dropdown có hai mục Untitled component cùng mục Column;
 không tìm thấy nút xóa những bản chưa đưa vào thư viện component/công trình.
 Các mục tồn tại gây rối danh sách. Ảnh xác nhận tên trùng và thiếu thao tác quản lý;
 không chứng minh các document đó rỗng hoặc không còn giá trị.
 
-**Đã kiểm source:** Open saved liệt kê `session.documents`, lọc workspace; đây là
+**Nguyên nhân ở mốc tiếp nhận (trước sửa):** Open saved liệt kê `session.documents`, lọc workspace; đây là
 editor documents đã persist trong store `editorDocuments`, không phải danh sách
 `componentAssets`. `New`, `Open`, import JSON và Edit component gọi save-before-
 switch; `save` hiện ghi snapshot dù document còn tên mặc định hoặc chưa có nội dung.
-Cơ chế này có thể tạo nhiều bản làm dở/placeholder trong Open saved. Chưa có API
-removeEditorDocument hoặc UI xóa document; Remove component chỉ xóa asset thư viện.
+Cơ chế này có thể tạo nhiều bản làm dở/placeholder trong Open saved. Khi tiếp nhận
+chưa có API/UI xóa document; Remove component chỉ xóa asset thư viện.
 Chưa có store autosave/recovery riêng. Không gọi mọi mục Untitled là autosave draft,
 và không kết luận tất cả bản trong ảnh được tạo cùng một đường thao tác.
 
@@ -212,8 +227,10 @@ New nhiều lần trên document rỗng, bản Untitled có nội dung, discard 
 xóa active/inactive document, thư viện component độc lập, reload, Save/autosave
 đến muộn, hai tab và storage failure. Mục đã xóa không tự xuất hiện lại.
 
-**Trạng thái:** mới ghi yêu cầu và đọc source; chưa sửa chức năng, chưa chạy browser
-reproduction cho BUG-07. Không xóa hoặc chỉnh dữ liệu của người dùng.
+**Cách xác thực lại:** chạy production `test:browser` với JAR/profile local như
+tài liệu 02; suite `documents-browser-scenarios.mjs` dùng profile browser riêng.
+Chỉ các records/asset fixtures trong profile cô lập bị sửa/xóa, không dùng storage
+hoặc world cá nhân. Phạm vi chưa có recovery được giữ rõ ở trên.
 
 ## Ghi nhận ban đầu (giữ làm bối cảnh; trạng thái mới nằm ở các đợt sửa phía trên)
 

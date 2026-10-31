@@ -58,6 +58,9 @@ Mở URL Vite in ra, thường `http://127.0.0.1:5173/`.
    `G`/`R` transform, nhập số, `Enter`
    commit và `Esc` hủy. `Ctrl+G`/`Ctrl+Alt+G` Group/Ungroup;
    `Ctrl+Z`/`Ctrl+Shift+Z` Undo/Redo. **Save / Ctrl+S** lưu document.
+   **Documents** mở danh sách theo workspace để tìm, mở, đổi tên và xóa bản đã lưu.
+   **Discard changes** bỏ phần chưa lưu, giữ checkpoint Saved nếu có. Xóa document
+   không xóa component trong thư viện; thao tác xóa/bỏ không được hoàn tác bằng Undo.
    Inspector cho sửa state chung của nhiều block; giá trị khác nhau hiện **Mixed**.
 6. Muốn fence/wall/cổng tự nối: chạy lại `prepare:game`, nhập lại JSON profile
    trong Resources, rồi bật **Auto connections** trong Inspector. Tùy chọn chỉ
@@ -95,8 +98,10 @@ trình duyệt hoặc xóa storage có thể làm mất quyền truy cập dữ 
 autosave/crash recovery**; lưu thường xuyên và xuất JSON backup. JSON không nhúng
 resource pack/profile; giữ file nguồn để nhập lại khi chuyển máy.
 Save có kiểm tra phiên bản lưu để tránh ghi đè từ phiên khác. Nếu gặp conflict,
-xuất JSON giữ chỉnh sửa local trước khi reload/mở lại bản đã lưu. Chưa có UI
-quản lý/xóa bản làm dở; nền repository đã sẵn sàng cho bước đó trong roadmap.
+xuất JSON giữ chỉnh sửa local trước khi reload/mở lại bản đã lưu. New trên bản
+rỗng chưa sửa không tạo thêm Saved; bản có sửa được lưu trước khi chuyển.
+Save chủ động vẫn lưu bản rỗng. Documents có Refresh để đọc thay đổi từ tab khác;
+chưa có live invalidation hoặc autosave/recovery nền.
 
 ```powershell
 fnm exec --using 24.19.0 pnpm.cmd check

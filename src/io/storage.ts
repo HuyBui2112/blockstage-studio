@@ -60,7 +60,6 @@ export const storage = {
   saveComponentAsset: (asset: ComponentAsset) => operation('componentAssets', 'readwrite', s => s.put(componentAssetSchema.parse(asset))),
   removeComponentAsset: (id: string) => operation('componentAssets', 'readwrite', s => s.delete(id)),
   editorPreference: (scope: string) => operation<{ id: string; value: string } | undefined>('preferences', 'readonly', s => s.get(`editor:${scope}`)),
-  setEditorPreference: (scope: string, value: string) => operation('preferences', 'readwrite', s => s.put({ id: `editor:${scope}`, value })),
 }
 export function download(name: string, bytes: Uint8Array | string, type: string) {
   const blob = new Blob([typeof bytes === 'string' ? bytes : new Uint8Array(bytes).buffer], { type })

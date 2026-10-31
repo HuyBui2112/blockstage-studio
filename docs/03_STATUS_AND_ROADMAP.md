@@ -40,7 +40,7 @@ triển khai, không phải kết quả chạy mới trong lượt nghiên cứu
 | Context placement | **Một phần:** 46 log/wood/stem/hyphae/bamboo IDs, 68 slabs, 64 stairs, bed/door; thêm 9 chain axis và 10 lantern hanging trên/dưới. Side lantern giữ state + note; không alternate attachment/fluid simulation. |
 | Support diagnostics | **Một phần:** door, bảy terrestrial doubleplants; thêm lantern/soul lantern khô với stone/9 chain khô. Có vị trí/unknown, cập nhật khi edit/Undo; không hard-block Design/export vì world đích có thể cung cấp support. |
 | Navigation | **Đã có:** MMB orbit, Shift+MMB pan, zoom, numpad/projection, Home/frame, fly, nút view trên màn hình và trực giao X/Y/Z. Fly chưa collision. |
-| Lưu và JSON | **Đã có:** Save/Ctrl+S, mở bản đã lưu, New/Open lưu draft trước khi chuyển, restore bản đã lưu, JSON backup/import v2. Import v1 là hành động rõ ràng; không sửa/xóa store project cũ ngầm. |
+| Lưu và JSON | **Đã có:** Save/Ctrl+S, Documents tìm/mở/đổi tên/xóa theo workspace, explicit discard giữ Saved checkpoint; New/Open lưu phần đã sửa và bỏ qua placeholder mới chưa sửa. JSON backup/import v2, v1 là chuyển đổi rõ ràng. Chưa autosave/crash recovery/live invalidation. |
 | Export game | **Đã có trong phạm vi hữu hạn:** preflight, Structure NBT gzip và datapack ZIP từ snapshot đã commit; writer dùng chung với v1. Giới hạn **48 mỗi chiều** là chính sách sản phẩm, không phải giới hạn bản thân NBT. |
 | Export semantics | **Đã có:** flatten cells group/component, normalize block/entity cùng vector; air tường minh xóa ô đích, sparse gap giữ ô đích. Chặn state/pair/occupancy/target sai, block entity thiếu payload và entity ngoài adapter. |
 | Runtime/resources | **Đã có nền:** effective asset index, cache/lifecycle GPU, viewport tải riêng, render theo thay đổi; animation chạy khi cần. Commit base scene vẫn rebuild batch; chưa dirty-chunk incremental toàn luồng. |
@@ -361,10 +361,22 @@ trước khi giao, không đưa nguyên cả hệ thống cho một agent.
   conflict giữ local data. Đây chưa phải hai tab app/live invalidation hoặc
   crash recovery/quota thật; D07 vẫn TODO. Smoke script tự bundle fixture riêng
   trong memory, không thêm test code/game assets vào bản phân phối.
-- **Tiếp theo:** hoàn thiện contract K04 còn lại cho D02/D03, đưa D04 quản lý/xóa
-  saved documents và discard bản làm dở vào slice UI đầu tiên. BUG-07 vẫn OPEN;
-  chưa có nút xóa, vẫn còn save-before-switch tạo Saved cho placeholder rỗng.
-  Chưa bật autosave trước khi hoàn thành lifecycle/delete/discard và kiểm thử.
+- **D04 catalogue v2 VERIFIED:** nút Documents, tìm/lọc workspace, mở/rename/delete
+  đúng ID kể cả trùng tên, metadata version/cells/date, explicit discard có/không
+  Saved base; cancel và lỗi storage giữ dữ liệu. New pristine không tích tụ Saved,
+  Save rỗng chủ động được giữ, Untitled có nội dung được bảo vệ khi chuyển.
+  Active delete reset history/selection/preference, không cascade assets/copies.
+  Working component IDs độc lập, source binding qua reload nằm trong sidecar.
+- Browser production bổ sung Open/rename active/inactive, Undo/discard, delete
+  failure giả lập, compact **620×800**, xóa rồi sửa lại component/library publish;
+  hai app pages cùng origin kiểm stale delete và peer Save không resurrect ID.
+  Đây là conflict rejection, chưa phải live invalidation/merge hay recovery.
+  Evidence tái tạo bằng `test:browser`; ảnh `artifacts/editor-documents.png` và
+  `artifacts/editor-documents-compact.png`. K07b seam đã có DocumentManager nhận
+  props/callbacks; K07a vẫn chưa có draft controller/committed revision.
+- **Tiếp theo:** hoàn thiện K04/D02 controller revision/draft, rồi D03 recovery UI.
+  D03 mới có discard thủ công cho phiên hiện tại; D07 mới kiểm các race D01/D04,
+  chưa đủ quota/recovery/portable acceptance. Chưa bật autosave nền.
 
 ### K — Hợp đồng và baseline
 
