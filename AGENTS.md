@@ -58,6 +58,13 @@ automatic eviction; report protection failures and retain local edits for retry/
 Documents Storage is a read-only origin health probe except explicit persist()
 opt-in. Never request persistence on mount, call quota an exact disk measurement,
 or delete user data to resolve quota. Missing API and denied/error remain distinct.
+Portable backup v1 contains one document v2, optional component-copy definitions
+and ordered resource/profile fingerprints only. Never embed game assets or profile
+geometry. Restore reports compatibility first, requires acknowledgement for missing
+data, creates fresh IDs and atomically adds document/revision/library/preference.
+Never overwrite/treat copies as links or restore a local publication binding
+implicitly. Unknown string states are preserved; unsupported fields/payload/versions
+are rejected. Keep aggregate input budgets before recursive schemas.
 
 - Reuse the existing React/TypeScript/Three.js base and verified asset pipeline.
 - Keep existing project data and import/export/domain code intact during changes.

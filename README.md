@@ -113,8 +113,17 @@ copies / 64 MiB payload, mỗi snapshot tối đa 32 MiB. Không tự xóa bản
 **Documents → Storage** hiển thị dung lượng/quota ước tính của origin và trạng
 thái persistent storage. Chỉ khi bấm **Request persistent storage** công cụ mới
 gửi yêu cầu; trình duyệt có thể từ chối. Refresh đọc lại thông tin, không dọn/xóa
-dữ liệu. Persistence không thay backup JSON ngoài trình duyệt. Portable bundle
-chứa document/thư viện và manifest tài nguyên vẫn là bước D05 tiếp theo.
+dữ liệu. Persistence không thay backup JSON ngoài trình duyệt.
+
+**Documents → Backup → Download backup** tạo file `.blockstage-backup.json`:
+một document hiện tại, tùy chọn kèm toàn bộ component library và manifest hash/
+thứ tự tài nguyên. File không chứa game assets/profile geometry, lịch sử Undo
+hoặc các bản recovery. Giữ riêng JAR/ZIP/profile để nhập lại khi chuyển máy.
+**Open backup** chỉ đọc và báo tương thích; nếu thiếu tài nguyên cần xác nhận
+giữ nguyên dữ liệu trước khi **Restore as new**. Restore tạo document/component
+với ID mới, không ghi đè dữ liệu cũ. Chuyển đúng Architecture/Component workspace
+trước khi mở backup. Giới hạn 32 MiB JSON, 256 component definitions và 100.000
+cells/objects tổng; bỏ chọn library khi quá lớn. JSON document cũ vẫn dùng Open JSON.
 
 ```powershell
 fnm exec --using 24.19.0 pnpm.cmd check

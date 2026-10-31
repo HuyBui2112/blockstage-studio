@@ -3,6 +3,7 @@ import { STORAGE_VERSION, upgradeStorageDatabase } from '../src/io/storage'
 import { newEditorDocument } from '../src/editor/model'
 import { createDraftRepository } from '../src/io/draft-repository'
 import { DraftConflict, MAX_DRAFTS } from '../src/io/draft-storage'
+import { commitPortableRestore } from '../src/io/portable-repository'
 
 /** Compiled only by the smoke harness, never by the product build. Uses native IDB. */
 export async function runRepositoryChecks() {
@@ -247,6 +248,20 @@ export async function runRepositoryChecks() {
       await new Promise<void>((resolve, reject) => { const request=indexedDB.deleteDatabase(version6Name);request.onsuccess=()=>resolve();request.onerror=()=>reject(request.error) })
     }
     checks.push('additive v6 to v7 migration preserves Saved payload/token/metadata')
+    const portablePlan={document:newEditorDocument(),components:[{schemaVersion:1 as const,id:crypto.randomUUID(),name:'Restored column',objects:[{id:'portable-stone',name:'Stone',kind:'block' as const,cells:[{pos:[0,0,0] as [number,number,number],state:{name:'minecraft:stone',properties:{}}}],children:[],pivot2:[1,1,1] as [number,number,number],orientation:0 as const}],pivot2:[1,1,1] as [number,number,number],size:[1,1,1] as [number,number,number],orientation:0 as const}]}
+    const beforePortablePointer=await raw(dbA,'preferences','editor:architecture')
+    const faultDb=await new Promise<IDBDatabase>(resolve=>{const injected=new Proxy(dbA,{get(target,property){if(property==='transaction')return(stores:string[],mode:IDBTransactionMode)=>{const tx=target.transaction(stores,mode),read=tx.objectStore.bind(tx);tx.objectStore=(name:string)=>{const store=read(name);if(name==='preferences')store.put=()=>{throw new DOMException('Portable quota failure','QuotaExceededError')};return store};return tx};const value=Reflect.get(target,property,target);return typeof value==='function'?value.bind(target):value}});resolve(injected)})
+    await rejects(commitPortableRestore(portablePlan,async()=>faultDb),'QuotaExceededError')
+    assert(await raw(dbA,'editorDocuments',portablePlan.document.id)===undefined,'Failed restore must roll back document')
+    assert(await raw(dbA,'editorRevisions',portablePlan.document.id)===undefined,'Failed restore must roll back revision')
+    assert(await raw(dbA,'componentAssets',portablePlan.components[0].id)===undefined,'Failed restore must roll back library copies')
+    assert(equal(await raw(dbA,'preferences','editor:architecture'),beforePortablePointer),'Failed restore must retain active preference')
+    const restoredPortable=await commitPortableRestore(portablePlan,async()=>dbA)
+    assert((await a.load(restoredPortable.document.id))?.token.version===1,'Restore creates a versioned Saved checkpoint')
+    assert(equal(await raw(dbA,'componentAssets',portablePlan.components[0].id),portablePlan.components[0]),'Restore publishes library definitions')
+    await rejects(commitPortableRestore(portablePlan,async()=>dbB))
+    assert(equal((await a.load(restoredPortable.document.id))?.document,portablePlan.document),'Repeat ID restore must not overwrite existing Saved')
+    checks.push('portable restore atomic document/revision/library/preference; quota rollback; repeat ID conflict preserves existing data')
     return checks
   } finally {
     connections.forEach(db => db.close())

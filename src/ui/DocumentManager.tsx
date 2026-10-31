@@ -6,8 +6,9 @@ import { Icon } from './Icon'
 import './documents.css'
 import { RecoveryList, type RecoveryProps } from './RecoveryList'
 import { StorageHealthPanel } from './StorageHealthPanel'
+import { PortableBackupPanel,type BackupProps } from './PortableBackupPanel'
 
-type Props = RecoveryProps & {
+type Props = RecoveryProps & Pick<BackupProps,'components'|'resources'|'onRestoreBackup'> & {
   document: EditorDocument; saved: EditorDocument | null; pristine: boolean; error: string
   onList: () => Promise<RepositoryListing>
   onOpen: (document: EditorDocument) => Promise<boolean>
@@ -20,7 +21,7 @@ type Props = RecoveryProps & {
 type Pending = { kind: 'delete' | 'rename'; record: StoredEditorDocument; current: EditorDocument } | { kind: 'discard'; current: EditorDocument }
 const cellCount = (objects: EditorObject[]): number => objects.reduce((sum, object) => sum + object.cells.length + cellCount(object.children), 0)
 
-export function DocumentManager({ document, saved, pristine, error, onList, onOpen, onRename, onDelete, onDiscard, onClose, recoveryCount, initialRecovery, ...recovery }: Props) {
+export function DocumentManager({ document, saved, pristine, error, onList, onOpen, onRename, onDelete, onDiscard, onClose, recoveryCount, initialRecovery,components,resources,onRestoreBackup, ...recovery }: Props) {
   const [records, setRecords] = useState<StoredEditorDocument[]>([])
   const [loading, setLoading] = useState(true)
   const [working, setWorking] = useState(false)
@@ -29,7 +30,7 @@ export function DocumentManager({ document, saved, pristine, error, onList, onOp
   const [limit, setLimit] = useState(40)
   const [pending, setPending] = useState<Pending | null>(null)
   const [name, setName] = useState('')
-  const [tab, setTab] = useState<'saved' | 'recovery' | 'storage'>(initialRecovery ? 'recovery' : 'saved')
+  const [tab, setTab] = useState<'saved' | 'recovery' | 'storage'|'backup'>(initialRecovery ? 'recovery' : 'saved')
   const confirmation = useRef<HTMLElement>(null)
   const dirty = saved !== document
   useEffect(() => {
@@ -67,8 +68,8 @@ export function DocumentManager({ document, saved, pristine, error, onList, onOp
         <div><strong>{document.name}</strong><small>{document.workspace === 'architecture' ? 'Architecture' : 'Component Editor'} · {saved ? dirty ? 'Unsaved changes' : 'Saved' : 'Not saved'}</small></div>
         <button className="button" aria-label="Discard document changes" disabled={working || !dirty || pristine} onClick={() => setPending({ kind: 'discard', current: document })}>Discard changes</button>
       </section>
-      <nav className="documents-tabs" aria-label="Document storage"><button className={tab === 'saved' ? 'active' : ''} disabled={working} onClick={() => setTab('saved')}>Saved</button><button aria-label="Recovery documents" className={tab === 'recovery' ? 'active' : ''} disabled={working} onClick={() => setTab('recovery')}>Recovery{recoveryCount > 0 && <span>{recoveryCount}</span>}</button><button aria-label="Storage health tab" className={tab === 'storage' ? 'active' : ''} disabled={working} onClick={() => setTab('storage')}>Storage</button></nav>
-      {tab === 'storage' ? <StorageHealthPanel /> : tab === 'recovery' ? <RecoveryList {...recovery} scope={document.workspace} onClose={onClose} error={error} onBusy={setWorking} /> : <>
+      <nav className="documents-tabs" aria-label="Document storage"><button className={tab === 'saved' ? 'active' : ''} disabled={working} onClick={() => setTab('saved')}>Saved</button><button aria-label="Recovery documents" className={tab === 'recovery' ? 'active' : ''} disabled={working} onClick={() => setTab('recovery')}>Recovery{recoveryCount > 0 && <span>{recoveryCount}</span>}</button><button aria-label="Storage health tab" className={tab === 'storage' ? 'active' : ''} disabled={working} onClick={() => setTab('storage')}>Storage</button><button aria-label="Portable backup tab" className={tab === 'backup' ? 'active' : ''} disabled={working} onClick={() => setTab('backup')}>Backup</button></nav>
+      {tab === 'backup' ? <PortableBackupPanel document={document} components={components} resources={resources} onRestoreBackup={onRestoreBackup} onClose={onClose} error={error} onBusy={setWorking}/> : tab === 'storage' ? <StorageHealthPanel /> : tab === 'recovery' ? <RecoveryList {...recovery} scope={document.workspace} onClose={onClose} error={error} onBusy={setWorking} /> : <>
       <div className="document-search"><input type="search" aria-label="Search saved documents" placeholder="Search saved documents…" value={query} onChange={event => { setQuery(event.target.value); setLimit(40) }} /><button className="icon-button" aria-label="Refresh saved documents" disabled={working || loading} onClick={() => { setPending(null); void refresh() }}><Icon name="refresh" size={16} /></button></div>
       <div className="document-list" aria-label="Saved documents">
         {loading && <p role="status">Loading documents…</p>}

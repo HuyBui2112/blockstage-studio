@@ -40,7 +40,7 @@ triển khai, không phải kết quả chạy mới trong lượt nghiên cứu
 | Context placement | **Một phần:** 46 log/wood/stem/hyphae/bamboo IDs, 68 slabs, 64 stairs, bed/door; thêm 9 chain axis và 10 lantern hanging trên/dưới. Side lantern giữ state + note; không alternate attachment/fluid simulation. |
 | Support diagnostics | **Một phần:** door, bảy terrestrial doubleplants; thêm lantern/soul lantern khô với stone/9 chain khô. Có vị trí/unknown, cập nhật khi edit/Undo; không hard-block Design/export vì world đích có thể cung cấp support. |
 | Navigation | **Đã có:** MMB orbit, Shift+MMB pan, zoom, numpad/projection, Home/frame, fly, nút view trên màn hình và trực giao X/Y/Z. Fly chưa collision. |
-| Lưu và JSON | **Đã có:** Save/Ctrl+S, Documents tìm/mở/đổi tên/xóa, discard giữ Saved checkpoint; autosave draft riêng, Recovery Restore/Recover copy/download/discard. New/Open bảo vệ draft, không nâng thành Saved; bỏ qua placeholder pristine. Storage health có estimate/status và opt-in persistence. JSON v2/v1 explicit import. Chưa portable bundle/merge; không bảo đảm chống mọi crash/eviction. |
+| Lưu và JSON | **Đã có:** Save/Ctrl+S, Documents quản lý Saved/Recovery/Storage/Backup; autosave draft riêng, explicit restore/discard. Portable v1 gồm một document + optional library copies + resource manifest, fresh-ID atomic restore và compatibility report. JSON v2/v1 import cũ giữ nguyên. Chưa linked/payload bundle hoặc merge; không bảo đảm chống mọi crash/eviction. |
 | Export game | **Đã có trong phạm vi hữu hạn:** preflight, Structure NBT gzip và datapack ZIP từ snapshot đã commit; writer dùng chung với v1. Giới hạn **48 mỗi chiều** là chính sách sản phẩm, không phải giới hạn bản thân NBT. |
 | Export semantics | **Đã có:** flatten cells group/component, normalize block/entity cùng vector; air tường minh xóa ô đích, sparse gap giữ ô đích. Chặn state/pair/occupancy/target sai, block entity thiếu payload và entity ngoài adapter. |
 | Runtime/resources | **Đã có nền:** effective asset index, cache/lifecycle GPU, viewport tải riêng, render theo thay đổi; animation chạy khi cần. Commit base scene vẫn rebuild batch; chưa dirty-chunk incremental toàn luồng. |
@@ -178,7 +178,7 @@ BUG-03/04/06 đã có fixes trong scope công bố. BUG-01/02/05 còn PARTIAL; c
 
 | Nhóm | Trạng thái phải giữ rõ |
 | --- | --- |
-| An toàn dữ liệu | **Một phần:** Save CAS, catalogue/delete, autosave draft, explicit recovery và Storage health đã có; quota failure/retry, stale writers được kiểm trong scope hữu hạn. Thiếu portable bundle và gate D07 đầy đủ. JSON backup không mang pack/profile; không hứa chống mọi crash/eviction. |
+| An toàn dữ liệu | **Một phần:** Save CAS, catalogue/delete, autosave draft, recovery, Storage health và portable v1 đã có. Fresh-origin restore, atomic rollback và stale writers được kiểm trong scope hữu hạn. D07/release acceptance chưa đầy đủ; assets phải giữ riêng, không hứa chống mọi crash/eviction. |
 | Dựng hằng ngày | **Chưa triển khai:** duplicate selection trực tiếp, repeat/arrays, resize theo quy tắc, parametric wall/column/span, socket. Đặt nhiều bản component hiện có không tương đương array tool. |
 | Nội thất/phân vùng | **Một phần:** fly và orthographic giúp quan sát; **chưa có** workflow chuyên cho nội thất, layers/hide roof/floor/cut/clip/local isolation trong editor v2, visible-only/lasso selection. |
 | Reuse/vật liệu | **Chưa triển khai:** linked component updates/overrides và material substitution có hợp đồng tương thích. Không suy safe replacement chỉ từ tags/creative tabs. |
@@ -413,10 +413,29 @@ trước khi giao, không đưa nguyên cả hệ thống cho một agent.
   ảnh `artifacts/editor-storage-health.png` và `editor-storage-health-compact.png`
   (620×800); screenshots quota cao dùng injected estimate, không phải dung lượng
   thật của máy. Không có game assets trong production output.
-- **Tiếp theo:** D05a/D05b portable backup với contract K06;
-  D07 còn fresh-origin/portable/quota thật và release acceptance. Recovery hiện là
-  dữ liệu trong origin, không thay backup ngoài trình duyệt; chưa có Undo journal
-  qua reload hoặc bảo đảm chống mọi browser crash/mất điện/eviction.
+- **D05a/D05b VERIFIED cho bundle v1/copies hiện tại:** Documents → Backup có
+  download/open/report/ack/cancel/Restore as new. Một document v2, optional toàn
+  bộ component library và ordered resource hashes; không chứa game assets/profile
+  geometry. K06 subset JSON/copy-boundary freeze ở kỹ thuật §4.5; typed NBT/linked
+  closure vẫn TODO, không coi mọi K06/N/I contracts đã hoàn tất.
+- Bundle max 32 MiB JSON, 256 definitions, aggregate 100k cells/objects và bounded
+  parse work/depth. Unknown string states giữ nguyên kèm report, unknown payload/
+  fields/version reject. Fresh IDs/remap source provenance, không publication link;
+  add document/revision/library/preference atomic, quota/conflict rollback.
+- Code gate **284/284 test, 28 file**, typecheck/lint/build và fixture typecheck đạt.
+  Production full browser suite pass. File thực tải từ UI → origin khác **localhost
+  so với 127.0.0.1**, trống DB/packs/profile → report + acknowledgement → restore →
+  reload → UI JSON download so exact restored document; group/log axis/bed pair/
+  fractional entity data và library copies giữ nguyên. Reimport tạo bản sao mới,
+  cancel/malformed/quota giả lập không mutation. Native IDB thêm atomic rollback
+  document/revision/assets/pointer và ID conflict rejection. Đã xem ảnh
+  `artifacts/portable-source-backup.png`, `artifacts/portable-import-compact.png`.
+  Build không chứa assets, không thêm dependencies/schema DB.
+- **Tiếp theo:** D07 còn audit fault/fresh-origin coverage và release workflow;
+  quota thật, browser kill/power loss và toàn bộ journey R1 chưa VERIFIED. Recovery
+  vẫn thuộc origin; portable file chỉ giúp khi người dùng tải và giữ file ngoài
+  browser. Chưa backup mọi workspace/recovery hoặc linked/payload data; mở lại gate
+  portable khi N06/L bổ sung schema. Sau gate dữ liệu, chọn slice quick-build theo DAG.
 
 ### K — Hợp đồng và baseline
 

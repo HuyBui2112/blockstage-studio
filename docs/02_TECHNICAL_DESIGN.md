@@ -186,7 +186,7 @@ callback tiếp theo không dùng token đã cũ trong cùng tab. Component asse
 làm việc mới dùng ID khác nhau; `componentAssetId` tùy chọn trong revision sidecar
 giữ nguồn thư viện qua reload, không tạo linked instance. Binding cũ doc ID bằng
 asset ID vẫn đọc được; không rewrite ngầm. JSON document v2 không mang binding
-thư viện local; portable definitions sẽ do D05 xử lý. Publish thư viện và Save
+thư viện local; portable v1 mang library copies riêng (§4.5). Publish thư viện và Save
 document là hai IO riêng: Save lỗi không rollback asset đã xuất bản.
 Conflict giữ document local, hướng dẫn xuất JSON backup rồi reload/mở bản lưu.
 Chưa có màn hình merge giữa tab; Documents Refresh đọc lại Saved list,
@@ -264,6 +264,51 @@ Nguồn API đối chiếu: [StorageManager.estimate](https://developer.mozilla.
 [persist](https://developer.mozilla.org/en-US/docs/Web/API/StorageManager/persist).
 Browser acceptance dùng native read-only probe và injected grant/deny/absent/error
 để kiểm UX; không tuyên bố đã được browser cấp permission thật trên profile người dùng.
+
+### 4.5 Portable backup v1 — K06 subset / D05a / D05b
+
+Documents → Backup tải/mở `.blockstage-backup.json`, dùng `portable-backup.ts` cho
+codec/report/ID planning, `portable-repository.ts` cho atomic add và session cho
+preserve/switch. Format `blockstage-portable`, version **1**, chứa một document
+schema v2/target 26.2/4903 và tùy chọn toàn bộ component library schema v1 (copies).
+Không gọi format version là Minecraft DataVersion, không phải full workspace backup.
+
+Resource manifest chỉ có adapter `blockstage-editor-v2-copy`, ordered pack names/
+enabled flags/source/fingerprint SHA-256 và profile source SHA-1 + SHA-256 của
+JSON serialization. Pack local IDs và priority timestamps không là identity;
+manifest ghi precedence từ orderedPacks. Không có JAR/textures/profile geometry,
+tokens/preferences/history/recovery, camera hoặc preview. Profile SHA-256 chứng
+minh serialized content khớp, không phải semantic equivalence hay game world proof.
+
+Strict schemas từ chối fields/version/payload chưa hỗ trợ, không strip ngầm NBT.
+Document string blockstates hợp schema nhưng thiếu/sai registry được giữ nguyên
+kèm report; không default/rewrite property. Restore không cần catalog/assets để
+đọc dữ liệu, nhưng editing/export vẫn qua validation hiện có và có thể bị chặn.
+Không hỗ trợ typed NBT/BigInt trong bundle này; mở schema payload phải version
+format và thêm typed codec trước. Legacy document JSON vẫn dùng đường import cũ.
+
+Trust boundary: 32 MiB UTF-8 JSON, 256 definitions, aggregate 100.000 cells/objects,
+generic depth 64/work 2M nodes trước recursive schema; từng document vẫn giữ
+limits depth/coords/IDs/occupancy/entities. Không ZIP/compressed input. File size
+được kiểm trước đọc; unsupported/malformed input không chạm IO. Report giữ tối đa
+100 notes cùng tổng count; có unknown profile/pack hash/order và component source
+không bundled. Component instance đã bake là self-contained, source ID không là link.
+
+Export chụp document/library committed snapshot trước async fingerprint; không
+Save document hoặc publish geometry. Import preview không đổi store, cancel bỏ
+candidate. Missing resource report cần acknowledgement Keep original data; user
+reimport/reorder packs ở Resources, công cụ không tải hoặc đổi pack tự động.
+Workspace mismatch yêu cầu chuyển workspace trước, không đổi source workspace ngầm.
+
+Confirm kiểm current document identity, pause/drain draft controller và bảo vệ
+current edits trước switch. Allocate fresh document/object/entity/component IDs,
+remap bundled component provenance; source refs không bundled được giữ để truy vết.
+Không mang publication binding của Component Editor cũ vào bản phục hồi. Transaction
+`add` document/revision/library/preference cùng lúc; existing ID/tombstone/conflict
+hoặc quota lỗi rollback toàn batch, không publish UI. Reimport tạo thêm bản sao.
+Save/persistence về sau tiếp tục dùng CAS; restore IO không là editor Undo command.
+Linked dependency closure, toàn bộ documents/recovery, partial library selection
+và payload mở rộng chưa hỗ trợ ở phiên bản này.
 
 ## 5. Tương tác, transform và placement
 
@@ -609,9 +654,10 @@ Tách từng contract nhỏ để module có thể làm riêng; không đổi to
 
 **31/10/2026:** token storage, Save/remove, tombstone, legacy read và Saved ack
 đã có (§4.2). Committed revision, savedRevision, draft base/ack/scheduler, retention
-và Recovery compare/claim đã freeze/triển khai ở §4.3. Multi-tab merge, portable
-và portable workflow chưa hoàn tất; Storage health đã có ở §4.4 nhưng không phải
-eviction-proof backup. Không coi cả milestone D đã đóng.
+và Recovery compare/claim đã freeze/triển khai ở §4.3. Storage health ở §4.4 và
+portable copies v1 ở §4.5 đã có; multi-tab merge/typed payload/linked closure và
+release acceptance còn thiếu. Không coi cả milestone D đã đóng hoặc storage là
+eviction-proof backup.
 
 - Phân biệt `documentId`, `sessionEpoch` của lần mở, committed `revision`,
   `savedRevision`, draft base/ack và persistent record `generation` khi delete/recreate.
@@ -688,6 +734,10 @@ export selection cần scope riêng cùng closure/pair checks, không suy từ m
 đang attach vào scene. Restore visibility luôn có lối trên UI.
 
 ### 10.5 Typed NBT, unknown data và portable projects — K06
+
+**Subset đã triển khai:** JSON bundle v1/document v2 copies ở §4.5 có budgets,
+strict reject policy, manifest/report và fresh-ID transaction. Các ý typed payload,
+NBT long/opaque data và linked revision closure dưới đây vẫn là thiết kế tương lai.
 
 - Giữ tag identity, signed long không qua JS Number mất precision, arrays/typed
   lists, Unicode/NUL và encoding đúng format. Codec hiện tại chỉ ghi finite

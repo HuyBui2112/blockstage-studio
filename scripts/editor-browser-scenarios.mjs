@@ -8,6 +8,7 @@ import { runNeighborScenarios } from './neighbor-browser-scenarios.mjs'
 import { runSaveScenarios } from './save-browser-scenarios.mjs'
 import { runDocumentScenarios } from './documents-browser-scenarios.mjs'
 import { runRecoveryScenarios } from './recovery-browser-scenarios.mjs'
+import { runPortableScenarios } from './portable-browser-scenarios.mjs'
 
 /** Real input integration scenarios, called by the existing isolated-browser harness. */
 export async function runEditorScenarios({ command, evaluate, until, click, aria, input, upload, key, screenshot, directory, profilePath, createPeer }) {
@@ -241,6 +242,7 @@ export async function runEditorScenarios({ command, evaluate, until, click, aria
   await runNeighborScenarios({ command, evaluate, until, click, aria, input, upload, key, screenshot, directory, profilePath })
   await runSaveScenarios({ command, evaluate, until, click, aria, input, key })
   await runDocumentScenarios({ command, evaluate, until, click, aria, input, upload, key, screenshot, createPeer, directory })
+  await runPortableScenarios({command,evaluate,until,click,aria,upload,screenshot,createPeer,directory})
   await runRecoveryScenarios({ command, evaluate, until, click, aria, input, upload, key, screenshot, createPeer, directory })
   await command('Emulation.setDeviceMetricsOverride', { width: 620, height: 800, deviceScaleFactor: 1, mobile: false })
   const compactReload = await evaluate('performance.timeOrigin')

@@ -45,4 +45,14 @@
 .storage-warning { color:var(--accent) }
 .storage-details { margin-top:18px; color:var(--muted); font-size:11px; line-height:1.7 }
 .storage-details summary { cursor:pointer }
+.backup-note,.backup-report p { font-size:11px; color:var(--muted); line-height:1.6 }
+.backup-library { display:flex; align-items:center; gap:8px; margin:16px 0; font-size:11px; color:var(--soft) }
+.backup-actions { display:flex; justify-content:flex-end; gap:8px; flex-wrap:wrap; margin:16px 0 }
+.backup-actions .button { font-size:11px }
+.backup-report { padding:14px; border:1px solid var(--border); border-radius:6px; margin-top:18px }
+.backup-report>strong { display:block; font-size:13px; overflow-wrap:anywhere }
+.backup-report>small { display:block; color:var(--muted); margin-top:8px }
+.backup-report details { font-size:11px; line-height:1.6; color:var(--soft) }
+.backup-report ul { max-height:160px; overflow:auto; padding-left:18px; overflow-wrap:anywhere }
+.backup-report li { margin:7px 0 }
 @media (max-width:620px) { .document-current { flex-wrap:wrap } .document-current>.button { margin-left:31px } .saved-document { gap:0 } .saved-document-open { padding:6px; gap:8px } }

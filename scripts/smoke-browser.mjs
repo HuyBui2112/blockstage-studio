@@ -115,7 +115,7 @@ try {
     throw new Error(`Timeout: ${expression}\n${JSON.stringify({ errors, editor: await evaluate(`(()=>{const e=document.querySelector('.editor-diagnostics'),c=document.querySelector('canvas');return {snapshot:{...e?.dataset},canvas:{...c?.dataset},feedback:document.querySelector('.editor-feedback')?.textContent}})()`), body: await evaluate('document.body.innerText.slice(-2500)') })}`)
   }
   const ready = `document.querySelector('.app-shell')?.dataset.ready === 'true' && document.querySelector('canvas')`
-  async function createPeer() {
+  async function createPeer(url=process.env.BLOCKSTAGE_URL ?? 'http://127.0.0.1:5173/') {
     const { targetId } = await send('Target.createTarget', { url: 'about:blank' })
     const { sessionId } = await send('Target.attachToTarget', { targetId, flatten: true })
     const peerCommand = (method, params) => send(method, params, sessionId)
@@ -133,9 +133,9 @@ try {
     }
     await peerCommand('Runtime.enable')
     await peerCommand('Page.enable')
-    await peerCommand('Page.navigate', { url: process.env.BLOCKSTAGE_URL ?? 'http://127.0.0.1:5173/' })
+    await peerCommand('Page.navigate', { url })
     await peerUntil(ready)
-    return { evaluate: peerEvaluate, until: peerUntil, close: () => send('Target.closeTarget', { targetId }) }
+    return { command:peerCommand,evaluate: peerEvaluate, until: peerUntil, close: () => send('Target.closeTarget', { targetId }) }
   }
   const click = selector => evaluate(`(() => { const element = document.querySelector(${JSON.stringify(selector)}); if (!element || element.disabled) throw new Error('Missing/enabled control: ' + ${JSON.stringify(selector)}); element.click(); })()`)
   const aria = label => `[aria-label=${JSON.stringify(label)}]`

@@ -13,6 +13,8 @@ import type { BlockState } from '../core/schema'
 import { draftRepository, type DraftWrite } from '../io/draft-repository'
 import { RECOVERY_CHANGED, type DraftHead } from '../io/draft-storage'
 import { createDraftController, type DraftController, type DraftStatus } from './draft-controller'
+import { planPortableRestore,type PortableBackup } from '../io/portable-backup'
+import { commitPortableRestore } from '../io/portable-repository'
 
 export type EditorScope = 'architecture' | 'component'
 export type TransformIntent = { kind: 'move'; delta: Vec3 } | { kind: 'rotate'; turns: number }
@@ -345,6 +347,18 @@ export function useEditorSession(catalog: Material[], neighborRules?: NeighborRu
   }
   async function recoveryDocument(head: DraftHead) { return draftRepository.load(head) }
   async function retryDraft(scope: EditorScope) { return controllers.current[scope]?.retry() ?? false }
+  async function restorePortable(bundle:PortableBackup,expectedCurrent:EditorDocument) {
+    const scope=bundle.document.workspace
+    return exclusive(scope,async()=>{
+      if(currentSlots.current[scope].history.document!==expectedCurrent)throw new Error('The current document changed. Review the backup again.')
+      const plan=planPortableRestore(bundle)
+      await preserve(scope)
+      const restored=await commitPortableRestore(plan)
+      const history=createHistory(restored.document)
+      setComponents(previous=>[...previous,...plan.components])
+      setSlots(previous=>({...previous,[scope]:{history,saved:history.document,token:restored.token,selection:[],pristine:false,editingAssetId:null,epoch:crypto.randomUUID(),draftId:crypto.randomUUID(),revision:0,savedRevision:0}}))
+    })
+  }
   async function editComponent(asset: ComponentAsset) {
     return exclusive('component', async () => {
       await preserve('component')
@@ -377,7 +391,7 @@ export function useEditorSession(catalog: Material[], neighborRules?: NeighborRu
     } catch (error) { setError(messageOf(error)) }
   }
   function configureConnections(scope:EditorScope,enabled:boolean){setPreview(null);setConnectionNotes(null);setAutoConnections(previous=>({...previous,[scope]:enabled}))}
-  return { draftStatus, recoveryCount, refreshRecoveries, restoreRecovery, discardRecovery, recoveryDocument, retryDraft, busy, refreshDocuments, renameSaved, deleteDocument, discardChanges, autoConnections, connectionNotes, configureConnections, slots, components, ready, error, setError, preview, cancelPreview: () => setPreview(null), select, history, transform, place, group, ungroup, remove, updateState, setPivot, move, rotate, rename, save, newDocument, open, importDocument, saveComponent, editComponent, placeComponent, importComponent, removeComponent }
+  return { restorePortable, draftStatus, recoveryCount, refreshRecoveries, restoreRecovery, discardRecovery, recoveryDocument, retryDraft, busy, refreshDocuments, renameSaved, deleteDocument, discardChanges, autoConnections, connectionNotes, configureConnections, slots, components, ready, error, setError, preview, cancelPreview: () => setPreview(null), select, history, transform, place, group, ungroup, remove, updateState, setPivot, move, rotate, rename, save, newDocument, open, importDocument, saveComponent, editComponent, placeComponent, importComponent, removeComponent }
 }
 
 export type EditorSession = ReturnType<typeof useEditorSession>
