@@ -10,7 +10,6 @@ import net.minecraft.core.HolderSet;
 import net.minecraft.SharedConstants;
 import net.minecraft.server.Bootstrap;
 import net.minecraft.core.registries.BuiltInRegistries;
-import net.minecraft.core.RegistryAccess;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.world.level.EmptyBlockGetter;

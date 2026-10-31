@@ -14,6 +14,7 @@ artifacts
 /public/*.jar
 /public/*.zip
 /public/generated/
+/scripts/java/libraries/
 *.local
 .env
 .env.*
@@ -26,6 +27,7 @@ artifacts
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
+!.vscode/settings.json
 .idea
 .DS_Store
 *.suo

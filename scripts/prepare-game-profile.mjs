@@ -1,4 +1,4 @@
-import { readFile, writeFile, mkdir, access } from 'node:fs/promises'
+import { readFile, writeFile, mkdir, access, copyFile } from 'node:fs/promises'
 import { createHash } from 'node:crypto'
 import { resolve, join, delimiter } from 'node:path'
 import { spawnSync } from 'node:child_process'
@@ -24,15 +24,17 @@ catch {
 }
 const digest = b => createHash('sha1').update(b).digest('hex')
 if (digest(bytes) !== metadata.downloads.client.sha1) throw new Error('Client checksum differs from official 26.2; modded extraction requires its own profile')
+const ideLibraries = resolve('scripts/java/libraries')
 const libraries = []
-let reused = 0, downloaded = 0
+let reused = 0, downloaded = 0, cachedLibraries = 0
 for (const library of metadata.libraries) {
   const artifact = library.downloads?.artifact
   if (!artifact || library.name.includes(':natives-')) continue
   const existing = process.env.APPDATA ? join(process.env.APPDATA, '.minecraft/libraries', artifact.path) : ''
-  const cached = join(cache, 'libraries', artifact.path)
+  const ideLibrary = join(ideLibraries, artifact.path)
+  const cachedPath = join(cache, 'libraries', artifact.path)
   let selected
-  for (const candidate of [existing, cached].filter(Boolean)) {
+  for (const candidate of [ideLibrary, cachedPath, existing].filter(Boolean)) {
     try { if (digest(await readFile(candidate)) === artifact.sha1) { selected = candidate; reused++; break } } catch { /* missing local library */ }
   }
   if (!selected) {
@@ -40,8 +42,12 @@ for (const library of metadata.libraries) {
     if (!response.ok) throw new Error(`Library download failed: ${library.name}`)
     const data = new Uint8Array(await response.arrayBuffer())
     if (digest(data) !== artifact.sha1) throw new Error(`Invalid library checksum: ${library.name}`)
-    await mkdir(resolve(cached, '..'), { recursive: true }); await writeFile(cached, data)
-    selected = cached; downloaded++
+    await mkdir(resolve(ideLibrary, '..'), { recursive: true }); await writeFile(ideLibrary, data)
+    selected = ideLibrary; downloaded++
+  } else if (selected !== ideLibrary) {
+    await mkdir(resolve(ideLibrary, '..'), { recursive: true })
+    await copyFile(selected, ideLibrary)
+    selected = ideLibrary; cachedLibraries++
   }
   libraries.push(selected)
 }
@@ -69,4 +75,4 @@ await mkdir('public/generated', { recursive: true })
 await writeFile('public/generated/26.2.profile.json', JSON.stringify(profile))
 // An importable sidecar keeps generated model geometry separate from the client JAR.
 await writeFile('public/generated/26.2.profile.zip', zipSync({ 'blockstage-profile.json': strToU8(JSON.stringify(profile)) }))
-console.log(JSON.stringify({ blocks: profile.blocks.length, entities: profile.entities.length, modelLayers: Object.keys(profile.entityModels).length, tabs: profile.creativeTabs.length, librariesReused: reused, librariesDownloaded: downloaded, output: 'public/generated/26.2.profile.json' }, null, 2))
+console.log(JSON.stringify({ blocks: profile.blocks.length, entities: profile.entities.length, modelLayers: Object.keys(profile.entityModels).length, tabs: profile.creativeTabs.length, librariesReused: reused, librariesCached: cachedLibraries, librariesDownloaded: downloaded, output: 'public/generated/26.2.profile.json' }, null, 2))

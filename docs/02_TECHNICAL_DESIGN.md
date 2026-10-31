@@ -391,6 +391,12 @@ Output: `public/generated/26.2.profile.json`, `.profile.zip` và cache
 `node_modules/.cache/game-profile/26.2`. ZIP sidecar cần giải nén JSON trước khi
 Import game profile. Trong **Resources**, nhập JAR/ZIP và JSON profile; vào Assets
 để xem block/entity, legal properties, texture browser và pack precedence.
+Workspace VS Code cấu hình `scripts/java` cùng client JAR và các thư viện trong
+`scripts/java/libraries` để Java Language Server phân giải các oracle. Script
+kiểm SHA-1 và cache các thư viện đã tìm thấy trong `.minecraft/libraries`; thư
+mục cache bị ignore, không đưa JAR vào Git.
+Nếu diagnostics vẫn cũ sau khi chuẩn bị profile, chạy **Java: Clean Java Language
+Server Workspace** rồi chọn Java 25 qua **Java: Configure Java Runtime**.
 
 ### 8.3 Gate code và native-browser
 

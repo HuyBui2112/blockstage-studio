@@ -1,0 +1,11 @@
+{
+  "java.server.launchMode": "Standard",
+  "java.project.sourcePaths": [
+    "scripts/java"
+  ],
+  "java.project.outputPath": "node_modules/.cache/game-profile/26.2/classes",
+  "java.project.referencedLibraries": [
+    "public/26.2.jar",
+    "scripts/java/libraries/**/*.jar"
+  ]
+}
