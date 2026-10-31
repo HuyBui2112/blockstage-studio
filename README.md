@@ -73,6 +73,21 @@ selection. Widget XYZ hoặc Numpad 1/3/7 chuyển view trực giao; Numpad 5 đ
 projection. Một đơn vị bằng một block, **+Y lên, +X đông, +Z nam**.
 Mở **Controls** để xem phím và dùng nút viewport nếu không có numpad.
 
+## Nhập Structure NBT
+
+Trong Architecture hoặc Component Editor, bấm **Import NBT → Choose .nbt**.
+Công cụ đọc Java Structure NBT gzip hoặc raw, kiểm tra **DataVersion 4903 / 26.2**,
+palette/state và multi-block, rồi hiển thị báo cáo. Chọn xác nhận và **Import as new**
+để tạo document Saved mới; công việc hiện tại được bảo vệ ở Recovery trước khi chuyển.
+Cancel hoặc lỗi không thay công trình đang mở. Nạp game profile trước để nhận đủ block.
+
+Phạm vi đầu tiên: blocks và legal states, bed/door/tall plant hoàn chỉnh; giữ explicit
+air và các khoảng trống sparse. **Chưa nhập entity hoặc block-entity payload** như
+rương/sign/banner NBT; file có dữ liệu đó bị từ chối, không bỏ ngầm. Không nhận world,
+`.schem`, `.litematic`, multiple palettes hoặc tự chuyển game version. Giới hạn file
+16 MiB, giải nén 32 MiB, 100.000 block entries, mỗi dimension tối đa 2048; export
+vẫn có policy 48. Empty border trong size không được giữ thành bounds editor.
+
 ## Xuất sang Minecraft
 
 Trong Architecture/Component Editor, chọn **Export Minecraft → Datapack**.

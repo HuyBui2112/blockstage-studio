@@ -9,10 +9,12 @@ import { runSaveScenarios } from './save-browser-scenarios.mjs'
 import { runDocumentScenarios } from './documents-browser-scenarios.mjs'
 import { runRecoveryScenarios } from './recovery-browser-scenarios.mjs'
 import { runPortableScenarios } from './portable-browser-scenarios.mjs'
+import { runNbtImportScenarios } from './nbt-import-browser-scenarios.mjs'
 
 /** Real input integration scenarios, called by the existing isolated-browser harness. */
 export async function runEditorScenarios({ command, evaluate, until, click, aria, input, upload, key, screenshot, directory, profilePath, createPeer }) {
   if (process.env.BLOCKSTAGE_EDITOR_SLICE === 'recovery') return runRecoveryScenarios({ command, evaluate, until, click, aria, input, upload, key, screenshot, createPeer, directory })
+  if (process.env.BLOCKSTAGE_EDITOR_SLICE === 'nbt') return runNbtImportScenarios({command,evaluate,until,click,aria,upload,key,screenshot,directory})
   const editor = '.editor-diagnostics'
   const snapshot = () => evaluate(`JSON.parse(document.querySelector('${editor}').dataset.snapshot)`)
   const count = async (objects, cells) => until(`document.querySelector('${editor}')?.dataset.objects === '${objects}' && document.querySelector('${editor}')?.dataset.blocks === '${cells}'`)
@@ -242,6 +244,7 @@ export async function runEditorScenarios({ command, evaluate, until, click, aria
   await runNeighborScenarios({ command, evaluate, until, click, aria, input, upload, key, screenshot, directory, profilePath })
   await runSaveScenarios({ command, evaluate, until, click, aria, input, key })
   await runDocumentScenarios({ command, evaluate, until, click, aria, input, upload, key, screenshot, createPeer, directory })
+  await runNbtImportScenarios({command,evaluate,until,click,aria,upload,key,screenshot,directory})
   await runPortableScenarios({command,evaluate,until,click,aria,upload,screenshot,createPeer,directory})
   await runRecoveryScenarios({ command, evaluate, until, click, aria, input, upload, key, screenshot, createPeer, directory })
   await command('Emulation.setDeviceMetricsOverride', { width: 620, height: 800, deviceScaleFactor: 1, mobile: false })

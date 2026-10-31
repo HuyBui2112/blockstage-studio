@@ -185,7 +185,7 @@ BUG-03/04/06 đã có fixes trong scope công bố. BUG-01/02/05 còn PARTIAL; c
 | Game behavior | **Một phần:** opt-in scene connections fence/wall/gate theo game predicates đã có. Chưa slab merge/player hinge, auto-pane/stairs, dynamic shapes, support tổng quát, gravity/redstone/fluid/ticks/player collision. |
 | Payload/entities | **Chưa triển khai:** entity editing workflow, block-entity inventory/custom NBT, arbitrary payload preservation adapters, entity equipment/variants/animation. |
 | Appearance | **Một phần:** thiếu nhiều special renderer, fluid geometry/appearance, biome tint, lighting/AO parity và một số hiệu ứng động. Sprite animation hiện có không đồng nghĩa entity animation. |
-| Formats/versions | **Chưa triển khai:** import Structure NBT, `.schem`, `.litematic`, multi-version migration và Fabric bridge. JSON import và NBT/ZIP export không bao hàm các hướng này. |
+| Formats/versions | **Một phần:** import Java Structure NBT raw/gzip blocks-only 26.2/4903 đã có, registry exact state, complete pairs và report/atomic commit. Chưa nhập entity/BE payload, multi-palettes, `.schem`, `.litematic`, multi-version migration hoặc Fabric bridge. |
 | Môi trường game | **Chưa kiểm chứng:** instance Fabric/modded của người dùng, ZIP bật qua UI client Fabric, command rotation/mirror, các block/state/entity ngoài fixture. |
 | Hiệu suất | **Chưa kiểm chứng:** GPU Windows thật, p95 end-to-end, memory dài hạn và cảnh triệu block. Schema v2 hiện giới hạn 100.000 cells/document; benchmark 1M đòi hỏi kế hoạch dữ liệu riêng. |
 | Phân phối | **Chưa triển khai:** desktop installer, cloud/AI/marketplace. Chỉ cân nhắc khi workflow thực tế cần, không là điều kiện hoàn thành editor local-first. |
@@ -436,6 +436,30 @@ trước khi giao, không đưa nguyên cả hệ thống cho một agent.
   vẫn thuộc origin; portable file chỉ giúp khi người dùng tải và giữ file ngoài
   browser. Chưa backup mọi workspace/recovery hoặc linked/payload data; mở lại gate
   portable khi N06/L bổ sung schema. Sau gate dữ liệu, chọn slice quick-build theo DAG.
+
+### Slice bổ sung theo yêu cầu — import `.nbt` trong phiên
+
+- **Đã có cho subset blocks-only:** Import NBT trên toolbar, raw/gzip Java named
+  big-endian NBT, DataVersion 4903, single palette, registry-validated strings,
+  complete logical multi-blocks, explicit air khác sparse gap. Worker cancel/timeout,
+  decompressed/work/depth limits; reject entities/BE payload/multiple palettes/
+  unknown fields/version, không drop dữ liệu. Author/border-size limitation có
+  report/ack. Import tạo Saved mới atomic sau bảo vệ draft hiện tại.
+- **293/293 test, 29 file**, typecheck/lint/build đạt. 9 tests mới: raw/gzip,
+  writer subset roundtrip, bed/door/stairs/slab/log state, air/sparse, missing/
+  illegal registry, duplicate/out-of-bounds/index, payload/version, truncation/
+  trailing data/CRC/decompression cap, long precision và Java modified UTF-8.
+- Full production browser suite đạt cùng fixture NBT tạo bởi builder độc lập:
+  raw/gzip report/cancel, payload/version reject, worker actual load, lỗi transaction
+  giả lập giữ scene cũ, Saved import/reload/JSON, export preflight/download và 620px.
+  Ảnh `artifacts/nbt-import-report.png`, `artifacts/nbt-import-compact.png` đã xem.
+  Giao diện dialog tự tải CSS riêng, không phụ thuộc đã mở Documents trước đó.
+- I01/I02/I03 và N01 **chỉ một phần**, không đánh VERIFIED nguyên milestone:
+  entity-only/payload/format variants và independent **world** roundtrip của file
+  import chưa có. Reader TAG1–12 không đồng nghĩa payload editor/lossless writer.
+  Đây không là full game/version conversion. Import envelope ≤2048/dimension,
+  100k explicit cells, 16 MiB input/32 MiB giải nén; export cap48 vẫn giữ. Không
+  thêm dependency, không thay document/DB schema, không commit/push.
 
 ### K — Hợp đồng và baseline
 

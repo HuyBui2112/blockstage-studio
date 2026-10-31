@@ -65,6 +65,12 @@ data, creates fresh IDs and atomically adds document/revision/library/preference
 Never overwrite/treat copies as links or restore a local publication binding
 implicitly. Unknown string states are preserved; unsupported fields/payload/versions
 are rejected. Keep aggregate input budgets before recursive schemas.
+Structure NBT import is a bounded blocks-only 26.2/4903 subset via a cancellable
+worker: raw/gzip, registry-validated exact states, complete logical pairs, explicit
+air vs sparse omission. Reject entities, block-entity payloads, multiple palettes,
+unknown fields/version instead of dropping them. Report stored size vs editor
+content bounds and unchanged 48-cell export policy. Confirm creates a new atomic
+Saved document after protecting current work; cancel never mutates the document.
 
 - Reuse the existing React/TypeScript/Three.js base and verified asset pipeline.
 - Keep existing project data and import/export/domain code intact during changes.

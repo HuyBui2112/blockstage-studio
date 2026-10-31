@@ -310,6 +310,43 @@ Save/persistence về sau tiếp tục dùng CAS; restore IO không là editor U
 Linked dependency closure, toàn bộ documents/recovery, partial library selection
 và payload mở rộng chưa hỗ trợ ở phiên bản này.
 
+### 4.6 Structure NBT import — blocks-only subset
+
+Toolbar Import NBT lazy-load `ImportStructureDialog`; chọn file → worker validate →
+report/explicit acknowledgement → session importStructure. `nbt-reader.ts` đọc
+named big-endian root compound, TAG 1–12, typed long BigInt và typed lists/arrays;
+duplicate fields, invalid tag/list lengths, UTF encoding/truncation/trailing data
+bị reject. Java modified UTF-8 (NUL/surrogate) và standard UTF-8 supplementary
+characters được đọc; không convert longs qua Number. Đây là reader nền hữu hạn,
+không công bố N01 lossless reader/writer/typed-payload milestone đã hoàn tất.
+
+Input raw hoặc gzip tối đa 16 MiB; DecompressionStream kiểm gzip, output stream
+tối đa 32 MiB; depth 64, work 2M nodes, collection length ≤1M. Worker timeout 30s,
+terminate khi cancel/thay file/unmount/error/success, transferable input buffer.
+File read kiểm size trước; component không parse binary hay archive trên main UI.
+
+`structure-import.ts` chỉ nhận DataVersion 4903, single `palette`, `size` ba số
+dương ≤2048, `blocks` 1–100k. Pos phải integer 0≤pos<size, palette index hợp lệ,
+không duplicate occupied cell. Palette dùng string IDs/properties exact, validate
+bằng current catalog; không đoán/default unknown property. Thiếu registry yêu cầu
+import profile, illegal state từ chối. `logicalCellGroups` ghép bed/door/tall plants;
+incomplete/mismatched pair reject, validateDocument kiểm lại main thread khi commit.
+
+Reject nonempty entities, block `nbt`, palette block có `hasBlockEntity`, multiple
+palettes và unknown fields. Không drop unsupported data hoặc chuyển DataVersion.
+Root author nếu có chỉ là thông tin: report rõ không giữ trong editor, cần policy
+ack trước import. Size header được report nhưng empty border không thành document
+geometry bounds; tọa độ explicit giữ nguyên, sparse gap không fill air. Air/cave_air/
+void_air là cells explicit theo registry. Xoay/state mesh và auto-neighbor không tự
+áp lại khi nhập. Entity-only template/NBT payload/format khác chưa hỗ trợ.
+
+Confirm checks expected current document, protects draft, allocates new document
+ID, dùng atomic add của portable repository (document/revision/preference; không
+library assets). Failure/quota giữ document cũ, không UI publish trước oncomplete.
+History mới bắt đầu sạch, import không là một command Undo. Export còn cap 48 theo
+policy; dimension 2048 là import envelope, không cam kết edit FPS hoặc export lớn.
+Không giữ root metadata chưa có contract ngoài acknowledgement author/size nói trên.
+
 ## 5. Tương tác, transform và placement
 
 ### 5.1 Input và atomic commands

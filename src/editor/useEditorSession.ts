@@ -359,6 +359,17 @@ export function useEditorSession(catalog: Material[], neighborRules?: NeighborRu
       setSlots(previous=>({...previous,[scope]:{history,saved:history.document,token:restored.token,selection:[],pristine:false,editingAssetId:null,epoch:crypto.randomUUID(),draftId:crypto.randomUUID(),revision:0,savedRevision:0}}))
     })
   }
+  async function importStructure(next:EditorDocument,expectedCurrent:EditorDocument){
+    return exclusive(next.workspace,async()=>{
+      if(currentSlots.current[next.workspace].history.document!==expectedCurrent)throw new Error('The document changed. Review the import again.')
+      validateDocument(next,catalog)
+      const document=editorDocumentSchema.parse({...next,id:crypto.randomUUID()})
+      await preserve(next.workspace)
+      const record=await commitPortableRestore({document,components:[]})
+      const history=createHistory(record.document)
+      setSlots(previous=>({...previous,[next.workspace]:{history,saved:history.document,token:record.token,selection:[],pristine:false,editingAssetId:null,epoch:crypto.randomUUID(),draftId:crypto.randomUUID(),revision:0,savedRevision:0}}))
+    })
+  }
   async function editComponent(asset: ComponentAsset) {
     return exclusive('component', async () => {
       await preserve('component')
@@ -391,7 +402,7 @@ export function useEditorSession(catalog: Material[], neighborRules?: NeighborRu
     } catch (error) { setError(messageOf(error)) }
   }
   function configureConnections(scope:EditorScope,enabled:boolean){setPreview(null);setConnectionNotes(null);setAutoConnections(previous=>({...previous,[scope]:enabled}))}
-  return { restorePortable, draftStatus, recoveryCount, refreshRecoveries, restoreRecovery, discardRecovery, recoveryDocument, retryDraft, busy, refreshDocuments, renameSaved, deleteDocument, discardChanges, autoConnections, connectionNotes, configureConnections, slots, components, ready, error, setError, preview, cancelPreview: () => setPreview(null), select, history, transform, place, group, ungroup, remove, updateState, setPivot, move, rotate, rename, save, newDocument, open, importDocument, saveComponent, editComponent, placeComponent, importComponent, removeComponent }
+  return { importStructure, restorePortable, draftStatus, recoveryCount, refreshRecoveries, restoreRecovery, discardRecovery, recoveryDocument, retryDraft, busy, refreshDocuments, renameSaved, deleteDocument, discardChanges, autoConnections, connectionNotes, configureConnections, slots, components, ready, error, setError, preview, cancelPreview: () => setPreview(null), select, history, transform, place, group, ungroup, remove, updateState, setPivot, move, rotate, rename, save, newDocument, open, importDocument, saveComponent, editComponent, placeComponent, importComponent, removeComponent }
 }
 
 export type EditorSession = ReturnType<typeof useEditorSession>
