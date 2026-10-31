@@ -39,6 +39,10 @@
   flex: 1;
   position: relative;
 }
+.editor-recovery-status { display:flex; align-items:center; gap:10px; padding:3px 20px; min-height:25px; color:var(--muted); font-size:10px; border-bottom:1px solid var(--border) }
+.editor-recovery-status button { border:0; background:transparent; color:var(--accent); padding:2px 5px; font-size:10px }
+.editor-recovery-status [data-phase="error"] { color:var(--accent) }
+.editor-recovery-status>button:last-child { margin-left:auto }
 .editor-document-bar {
   display: flex;
   align-items: center;

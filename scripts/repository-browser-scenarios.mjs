@@ -14,6 +14,6 @@ export async function runRepositoryScenarios({ evaluate }) {
   const entry = output.find(item => item.type === 'chunk' && item.isEntry)
   assert.ok(entry, 'Repository test bundle missing')
   const checks = await evaluate(`${entry.code}\nBlockstageRepositoryCheck.runRepositoryChecks()`)
-  assert.equal(checks.length, 6)
+  assert.equal(checks.length, 11)
   return checks
 }

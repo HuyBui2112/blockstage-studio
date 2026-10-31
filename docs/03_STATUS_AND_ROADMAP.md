@@ -40,7 +40,7 @@ triển khai, không phải kết quả chạy mới trong lượt nghiên cứu
 | Context placement | **Một phần:** 46 log/wood/stem/hyphae/bamboo IDs, 68 slabs, 64 stairs, bed/door; thêm 9 chain axis và 10 lantern hanging trên/dưới. Side lantern giữ state + note; không alternate attachment/fluid simulation. |
 | Support diagnostics | **Một phần:** door, bảy terrestrial doubleplants; thêm lantern/soul lantern khô với stone/9 chain khô. Có vị trí/unknown, cập nhật khi edit/Undo; không hard-block Design/export vì world đích có thể cung cấp support. |
 | Navigation | **Đã có:** MMB orbit, Shift+MMB pan, zoom, numpad/projection, Home/frame, fly, nút view trên màn hình và trực giao X/Y/Z. Fly chưa collision. |
-| Lưu và JSON | **Đã có:** Save/Ctrl+S, Documents tìm/mở/đổi tên/xóa theo workspace, explicit discard giữ Saved checkpoint; New/Open lưu phần đã sửa và bỏ qua placeholder mới chưa sửa. JSON backup/import v2, v1 là chuyển đổi rõ ràng. Chưa autosave/crash recovery/live invalidation. |
+| Lưu và JSON | **Đã có:** Save/Ctrl+S, Documents tìm/mở/đổi tên/xóa, discard giữ Saved checkpoint; autosave draft riêng, Recovery Restore/Recover copy/download/discard. New/Open bảo vệ draft, không nâng thành Saved; bỏ qua placeholder pristine. JSON v2/v1 explicit import. Chưa portable bundle/storage health/merge; không bảo đảm chống mọi crash/eviction. |
 | Export game | **Đã có trong phạm vi hữu hạn:** preflight, Structure NBT gzip và datapack ZIP từ snapshot đã commit; writer dùng chung với v1. Giới hạn **48 mỗi chiều** là chính sách sản phẩm, không phải giới hạn bản thân NBT. |
 | Export semantics | **Đã có:** flatten cells group/component, normalize block/entity cùng vector; air tường minh xóa ô đích, sparse gap giữ ô đích. Chặn state/pair/occupancy/target sai, block entity thiếu payload và entity ngoài adapter. |
 | Runtime/resources | **Đã có nền:** effective asset index, cache/lifecycle GPU, viewport tải riêng, render theo thay đổi; animation chạy khi cần. Commit base scene vẫn rebuild batch; chưa dirty-chunk incremental toàn luồng. |
@@ -178,7 +178,7 @@ BUG-03/04/06 đã có fixes trong scope công bố. BUG-01/02/05 còn PARTIAL; c
 
 | Nhóm | Trạng thái phải giữ rõ |
 | --- | --- |
-| An toàn dữ liệu | **Chưa triển khai:** autosave draft/crash recovery đầy đủ, giao diện xóa saved editor document. Save/restore bản đã lưu và save-before-switch đã có. JSON backup không mang resource pack/profile. |
+| An toàn dữ liệu | **Một phần:** Save CAS, catalogue/delete, autosave draft và explicit recovery đã có; quota failure/retry, stale writers được kiểm trong scope hữu hạn. Thiếu portable bundle, storage health và gate D07 đầy đủ. JSON backup không mang pack/profile; không hứa chống mọi crash/eviction. |
 | Dựng hằng ngày | **Chưa triển khai:** duplicate selection trực tiếp, repeat/arrays, resize theo quy tắc, parametric wall/column/span, socket. Đặt nhiều bản component hiện có không tương đương array tool. |
 | Nội thất/phân vùng | **Một phần:** fly và orthographic giúp quan sát; **chưa có** workflow chuyên cho nội thất, layers/hide roof/floor/cut/clip/local isolation trong editor v2, visible-only/lasso selection. |
 | Reuse/vật liệu | **Chưa triển khai:** linked component updates/overrides và material substitution có hợp đồng tương thích. Không suy safe replacement chỉ từ tags/creative tabs. |
@@ -351,9 +351,9 @@ trước khi giao, không đưa nguyên cả hệ thống cho một agent.
   Save CAS + snapshot/revision/preference atomic, remove CAS + tombstone.
   Đường Save hiện tại đã dùng repository, epoch/snapshot ack và báo conflict giữ
   local edits; không bypass CAS qua storage API cũ. Không có dependency mới.
-- **K04 subset repository REVIEWED**, **K07a một phần:** epoch và repository seam
-  đã nối; local committed revision/draft controller còn thiếu. K04 chưa VERIFIED
-  toàn bộ. K02/K03/K05/K06 và các task khác giữ TODO như catalogue.
+- **K04 subset repository REVIEWED**, **K07a một phần** ở mốc D01. Revision và
+  controller bổ sung ở D02/D03 bên dưới. K02/K03/K05/K06 vẫn TODO; không đánh
+  VERIFIED toàn bộ operation/persistence contracts từ một slice.
 - Kiểm chứng: code gate **262/262 test, 25 file**, typecheck/lint/build; native
   browser dùng hai connection IDB độc lập, Save đảo thứ tự, tombstone chống
   resurrection, rollback lỗi quota giả lập, upgrade v5/abort giữ dữ liệu và invalid
@@ -374,9 +374,36 @@ trước khi giao, không đưa nguyên cả hệ thống cho một agent.
   Evidence tái tạo bằng `test:browser`; ảnh `artifacts/editor-documents.png` và
   `artifacts/editor-documents-compact.png`. K07b seam đã có DocumentManager nhận
   props/callbacks; K07a vẫn chưa có draft controller/committed revision.
-- **Tiếp theo:** hoàn thiện K04/D02 controller revision/draft, rồi D03 recovery UI.
-  D03 mới có discard thủ công cho phiên hiện tại; D07 mới kiểm các race D01/D04,
-  chưa đủ quota/recovery/portable acceptance. Chưa bật autosave nền.
+- **D02/D03 VERIFIED trong scope draft recovery v2:** IndexedDB v7 thêm heads/payload stores, không
+  rewrite Saved v5/v6. Local revision tăng qua Undo/Redo; savedRevision và storage
+  token độc lập. Controller debounce 750ms/max delay 5s, latest coalescing, stale
+  ack rejection, pause/drain trước IO, retry thủ công sau lỗi và cleanup timers.
+  Autosave chỉ bảo vệ draft, không publish Saved hoặc camera/preview. New/Open
+  flush recovery thay save-before-switch; failed protection giữ document đang mở.
+- Documents → Recovery có Restore/Recover copy/download JSON/discard. Saved base
+  đã đổi thì Restore bị chặn; copy ID mới bỏ library publication binding. Save
+  retire own stream atomic, Delete document retire mọi stream; tombstone chặn
+  callback đến muộn. Giới hạn 32 live drafts/64 MiB tổng/32 MiB mỗi snapshot;
+  reject overflow, không tự xóa dữ liệu. BroadcastChannel/focus/Refresh invalidation
+  không thay CAS và không phải merge. Tab nền có thể throttle, pagehide best effort.
+- Code gate mới **270/270 test, 26 file**, gồm 8 controller tests với fake clock;
+  typecheck/lint/build đạt. Native IDB fixtures kiểm stale Save/discard/load,
+  delete nhiều stream, rollback/quota giả lập, capacity/aggregate byte accounting,
+  payload sai giữ nguyên, copy/resume binding, upgrade v6→v7 không rewrite.
+  Byte budget aggregate dùng metadata fixture; không coi là memory benchmark.
+- Full production browser suite đạt cùng tài nguyên 26.2 local: resources,
+  placement/export/state/neighbor, Save, Documents và Recovery đều pass. Recovery
+  kiểm reload offer/restore, download JSON, Saved base giữ nguyên, Undo/Redo tăng
+  revision, Architecture/Component độc lập, đóng page rồi phục hồi, lỗi quota giả
+  lập + latest retry, changed-base copy, hai app pages delete vô hiệu hóa mọi draft,
+  phục hồi thiếu pack/profile và compact 620×800. Ảnh đã xem:
+  `artifacts/editor-recovery.png`, `artifacts/editor-recovery-compact.png`.
+  Không thử tắt nguồn/kill browser hoặc disk quota thật; không suy thành bảo đảm
+  mọi crash hay fresh-origin portable restore. D07 vẫn một phần.
+- **Tiếp theo:** D05a/D05b portable backup với contract K06 và D06 storage health;
+  D07 còn fresh-origin/portable/quota thật và release acceptance. Recovery hiện là
+  dữ liệu trong origin, không thay backup ngoài trình duyệt; chưa có Undo journal
+  qua reload hoặc bảo đảm chống mọi browser crash/mất điện/eviction.
 
 ### K — Hợp đồng và baseline
 

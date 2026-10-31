@@ -136,8 +136,10 @@ Unknown properties/NBT bị từ chối rõ ràng khi chưa có schema/adapter, 
 
 ### 4.2 Lưu trữ và lifecycle
 
-IndexedDB `blockstage-studio` v6 giữ các stores cũ `projects/packs/catalogs/profiles/
-preferences/editorDocuments/componentAssets`, thêm `editorRevisions` làm sidecar.
+IndexedDB `blockstage-studio` v7 giữ các stores cũ `projects/packs/catalogs/profiles/
+preferences/editorDocuments/componentAssets/editorRevisions`, thêm `editorDraftHeads`
+và `editorDrafts`. `editorRevisions` tiếp tục là sidecar Saved; head draft có index
+`status/documentId`, payload nằm riêng để listing/retention không load mọi snapshot.
 Upgrade chỉ tạo store còn thiếu, không ghi lại snapshot, không đổi document v2.
 Legacy project v1 không bị
 migrate ngầm; chỉ chuyển khi người dùng Open JSON, coalesce pair đầy đủ và báo lỗi
@@ -146,11 +148,12 @@ nếu thiếu/mismatch. Transaction chỉ thành công tại `oncomplete`; versi
 
 Architecture và Component có document/history/selection riêng. Preview chỉ đọc
 document nguồn; Assets preview hoàn toàn tách khỏi công trình. Save lưu snapshot;
-New/Open/Import/Edit component lưu bản có sửa trước khi chuyển; placeholder mới
-chưa sửa và checkpoint sạch không tạo thêm Saved. `pristine` theo identity/history,
+New/Open/Import/Edit component bảo vệ draft có sửa trước khi chuyển, không tự
+nâng thành Saved; placeholder mới chưa sửa và checkpoint sạch không tạo recovery.
+`pristine` theo identity/history,
 không suy từ tên Untitled hoặc số cell; Save chủ động vẫn lưu bản rỗng.
 Chọn asset, camera, ghost hoặc mở export không tạo history.
-Chưa có autosave/crash recovery hoặc Undo journal qua reload; xem backlog tài liệu 03.
+Đã có draft autosave và explicit recovery (§4.3); chưa có Undo journal qua reload.
 
 `src/io/editor-repository.ts` là đường đọc/ghi editor documents. Save nhận snapshot
 và expected token `{generation, version}`; `null` chỉ cho ID chưa từng tồn tại.
@@ -186,8 +189,51 @@ asset ID vẫn đọc được; không rewrite ngầm. JSON document v2 không m
 thư viện local; portable definitions sẽ do D05 xử lý. Publish thư viện và Save
 document là hai IO riêng: Save lỗi không rollback asset đã xuất bản.
 Conflict giữ document local, hướng dẫn xuất JSON backup rồi reload/mở bản lưu.
-Chưa có live invalidation/màn hình merge giữa tab; Documents Refresh đọc lại list,
-CAS từ chối stale rename/delete/save. Controller D02/D03/D07 sẽ bổ sung recovery.
+Chưa có màn hình merge giữa tab; Documents Refresh đọc lại Saved list,
+CAS từ chối stale rename/delete/save. Recovery invalidation chỉ gửi notification
+qua BroadcastChannel khi có, không gửi snapshot; session cũng refresh khi focus.
+
+### 4.3 Draft controller và recovery — K04/D02/D03
+
+`draft-controller.ts` là scheduler thuần: một snapshot pending mới nhất, một write
+in-flight, debounce 750ms và deadline 5s. Không ghi ghost/camera/palette/selection.
+Tab nền/tắt browser có thể throttle hoặc hủy job; deadline không cam kết flush
+thành công khi trang đóng. Visibility/pagehide flush là best effort; beforeunload
+cảnh báo nếu latest revision chưa được bảo vệ. Không hứa chống mất điện/crash mọi lúc.
+
+Slot có `revision` tăng đơn điệu sau commit/Undo/Redo, `savedRevision` của snapshot
+được Save ack, `epoch` lần mở và `draftId` của stream. Storage Saved version là
+trục riêng. ACK cũ không đánh dấu Protected cho edit mới hoặc workspace/session mới.
+Lỗi draft giữ latest pending, không retry nóng theo mỗi phím; Retry ghi latest.
+Không dùng token mới đọc lại để retry snapshot đã stale.
+
+`draft-repository.ts` ghi head + payload trong transaction cùng Saved/revision để
+kiểm base token. Stream có ID/epoch riêng từng lần mở, local revision phải mới hơn
+head hiện tại; hai tab không overwrite chung một draft. Head retired giữ tombstone,
+payload được bỏ. Save pause/drain controller, ghi checkpoint và retire **own** stream
+atomic; edit trong await giữ dirty và được bảo vệ ở stream mới với base mới. Save
+đến muộn sau discard bị chặn. Delete document retire **mọi** stream theo documentId;
+discard current chỉ retire own stream và cập nhật matching Saved preference atomic.
+Undo editing không phục hồi các IO này. Save/library publish vẫn là hai IO riêng.
+
+Retention: tối đa 32 live drafts và 64 MiB tổng JSON UTF-8 payload, mỗi snapshot
+32 MiB, ngoài các giới hạn document v2. Reject overflow và giữ mọi bản cũ; người
+dùng tải JSON hoặc discard rõ ràng để dọn. Không auto-evict theo tên/time/cell count.
+Listing chỉ đọc bounded heads; payload được schema/size/identity/metadata validate
+khi load/restore. Record sai được giữ nguyên và báo lỗi. Tombstones không tự GC.
+
+Documents phân Saved/Recovery. Reload mở checkpoint Saved theo preference rồi
+**offer recovery**, không tự thay công trình. Restore compare revision/epoch đã xem,
+kiểm Saved base còn nguyên, retire source và tạo stream mới + pointer trong cùng
+transaction. Saved checkpoint vẫn giữ; history bắt đầu lại ở snapshot phục hồi.
+Saved base đã đổi/xóa thì không resume ngầm. Recover copy dùng document ID mới,
+base null và bỏ library publication binding; Restore nguyên bản giữ binding nếu có.
+Xóa Saved đã vô hiệu hóa mọi recovery của nó thì không offer lại từ các stream cũ.
+Download JSON recovery là document v2, chưa phải portable project bundle D05.
+
+BroadcastChannel chỉ invalidation/đếm recovery, có fallback Refresh/focus; CAS mới
+là hàng rào đồng bộ. Không phải merge/multiplayer. Recovery độc lập Architecture/
+Component, đọc được dữ liệu khi thiếu assets/profile; rendering vẫn báo fallback.
 
 ## 5. Tương tác, transform và placement
 
@@ -531,10 +577,10 @@ Tách từng contract nhỏ để module có thể làm riêng; không đổi to
 
 ### 10.1 Revision, draft và saved records — K04
 
-**31/10/2026:** đã chốt/triển khai token storage, transaction Save/remove,
-tombstone, legacy read và Save acknowledgement theo epoch/snapshot (§4.2).
-Committed revision tăng đơn điệu, draft base/ack/scheduler, catalogue và conflict
-resolution UI bên dưới vẫn là hợp đồng dự kiến; không coi toàn bộ K04 đã hoàn tất.
+**31/10/2026:** token storage, Save/remove, tombstone, legacy read và Saved ack
+đã có (§4.2). Committed revision, savedRevision, draft base/ack/scheduler, retention
+và Recovery compare/claim đã freeze/triển khai ở §4.3. Multi-tab merge, portable
+và storage-health/eviction workflow chưa hoàn tất; không coi cả milestone D đã đóng.
 
 - Phân biệt `documentId`, `sessionEpoch` của lần mở, committed `revision`,
   `savedRevision`, draft base/ack và persistent record `generation` khi delete/recreate.
@@ -561,8 +607,8 @@ resolution UI bên dưới vẫn là hợp đồng dự kiến; không coi toàn
   Catalogue phải phân biệt bản trùng tên bằng ID/metadata và có rename/delete.
 - Xóa active doc phải nhất quán với preference, phần sửa chưa lưu và doc kế tiếp;
   mọi Save/autosave/save-before-switch cũ phải bị invalidated, kể cả từ tab khác.
-  Chỉ bỏ mục khỏi UI sau transaction thành công. Catalogue/delete/explicit discard
-  cho v2 hiện tại đã có (§4.2); draft recovery/scheduler chưa triển khai.
+  Chỉ bỏ mục khỏi UI sau transaction thành công. Catalogue/delete/discard và
+  recovery/scheduler v2 hiện tại đã có (§4.2–4.3).
 - Multi-tab có invalidation/conflict UI; Web Locks/BroadcastChannel nếu dùng cần
   feature detect, nhưng transactional compare-and-set vẫn là nền đảm bảo.
 - Store wrapper/version mới phải đọc records v5 cũ không phá hủy; migration test

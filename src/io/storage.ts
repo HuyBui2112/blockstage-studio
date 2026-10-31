@@ -5,10 +5,16 @@ import type { GameProfile } from '../core/profile'
 import { componentAssetSchema, type ComponentAsset } from '../editor/model'
 
 let opened: Promise<IDBDatabase> | undefined
-export const STORAGE_VERSION = 6
+export const STORAGE_VERSION = 7
 export function upgradeStorageDatabase(database: IDBDatabase) {
   for (const name of ['projects', 'packs', 'catalogs', 'profiles', 'preferences', 'editorDocuments', 'componentAssets', 'editorRevisions']) {
     if (!database.objectStoreNames.contains(name)) database.createObjectStore(name, { keyPath: 'id' })
+  }
+  if (!database.objectStoreNames.contains('editorDrafts')) database.createObjectStore('editorDrafts', { keyPath: 'id' })
+  if (!database.objectStoreNames.contains('editorDraftHeads')) {
+    const heads = database.createObjectStore('editorDraftHeads', { keyPath: 'id' })
+    heads.createIndex('documentId', 'documentId')
+    heads.createIndex('status', 'status')
   }
 }
 export function openStorageDatabase() {

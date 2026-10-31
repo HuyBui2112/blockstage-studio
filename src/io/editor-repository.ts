@@ -1,11 +1,12 @@
 import { z } from 'zod'
 import { editorDocumentSchema, type EditorDocument } from '../editor/model'
 import { openStorageDatabase } from './storage'
+import { DRAFT_STORES, notifyRecoveryChanged, retireDraft, retireDocumentDrafts, type DraftIdentity } from './draft-storage'
 
 /** Storage version is independent of edit/history revision. null means never persisted. */
 export type RepositoryToken = { generation: string; version: number }
 export type StoredEditorDocument = { document: EditorDocument; token: RepositoryToken; componentAssetId?: string; updatedAt?: number }
-export type RepositorySaveOptions = { activate?: boolean; componentAssetId?: string }
+export type RepositorySaveOptions = { activate?: boolean; componentAssetId?: string; draft?: DraftIdentity }
 export type RepositoryListing = { records: StoredEditorDocument[]; issues: string[] }
 const revisionSchema = z.object({
   id: z.string().min(1).max(200), generation: z.string().min(1).max(200),
@@ -91,7 +92,7 @@ export function createEditorRepository(database: () => Promise<IDBDatabase> = op
     async save(document: EditorDocument, expected: RepositoryToken | null, options: RepositorySaveOptions = {}): Promise<StoredEditorDocument> {
       // Parse/clone before the first await: caller edits cannot change the submitted snapshot.
       const snapshot = editorDocumentSchema.parse(document)
-      return mutate(snapshot.id, expected, snapshot.workspace, snapshot, { ...options })
+      return mutate(snapshot.id, expected, snapshot.workspace, snapshot, { ...options, draft: options.draft ? { ...options.draft } : undefined })
     },
     async remove(id: string, expected: RepositoryToken, scope: EditorDocument['workspace']): Promise<void> {
       await mutate(id, expected, scope, null)
@@ -124,9 +125,9 @@ export function createEditorRepository(database: () => Promise<IDBDatabase> = op
     const expectedToken = expected && { ...expected }
     const db = await database()
     return new Promise((resolve, reject) => {
-      const tx = db.transaction(['editorDocuments', 'editorRevisions', 'preferences'], 'readwrite')
+      const tx = db.transaction(['editorDocuments', 'editorRevisions', 'preferences', ...DRAFT_STORES], 'readwrite')
       let result: StoredEditorDocument | void, failure: unknown
-      tx.oncomplete = () => resolve(result)
+      tx.oncomplete = () => { notifyRecoveryChanged(); resolve(result) }
       tx.onerror = tx.onabort = () => reject(failure ?? tx.error ?? new Error('Could not write editor storage'))
       const documents = tx.objectStore('editorDocuments'), revisions = tx.objectStore('editorRevisions'), preferences = tx.objectStore('preferences')
       const oldDocument = documents.get(id), oldRevision = revisions.get(id)
@@ -147,8 +148,13 @@ export function createEditorRepository(database: () => Promise<IDBDatabase> = op
             documents.put(snapshot)
             if (options.activate !== false) preferences.put({ id: `editor:${scope}`, value: id })
             result = { document: snapshot, token: { generation, version }, updatedAt: revision.updatedAt, ...(componentAssetId ? { componentAssetId } : {}) }
+            if (options.draft) {
+              if (options.draft.documentId !== id || options.draft.workspace !== scope) throw new Error('Draft checkpoint identity mismatch')
+              retireDraft(tx, options.draft, error => { failure = error; tx.abort() }, undefined, true)
+            }
           } else {
             documents.delete(id)
+            retireDocumentDrafts(tx, id, error => { failure = error; tx.abort() })
             const preference = preferences.get(`editor:${scope}`)
             preference.onsuccess = () => { if (preference.result?.value === id) preferences.delete(`editor:${scope}`) }
           }
@@ -159,3 +165,4 @@ export function createEditorRepository(database: () => Promise<IDBDatabase> = op
 }
 
 export const editorRepository = createEditorRepository()
+export { stored as decodeStoredEditorDocument, matches as sameRepositoryToken }

@@ -10,14 +10,19 @@ import { componentAssetSchema, editorDocumentSchema, fromLegacyProject, newEdito
 import { componentFromSelection, groupObjects, insertObject, moveObjects, previewTransform, removeObjects, rotateObjects, setObjectPivot, ungroupObjects, updateObjectsState } from './operations'
 import { planBlockPlacement, planComponentPlacement, type PlacementHit, type PlacementOptions } from './placement-plan'
 import type { BlockState } from '../core/schema'
+import { draftRepository, type DraftWrite } from '../io/draft-repository'
+import { RECOVERY_CHANGED, type DraftHead } from '../io/draft-storage'
+import { createDraftController, type DraftController, type DraftStatus } from './draft-controller'
 
 export type EditorScope = 'architecture' | 'component'
 export type TransformIntent = { kind: 'move'; delta: Vec3 } | { kind: 'rotate'; turns: number }
-type Slot = { history: EditorHistory; selection: string[]; saved: EditorDocument | null; editingAssetId: string | null; epoch: string; token: RepositoryToken | null; pristine: boolean }
+type Slot = { history: EditorHistory; selection: string[]; saved: EditorDocument | null; editingAssetId: string | null; epoch: string; token: RepositoryToken | null; pristine: boolean; revision: number; savedRevision: number | null; draftId: string }
 type Preview = { scope: EditorScope; result: ReturnType<typeof previewTransform> }
 const messageOf = (error: unknown) => error instanceof Error ? error.message : String(error)
-const makeSlot = (scope: EditorScope): Slot => ({ history: createHistory(newEditorDocument(scope)), selection: [], saved: null, editingAssetId: null, epoch: crypto.randomUUID(), token: null, pristine: true })
+const makeSlot = (scope: EditorScope): Slot => ({ history: createHistory(newEditorDocument(scope)), selection: [], saved: null, editingAssetId: null, epoch: crypto.randomUUID(), token: null, pristine: true, revision: 0, savedRevision: null, draftId: crypto.randomUUID() })
 const sameToken = (a: RepositoryToken | null, b: RepositoryToken) => a?.generation === b.generation && a.version === b.version
+const draftIdentity = (slot: Slot) => ({ id: slot.draftId, epoch: slot.epoch, documentId: slot.history.document.id, workspace: slot.history.document.workspace })
+const draftWrite = (slot: Slot): DraftWrite | null => slot.pristine || slot.saved === slot.history.document ? null : ({ ...draftIdentity(slot), document: slot.history.document, revision: slot.revision, base: slot.token, ...(slot.editingAssetId ? { componentAssetId: slot.editingAssetId } : {}) })
 
 export function useEditorSession(catalog: Material[], neighborRules?: NeighborRules) {
   const [autoConnections, setAutoConnections] = useState<Record<EditorScope,boolean>>({architecture:false,component:false})
@@ -31,20 +36,72 @@ export function useEditorSession(catalog: Material[], neighborRules?: NeighborRu
   const currentSlots = useRef(slots)
   const saving = useRef(new Set<EditorScope>())
   const lifecycle = useRef(new Set<EditorScope>())
+  const controllers = useRef<Partial<Record<EditorScope, DraftController>>>({})
+  const [draftStatus, setDraftStatus] = useState<Record<EditorScope, DraftStatus>>({ architecture: { phase: 'idle' }, component: { phase: 'idle' } })
+  const [recoveryCount, setRecoveryCount] = useState<Record<EditorScope, number>>({ architecture: 0, component: 0 })
+  const refreshRecoveries = useCallback(async () => {
+    const list = await draftRepository.list()
+    const own = new Set(Object.values(currentSlots.current).map(slot => slot.draftId))
+    const records = list.records.filter(head => !own.has(head.id))
+    const architecture = records.filter(head => head.workspace === 'architecture').length, component = records.filter(head => head.workspace === 'component').length
+    setRecoveryCount(previous => previous.architecture === architecture && previous.component === component ? previous : { architecture, component })
+    return { ...list, records }
+  }, [])
   function setSlots(update: (previous: Record<EditorScope, Slot>) => Record<EditorScope, Slot>) {
-    const next = update(currentSlots.current)
+    const before = currentSlots.current, next = update(before)
+    for (const scope of ['architecture', 'component'] as const) {
+      const slot = next[scope]
+      if (slot.epoch === before[scope].epoch && slot.history.document !== before[scope].history.document) {
+        next[scope] = { ...slot, revision: before[scope].revision + 1 }
+      }
+    }
     currentSlots.current = next
     setSlotState(next)
+    for (const scope of ['architecture', 'component'] as const) if (next[scope] !== before[scope]) controllers.current[scope]?.update(draftWrite(next[scope]))
   }
   async function exclusive(scope: EditorScope, work: () => Promise<void>) {
     if (lifecycle.current.has(scope) || saving.current.has(scope)) { setError('An operation is in progress. Retry when it finishes.'); return false }
     lifecycle.current.add(scope)
     setBusy(previous => ({ ...previous, [scope]: true }))
     setPreview(null)
-    try { await work(); setError(''); return true }
+    try { await controllers.current[scope]?.pause(); await work(); setError(''); void refreshRecoveries().catch(() => {}); return true }
     catch (error) { setError(messageOf(error)); return false }
-    finally { lifecycle.current.delete(scope); setBusy(previous => ({ ...previous, [scope]: false })) }
+    finally { lifecycle.current.delete(scope); controllers.current[scope]?.resume(); setBusy(previous => ({ ...previous, [scope]: false })) }
   }
+
+  useEffect(() => {
+    const refresh = () => { void refreshRecoveries().catch(() => {}) }
+    let channel: BroadcastChannel | undefined
+    if (typeof BroadcastChannel !== 'undefined') { try { channel = new BroadcastChannel(RECOVERY_CHANGED); channel.onmessage = refresh } catch { /* Manual Refresh still works. */ } }
+    window.addEventListener(RECOVERY_CHANGED, refresh)
+    window.addEventListener('focus', refresh)
+    return () => { window.removeEventListener(RECOVERY_CHANGED, refresh); window.removeEventListener('focus', refresh); channel?.close() }
+  }, [refreshRecoveries])
+
+  useEffect(() => {
+    const owned = {} as Record<EditorScope, DraftController>
+    for (const scope of ['architecture', 'component'] as const) {
+      owned[scope] = createDraftController({ write: draftRepository.write, onStatus: status => setDraftStatus(previous => ({ ...previous, [scope]: status })) })
+      controllers.current[scope] = owned[scope]
+      owned[scope].update(draftWrite(currentSlots.current[scope]))
+    }
+    const flush = () => { for (const controller of Object.values(owned)) void controller.flush() }
+    const visibility = () => { if (document.hidden) flush() }
+    const unload = (event: BeforeUnloadEvent) => {
+      if ((['architecture', 'component'] as const).some(scope => {
+        const slot = currentSlots.current[scope], status = owned[scope].status
+        return !!draftWrite(slot) && (status.phase !== 'protected' || status.revision !== slot.revision)
+      })) { event.preventDefault(); event.returnValue = '' }
+    }
+    document.addEventListener('visibilitychange', visibility)
+    window.addEventListener('pagehide', flush)
+    window.addEventListener('beforeunload', unload)
+    return () => {
+      document.removeEventListener('visibilitychange', visibility); window.removeEventListener('pagehide', flush); window.removeEventListener('beforeunload', unload)
+      Object.values(owned).forEach(controller => controller.stop())
+      controllers.current = {}
+    }
+  }, [])
 
   useEffect(() => {
     let active = true
@@ -75,15 +132,15 @@ export function useEditorSession(catalog: Material[], neighborRules?: NeighborRu
             const token = results[0].status === 'fulfilled' ? results[0].value.records.find(record => record.document.id === doc.id)!.token : null
             const record = results[0].status === 'fulfilled' ? results[0].value.records.find(record => record.document.id === doc.id)! : null
             const assetId = record?.componentAssetId ?? doc.id
-            next[scope] = { history, selection: [], saved: history.document, editingAssetId: scope === 'component' && restoredComponents.some(asset => asset.id === assetId) ? assetId : null, epoch: crypto.randomUUID(), token, pristine: false }
+            next[scope] = { history, selection: [], saved: history.document, editingAssetId: scope === 'component' && restoredComponents.some(asset => asset.id === assetId) ? assetId : null, epoch: crypto.randomUUID(), token, pristine: false, revision: 0, savedRevision: 0, draftId: crypto.randomUUID() }
           }
         }
         return next
       })
       setError(issues.join(' '))
-    }).finally(() => { if (active) setReady(true) })
+    }).finally(() => { if (active) { setReady(true); void refreshRecoveries().catch(error => setError(messageOf(error))) } })
     return () => { active = false }
-  }, [])
+  }, [refreshRecoveries])
 
   function commit(scope: EditorScope, next: EditorDocument, label: string, selection?: string[]) {
     if (lifecycle.current.has(scope)) throw new Error('A document operation is in progress')
@@ -169,12 +226,13 @@ export function useEditorSession(catalog: Material[], neighborRules?: NeighborRu
     saving.current.add(scope)
     const slot = currentSlots.current[scope], snapshot = slot.history.document
     try {
-      const record = await editorRepository.save(snapshot, slot.token, { componentAssetId: slot.editingAssetId ?? undefined })
-      setSlots(previous => previous[scope].epoch === slot.epoch ? ({ ...previous, [scope]: { ...previous[scope], saved: snapshot, token: record.token } }) : previous)
+      await controllers.current[scope]?.pause()
+      const record = await editorRepository.save(snapshot, slot.token, { componentAssetId: slot.editingAssetId ?? undefined, draft: draftIdentity(slot) })
+      setSlots(previous => previous[scope].epoch === slot.epoch ? ({ ...previous, [scope]: { ...previous[scope], saved: snapshot, token: record.token, savedRevision: slot.revision, draftId: crypto.randomUUID() } }) : previous)
       setError('')
       return true
     } catch (error) { setError(messageOf(error)); throw error }
-    finally { saving.current.delete(scope) }
+    finally { saving.current.delete(scope); if (!lifecycle.current.has(scope)) controllers.current[scope]?.resume() }
   }
   async function save(scope: EditorScope) {
     if (lifecycle.current.has(scope)) { setError('A document operation is in progress. Retry when it finishes.'); return false }
@@ -183,7 +241,7 @@ export function useEditorSession(catalog: Material[], neighborRules?: NeighborRu
   async function preserve(scope: EditorScope) {
     const slot = currentSlots.current[scope]
     if ((slot.pristine && !slot.saved) || slot.saved === slot.history.document) return
-    await persist(scope)
+    if (!await controllers.current[scope]?.flush()) throw new Error(controllers.current[scope]?.status.error ?? 'Could not protect the draft. Save/export JSON or retry before switching.')
   }
   async function newDocument(scope: EditorScope) {
     return exclusive(scope, async () => {
@@ -202,7 +260,7 @@ export function useEditorSession(catalog: Material[], neighborRules?: NeighborRu
       setSlots(previous => {
         const history = createHistory(record.document)
         const assetId = record.componentAssetId ?? record.document.id
-        return { ...previous, [scope]: { history, selection: [], saved: history.document, token: record.token, epoch: crypto.randomUUID(), pristine: false, editingAssetId: scope === 'component' && components.some(asset => asset.id === assetId) ? assetId : null } }
+        return { ...previous, [scope]: { history, selection: [], saved: history.document, token: record.token, epoch: crypto.randomUUID(), pristine: false, editingAssetId: scope === 'component' && components.some(asset => asset.id === assetId) ? assetId : null, revision: 0, savedRevision: 0, draftId: crypto.randomUUID() } }
       })
     })
   }
@@ -215,7 +273,7 @@ export function useEditorSession(catalog: Material[], neighborRules?: NeighborRu
       await preserve(scope)
       const imported = { ...document, id: crypto.randomUUID(), workspace: scope }
       await editorRepository.activate(scope, null, null)
-      setSlots(previous => ({ ...previous, [scope]: { history: createHistory(imported), selection: [], saved: null, editingAssetId: null, token: null, epoch: crypto.randomUUID(), pristine: false } }))
+      setSlots(previous => ({ ...previous, [scope]: { history: createHistory(imported), selection: [], saved: null, editingAssetId: null, token: null, epoch: crypto.randomUUID(), pristine: false, revision: 1, savedRevision: null, draftId: crypto.randomUUID() } }))
     })
   }
   async function saveComponent(scope: EditorScope, selectionOnly = true) {
@@ -245,7 +303,7 @@ export function useEditorSession(catalog: Material[], neighborRules?: NeighborRu
       if (name.trim() === record.document.name) return
       const next = editorDocumentSchema.parse({ ...record.document, name: name.trim() })
       const updated = await editorRepository.save(next, record.token, { activate: false })
-      if (active) setSlots(previous => ({ ...previous, [scope]: { ...previous[scope], history: executeHistory(previous[scope].history, next, 'Rename document'), saved: next, token: updated.token } }))
+      if (active) setSlots(previous => ({ ...previous, [scope]: { ...previous[scope], history: executeHistory(previous[scope].history, next, 'Rename document'), saved: next, token: updated.token, savedRevision: previous[scope].revision + 1 } }))
     })
   }
   async function deleteDocument(record: StoredEditorDocument, expectedCurrent: EditorDocument) {
@@ -262,19 +320,37 @@ export function useEditorSession(catalog: Material[], neighborRules?: NeighborRu
     return exclusive(scope, async () => {
       const slot = currentSlots.current[scope]
       if (slot.history.document !== expectedCurrent) throw new Error('The current document changed. Review the discard confirmation again.')
-      await editorRepository.activate(scope, slot.saved?.id ?? null, slot.token)
+      await draftRepository.discard(draftIdentity(slot), undefined, { id: slot.saved?.id ?? null, token: slot.token })
       if (slot.saved) {
         const history = createHistory(slot.saved)
-        setSlots(previous => ({ ...previous, [scope]: { ...slot, history, saved: history.document, selection: [], epoch: crypto.randomUUID() } }))
+        setSlots(previous => ({ ...previous, [scope]: { ...slot, history, saved: history.document, selection: [], epoch: crypto.randomUUID(), revision: 0, savedRevision: 0, draftId: crypto.randomUUID() } }))
       } else setSlots(previous => ({ ...previous, [scope]: makeSlot(scope) }))
     })
   }
+  async function restoreRecovery(head: DraftHead, copy: boolean) {
+    const scope = head.workspace
+    return exclusive(scope, async () => {
+      await preserve(scope)
+      const recovered = await draftRepository.restore(head, { id: crypto.randomUUID(), epoch: crypto.randomUUID(), ...(copy ? { copyDocumentId: crypto.randomUUID() } : {}) })
+      const history = createHistory(recovered.document)
+      const slot: Slot = { history, saved: recovered.saved?.document ?? null, token: recovered.saved?.token ?? null,
+        selection: [], pristine: false, editingAssetId: recovered.head.componentAssetId ?? null,
+        epoch: recovered.head.epoch, draftId: recovered.head.id, revision: 1, savedRevision: recovered.saved ? 0 : null }
+      setSlots(previous => ({ ...previous, [scope]: slot }))
+      controllers.current[scope]?.adopt(draftWrite(slot)!)
+    })
+  }
+  async function discardRecovery(head: DraftHead) {
+    return exclusive(head.workspace, () => draftRepository.discard(head, head.revision))
+  }
+  async function recoveryDocument(head: DraftHead) { return draftRepository.load(head) }
+  async function retryDraft(scope: EditorScope) { return controllers.current[scope]?.retry() ?? false }
   async function editComponent(asset: ComponentAsset) {
     return exclusive('component', async () => {
       await preserve('component')
       const document = { ...newEditorDocument('component'), name: asset.name, objects: structuredClone(asset.objects) }
       await editorRepository.activate('component', null, null)
-      setSlots(previous => ({ ...previous, component: { history: createHistory(document), selection: [], saved: null, editingAssetId: asset.id, token: null, epoch: crypto.randomUUID(), pristine: false } }))
+      setSlots(previous => ({ ...previous, component: { history: createHistory(document), selection: [], saved: null, editingAssetId: asset.id, token: null, epoch: crypto.randomUUID(), pristine: false, revision: 1, savedRevision: null, draftId: crypto.randomUUID() } }))
     })
   }
   function placeComponent(scope: EditorScope, asset: ComponentAsset, pos: Vec3, turns: QuarterTurn = 0) {
@@ -301,7 +377,7 @@ export function useEditorSession(catalog: Material[], neighborRules?: NeighborRu
     } catch (error) { setError(messageOf(error)) }
   }
   function configureConnections(scope:EditorScope,enabled:boolean){setPreview(null);setConnectionNotes(null);setAutoConnections(previous=>({...previous,[scope]:enabled}))}
-  return { busy, refreshDocuments, renameSaved, deleteDocument, discardChanges, autoConnections, connectionNotes, configureConnections, slots, components, ready, error, setError, preview, cancelPreview: () => setPreview(null), select, history, transform, place, group, ungroup, remove, updateState, setPivot, move, rotate, rename, save, newDocument, open, importDocument, saveComponent, editComponent, placeComponent, importComponent, removeComponent }
+  return { draftStatus, recoveryCount, refreshRecoveries, restoreRecovery, discardRecovery, recoveryDocument, retryDraft, busy, refreshDocuments, renameSaved, deleteDocument, discardChanges, autoConnections, connectionNotes, configureConnections, slots, components, ready, error, setError, preview, cancelPreview: () => setPreview(null), select, history, transform, place, group, ungroup, remove, updateState, setPivot, move, rotate, rename, save, newDocument, open, importDocument, saveComponent, editComponent, placeComponent, importComponent, removeComponent }
 }
 
 export type EditorSession = ReturnType<typeof useEditorSession>

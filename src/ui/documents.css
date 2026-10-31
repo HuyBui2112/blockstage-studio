@@ -22,4 +22,14 @@
 .document-confirm>div { display:flex; justify-content:flex-end; gap:8px }
 .document-manager-error { color:var(--accent); font-size:11px; line-height:1.6; overflow-wrap:anywhere }
 .documents-footer>span { color:var(--muted); font-size:11px }
+.documents-tabs { display:flex; gap:6px }
+.documents-tabs button { flex:1; padding:8px; background:transparent; border-color:transparent; color:var(--muted) }
+.documents-tabs button.active { color:var(--accent); border-color:var(--border); background:var(--input) }
+.documents-tabs span { margin-left:8px; font-size:10px }
+.recovery-heading { display:flex; align-items:center; justify-content:space-between; gap:8px; color:var(--muted); font-size:10px; margin-bottom:12px }
+.recovery-item { padding:13px; border:1px solid var(--border); border-radius:6px; margin:7px 0 }
+.recovery-item strong { display:block; font-size:12px; overflow-wrap:anywhere }
+.recovery-item small,.recovery-item code { display:block; color:var(--muted); font-size:10px; margin-top:7px }
+.recovery-actions { display:flex; justify-content:flex-end; gap:6px; flex-wrap:wrap; margin-top:12px }
+.recovery-list .document-confirm { margin-top:12px }
 @media (max-width:620px) { .document-current { flex-wrap:wrap } .document-current>.button { margin-left:31px } .saved-document { gap:0 } .saved-document-open { padding:6px; gap:8px } }

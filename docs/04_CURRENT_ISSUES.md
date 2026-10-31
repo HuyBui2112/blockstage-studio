@@ -22,7 +22,7 @@ sót nền tảng, nhưng chưa được gom thành một nguyên nhân khi chư
 | BUG-04 | Fence/wall phải chỉnh connection state bằng tay | **RESOLVED trong static scene scope:** opt-in fence/wall/gate auto connections, cùng preview/commit và Undo; dynamic shapes có reason giữ state | 521 actual-world fixtures; không full simulation/auto-pane | G02c/G02e, G04a/G04c, G07; pane khi mở rộng |
 | BUG-05 | Đặt đèn treo vào chain khó/sai vị trí hoặc bị đè | **PARTIAL / bounded fix:** mặt ô chain + Context hanging dọc + cảnh báo support hữu hạn; còn side fallback/fluid/support khác | Đã kiểm tra vanilla 26.2; Fabric chưa kiểm chứng | K05/K03, G01/G05/G07, V02 |
 | BUG-06 | Block mảnh/nhỏ khó click để chọn | **RESOLVED trong editor hiện hành:** click theo occupied cell gần nhất, không phụ thuộc mesh mảnh | Theo dõi scene lớn; chưa có GPU/performance claim | K05, V01/V02/V06, P02/P04 |
-| BUG-07 | Open saved tích tụ Untitled component/bản làm dở, không có nút xóa | **RESOLVED cho quản lý v2 hiện tại:** Documents mở/rename/delete, explicit discard, không Save placeholder pristine; recovery/live invalidation vẫn chưa có | Tiếp tục controller/recovery, không bật autosave ngầm | K04, D01–D04, D07 |
+| BUG-07 | Open saved tích tụ Untitled component/bản làm dở, không có nút xóa | **RESOLVED cho quản lý v2 hiện tại:** Documents mở/rename/delete, discard; draft riêng/Recovery và chống ghi lại sau xóa đã có | Tiếp tục portable/storage health, không coi recovery là backup ngoài origin | K04, D01–D04, D07 |
 
 BUG-05 đã có oracle lantern/chain riêng; fixture block khác không chứng minh luật
 treo đèn. Không tự gán mọi renderer hoặc block chức năng là lỗi. Nội dung “đã đọc
@@ -181,9 +181,14 @@ stale delete bị chặn, peer Save không resurrect ID và giữ local edits. �
 Native repository còn thử late write/delete và activate đến muộn không phục hồi
 preference. Lỗi quota là fault injection, không tuyên bố đã làm đầy disk thật.
 
-**Còn ngoài scope:** D02/D03 recovery store/scheduler, autosave nền, live
-invalidation/merge và D07 recovery/portable suite. Dùng Refresh để đọc list tab
-khác; conflict hướng dẫn JSON backup rồi reload. Tài liệu 03 giữ thứ tự tiếp theo.
+**Bổ sung D02/D03:** đã có autosave draft riêng và Documents → Recovery:
+Restore/Recover copy/download/discard. New/Open bảo vệ draft, không tự tạo Saved;
+Save retire own stream, Delete document retire mọi recovery stream atomic. Các
+callback đến muộn không khôi phục bản đã xóa. Recovery có invalidation notification
+giữa tab khi hỗ trợ, Saved list dùng Refresh; không có merge tự động.
+**Còn ngoài scope:** portable bundle/storage health và D07 acceptance đầy đủ;
+recovery thuộc origin, không bảo đảm chống mọi crash/eviction. Tài liệu 03 giữ
+thứ tự tiếp theo và giới hạn bằng chứng.
 
 **Người dùng thấy:** dropdown có hai mục Untitled component cùng mục Column;
 không tìm thấy nút xóa những bản chưa đưa vào thư viện component/công trình.
@@ -230,7 +235,7 @@ xóa active/inactive document, thư viện component độc lập, reload, Save/
 **Cách xác thực lại:** chạy production `test:browser` với JAR/profile local như
 tài liệu 02; suite `documents-browser-scenarios.mjs` dùng profile browser riêng.
 Chỉ các records/asset fixtures trong profile cô lập bị sửa/xóa, không dùng storage
-hoặc world cá nhân. Phạm vi chưa có recovery được giữ rõ ở trên.
+hoặc world cá nhân. Giới hạn recovery/portable được giữ rõ ở trên.
 
 ## Ghi nhận ban đầu (giữ làm bối cảnh; trạng thái mới nằm ở các đợt sửa phía trên)
 

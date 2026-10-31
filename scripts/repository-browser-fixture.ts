@@ -1,6 +1,8 @@
 import { createEditorRepository, RepositoryConflict } from '../src/io/editor-repository'
 import { STORAGE_VERSION, upgradeStorageDatabase } from '../src/io/storage'
 import { newEditorDocument } from '../src/editor/model'
+import { createDraftRepository } from '../src/io/draft-repository'
+import { DraftConflict, MAX_DRAFTS } from '../src/io/draft-storage'
 
 /** Compiled only by the smoke harness, never by the product build. Uses native IDB. */
 export async function runRepositoryChecks() {
@@ -145,6 +147,106 @@ export async function runRepositoryChecks() {
     await rejects(a.activate('component', renamed.document.id, renamed.token), RepositoryConflict.name)
     assert(await raw(dbA, 'preferences', 'editor:component') === undefined, 'Late activation must not restore a deleted preference')
     checks.push('document deletion preserves same-ID component asset')
+    const drafts = createDraftRepository(async () => dbA), peerDrafts = createDraftRepository(async () => dbB)
+    const draftDocument = newEditorDocument(), draftId = crypto.randomUUID()
+    const draft = { id: draftId, epoch: draftId, documentId: draftDocument.id, workspace: draftDocument.workspace, document: draftDocument, base: null, revision: 1 }
+    const beforePointer = await raw(dbA, 'preferences', 'editor:architecture')
+    const protectedDraft = await drafts.write(draft)
+    assert(await raw(dbA, 'editorDocuments', draftDocument.id) === undefined, 'Autosave must never promote a draft to Saved')
+    assert(equal(await raw(dbA, 'preferences', 'editor:architecture'), beforePointer), 'Draft write must not change Saved active pointer')
+    const newer = await drafts.write({ ...draft, revision: 2, document: { ...draft.document, name: 'Newer draft' } })
+    await rejects(drafts.discard(protectedDraft, protectedDraft.revision), DraftConflict.name)
+    await rejects(drafts.load(protectedDraft), DraftConflict.name)
+    await drafts.discard(newer, newer.revision)
+    await rejects(drafts.write({ ...draft, revision: 3 }), DraftConflict.name)
+    await rejects(a.save(draftDocument, null, { draft }), DraftConflict.name)
+    assert(await raw(dbA, 'editorDocuments', draftDocument.id) === undefined, 'Late Save must abort if its draft stream was discarded')
+    checks.push('draft and Saved separation; stale discard/load rejected; tombstone blocks late draft and Save')
+
+    const checkpoint = await a.save(newEditorDocument(), null)
+    const ownId = crypto.randomUUID(), peerId = crypto.randomUUID()
+    const own = { ...draft, id: ownId, epoch: ownId, documentId: checkpoint.document.id, document: checkpoint.document, base: checkpoint.token }
+    const peerWrite = { ...own, id: peerId, epoch: peerId }
+    const ownHead = await drafts.write(own), peerHead = await peerDrafts.write(peerWrite)
+    await rejects(fault.save(checkpoint.document, checkpoint.token, { draft: own }), 'QuotaExceededError')
+    assert((await drafts.load(ownHead)).id === checkpoint.document.id, 'Failed Save must preserve recovery payload')
+    const savedAgain = await a.save(checkpoint.document, checkpoint.token, { draft: own })
+    assert(!(await drafts.list()).records.some(head => head.id === ownId), 'Successful Save must atomically retire its own recovery')
+    assert((await drafts.list()).records.some(head => head.id === peerId), 'Save must not delete a peer recovery')
+    await rejects(drafts.restore(peerHead, { id: crypto.randomUUID(), epoch: crypto.randomUUID() }), DraftConflict.name)
+    const forked = await drafts.restore(peerHead, { id: crypto.randomUUID(), epoch: crypto.randomUUID(), copyDocumentId: crypto.randomUUID() })
+    assert(forked.document.id !== checkpoint.document.id && forked.saved === null, 'Conflicting recovery must fork with a fresh document ID')
+    assert(equal(await a.load(checkpoint.document.id), savedAgain), 'Recover copy must not modify original Saved checkpoint')
+    await rejects(peerDrafts.write({ ...peerWrite, revision: 2 }), DraftConflict.name)
+    const liveAfter = { ...own, id: crypto.randomUUID(), epoch: crypto.randomUUID(), base: savedAgain.token }
+    await drafts.write(liveAfter)
+    await a.remove(checkpoint.document.id, savedAgain.token, 'architecture')
+    assert(!(await drafts.list()).records.some(head => head.documentId === checkpoint.document.id), 'Document delete must retire every recovery stream for the document')
+    await rejects(peerDrafts.write({ ...liveAfter, revision: 2 }), DraftConflict.name)
+    checks.push('Save retires only own stream; failed Save preserves recovery; changed-base copy; document delete invalidates all streams')
+
+    const remaining = (await drafts.list()).records
+    for (const head of remaining) await drafts.discard(head, head.revision)
+    const capacity = []
+    for (let index = 0; index < MAX_DRAFTS; index++) {
+      const document = newEditorDocument(), id = crypto.randomUUID()
+      capacity.push(await drafts.write({ id, epoch: id, documentId: document.id, workspace: document.workspace, base: null, revision: 1, document }))
+    }
+    const extraDoc = newEditorDocument(), extraId = crypto.randomUUID()
+    const extraWrite = { id: extraId, epoch: extraId, documentId: extraDoc.id, workspace: extraDoc.workspace, base: null, revision: 1, document: extraDoc }
+    await rejects(drafts.write(extraWrite))
+    assert((await drafts.list()).records.length === MAX_DRAFTS, 'Retention cap must reject new work without deleting old user drafts')
+    await drafts.discard(capacity[0], capacity[0].revision)
+    await drafts.write(extraWrite)
+    checks.push('bounded recovery retention rejects overflow; explicit discard frees capacity without automatic eviction')
+    for (const head of (await drafts.list()).records) await drafts.discard(head, head.revision)
+    const byteHeads = []
+    for (let index = 0; index < 2; index++) {
+      const document = newEditorDocument(), id = crypto.randomUUID()
+      const head = await drafts.write({ id,epoch:id,documentId:document.id,workspace:document.workspace,base:null,revision:1,document })
+      const simulatedLargeHead = { ...head, bytes:32 * 1024 ** 2 }
+      await write(dbA, 'editorDraftHeads', simulatedLargeHead)
+      byteHeads.push(simulatedLargeHead)
+    }
+    await rejects(drafts.write({ ...extraWrite, id:crypto.randomUUID(),epoch:crypto.randomUUID() }))
+    assert((await drafts.list()).records.length === 2, 'Aggregate byte budget must reject overflow without evicting live heads')
+    for (const head of byteHeads) await drafts.discard(head, head.revision)
+    const componentDocument = newEditorDocument('component'), componentDraftId = crypto.randomUUID()
+    const bound = await drafts.write({ id:componentDraftId,epoch:componentDraftId,documentId:componentDocument.id,workspace:'component',base:null,revision:1,document:componentDocument,componentAssetId:legacy.id })
+    const resumed = await drafts.restore(bound, { id:crypto.randomUUID(),epoch:crypto.randomUUID() })
+    assert(resumed.head.componentAssetId === legacy.id, 'Resume must keep component publication provenance')
+    const independent = await drafts.restore(resumed.head, { id:crypto.randomUUID(),epoch:crypto.randomUUID(),copyDocumentId:crypto.randomUUID() })
+    assert(independent.head.componentAssetId === undefined, 'Independent recovery copy must not keep a library publication binding')
+    const corruptPayload = { id:independent.head.id,document:{ ...independent.document,name:'Corrupt metadata mismatch' } }
+    await write(dbA, 'editorDrafts', corruptPayload)
+    await rejects(drafts.load(independent.head))
+    await rejects(drafts.restore(independent.head, { id:crypto.randomUUID(),epoch:crypto.randomUUID() }))
+    assert(equal(await raw(dbA, 'editorDrafts', independent.head.id), corruptPayload), 'Invalid payload must be left untouched after failed recovery')
+    checks.push('aggregate payload budget; resume/copy binding ownership; malformed recovery payload preserved')
+    const version6Name = `${name}-v6`
+    let version6Db: IDBDatabase | undefined
+    try {
+      version6Db = await new Promise<IDBDatabase>((resolve, reject) => {
+        const request = indexedDB.open(version6Name, 6)
+        request.onupgradeneeded = () => { for (const store of ['projects','packs','catalogs','profiles','preferences','editorDocuments','componentAssets','editorRevisions']) request.result.createObjectStore(store, { keyPath:'id' }) }
+        request.onerror = () => reject(request.error); request.onsuccess = () => resolve(request.result)
+      })
+      const version6Doc = newEditorDocument(), version6Token = { id:version6Doc.id,generation:'v6-generation',version:8,deleted:false,updatedAt:1234 }
+      await write(version6Db, 'editorDocuments', version6Doc); await write(version6Db, 'editorRevisions', version6Token)
+      version6Db.close()
+      version6Db = await new Promise<IDBDatabase>((resolve, reject) => {
+        const request = indexedDB.open(version6Name, STORAGE_VERSION)
+        request.onupgradeneeded = () => upgradeStorageDatabase(request.result)
+        request.onerror = () => reject(request.error); request.onsuccess = () => resolve(request.result)
+      })
+      assert(equal(await raw(version6Db, 'editorDocuments', version6Doc.id), version6Doc), 'v6 upgrade must not rewrite Saved payload')
+      assert(equal(await raw(version6Db, 'editorRevisions', version6Doc.id), version6Token), 'v6 upgrade must preserve repository token and metadata')
+      assert(version6Db.objectStoreNames.contains('editorDraftHeads') && version6Db.objectStoreNames.contains('editorDrafts'), 'v7 must add recovery stores')
+    } finally {
+      version6Db?.close()
+      await new Promise<void>((resolve, reject) => { const request=indexedDB.deleteDatabase(version6Name);request.onsuccess=()=>resolve();request.onerror=()=>reject(request.error) })
+    }
+    checks.push('additive v6 to v7 migration preserves Saved payload/token/metadata')
     return checks
   } finally {
     connections.forEach(db => db.close())

@@ -94,14 +94,21 @@ cấu trúc editor; NBT flatten thành dữ liệu game. Phạm vi world/Fabric 
 ## Lưu dữ liệu và kiểm tra
 
 Document, component, pack/profile lưu trong IndexedDB theo origin. Đổi IP/cổng,
-trình duyệt hoặc xóa storage có thể làm mất quyền truy cập dữ liệu cũ. **Chưa có
-autosave/crash recovery**; lưu thường xuyên và xuất JSON backup. JSON không nhúng
-resource pack/profile; giữ file nguồn để nhập lại khi chuyển máy.
+trình duyệt hoặc xóa storage có thể làm mất quyền truy cập dữ liệu cũ. **Draft
+protected** là bản nháp đã ghi thành công; **Saved** là checkpoint do bạn bấm Save.
+Autosave draft sau khoảng 750ms ngừng sửa, tối đa 5s khi sửa liên tục (tab nền có
+thể chậm hơn). Trong lúc còn Protecting draft hoặc báo lỗi, phần mới chưa được bảo vệ.
+Sau reload, mở **Documents → Recovery → Restore**; công cụ không tự áp bản nháp.
+Nếu Saved đã đổi, dùng **Recover copy** hoặc nút tải JSON. Lưu thường xuyên và
+xuất JSON backup ngoài trình duyệt; recovery vẫn thuộc origin, không chống mọi
+crash/mất điện hoặc browser eviction. JSON không nhúng pack/profile, giữ file nguồn.
 Save có kiểm tra phiên bản lưu để tránh ghi đè từ phiên khác. Nếu gặp conflict,
 xuất JSON giữ chỉnh sửa local trước khi reload/mở lại bản đã lưu. New trên bản
-rỗng chưa sửa không tạo thêm Saved; bản có sửa được lưu trước khi chuyển.
+rỗng chưa sửa không tạo thêm Saved/draft; bản có sửa được bảo vệ ở Recovery trước khi chuyển.
 Save chủ động vẫn lưu bản rỗng. Documents có Refresh để đọc thay đổi từ tab khác;
-chưa có live invalidation hoặc autosave/recovery nền.
+recovery có thông báo thay đổi giữa tab khi browser hỗ trợ. Saved list không tự
+merge hoặc ghi đè local edits. Lỗi bảo vệ hiện nút Retry; giới hạn 32 recovery
+copies / 64 MiB payload, mỗi snapshot tối đa 32 MiB. Không tự xóa bản cũ để dọn chỗ.
 
 ```powershell
 fnm exec --using 24.19.0 pnpm.cmd check

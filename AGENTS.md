@@ -40,13 +40,21 @@ Banner base-color/static pose and inactive conduit are partial special renderers
 do not claim banner patterns, cloth animation, active conduit or payload export.
 Documentation is consolidated; future implementation starts from a user-authorized
 slice. Do not treat the proposed next slice as already active.
-Editor document Save uses the CAS repository with v6 revision sidecars; never
+Editor document Save uses the CAS repository with v7 additive draft stores and revision sidecars; never
 restore an unguarded snapshot writer. Save/remove and matching preference changes
 are transactional. Tombstoned IDs cannot be reused. Documents provides saved
-catalogue/rename/delete and explicit discard; recovery/autosave remains planned.
+catalogue/rename/delete, explicit discard and Recovery. Draft protection is separate
+from explicit Save; switching protects drafts without promoting them to Saved.
 Lifecycle operations lock their workspace; Save alone still permits editing.
 Never auto-save pristine placeholders on switch or reuse a component asset ID
 as its new working document ID. Library provenance lives in revision metadata.
+Committed local revision increases on Undo/Redo; savedRevision is not a storage token.
+Draft controller coalesces committed snapshots only (750ms idle / 5s maximum delay).
+Never rebase a stale writer to a freshly-read token. Save retires its own stream;
+document delete retires all streams atomically. Recovery claims use displayed
+epoch/revision and create a fresh stream; conflicting Saved bases require copy.
+Recovery copy clears library publication binding. Keep bounded retention without
+automatic eviction; report protection failures and retain local edits for retry/JSON.
 
 - Reuse the existing React/TypeScript/Three.js base and verified asset pipeline.
 - Keep existing project data and import/export/domain code intact during changes.

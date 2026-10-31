@@ -4,8 +4,9 @@ import type { RepositoryListing, StoredEditorDocument } from '../io/editor-repos
 import { Dialog } from './Dialog'
 import { Icon } from './Icon'
 import './documents.css'
+import { RecoveryList, type RecoveryProps } from './RecoveryList'
 
-type Props = {
+type Props = RecoveryProps & {
   document: EditorDocument; saved: EditorDocument | null; pristine: boolean; error: string
   onList: () => Promise<RepositoryListing>
   onOpen: (document: EditorDocument) => Promise<boolean>
@@ -13,11 +14,12 @@ type Props = {
   onDelete: (record: StoredEditorDocument, current: EditorDocument) => Promise<boolean>
   onDiscard: (current: EditorDocument) => Promise<boolean>
   onClose: () => void
+  recoveryCount: number; initialRecovery?: boolean
 }
 type Pending = { kind: 'delete' | 'rename'; record: StoredEditorDocument; current: EditorDocument } | { kind: 'discard'; current: EditorDocument }
 const cellCount = (objects: EditorObject[]): number => objects.reduce((sum, object) => sum + object.cells.length + cellCount(object.children), 0)
 
-export function DocumentManager({ document, saved, pristine, error, onList, onOpen, onRename, onDelete, onDiscard, onClose }: Props) {
+export function DocumentManager({ document, saved, pristine, error, onList, onOpen, onRename, onDelete, onDiscard, onClose, recoveryCount, initialRecovery, ...recovery }: Props) {
   const [records, setRecords] = useState<StoredEditorDocument[]>([])
   const [loading, setLoading] = useState(true)
   const [working, setWorking] = useState(false)
@@ -26,6 +28,7 @@ export function DocumentManager({ document, saved, pristine, error, onList, onOp
   const [limit, setLimit] = useState(40)
   const [pending, setPending] = useState<Pending | null>(null)
   const [name, setName] = useState('')
+  const [tab, setTab] = useState<'saved' | 'recovery'>(initialRecovery ? 'recovery' : 'saved')
   const confirmation = useRef<HTMLElement>(null)
   const dirty = saved !== document
   useEffect(() => {
@@ -63,6 +66,8 @@ export function DocumentManager({ document, saved, pristine, error, onList, onOp
         <div><strong>{document.name}</strong><small>{document.workspace === 'architecture' ? 'Architecture' : 'Component Editor'} · {saved ? dirty ? 'Unsaved changes' : 'Saved' : 'Not saved'}</small></div>
         <button className="button" aria-label="Discard document changes" disabled={working || !dirty || pristine} onClick={() => setPending({ kind: 'discard', current: document })}>Discard changes</button>
       </section>
+      <nav className="documents-tabs" aria-label="Document storage"><button className={tab === 'saved' ? 'active' : ''} disabled={working} onClick={() => setTab('saved')}>Saved</button><button aria-label="Recovery documents" className={tab === 'recovery' ? 'active' : ''} disabled={working} onClick={() => setTab('recovery')}>Recovery{recoveryCount > 0 && <span>{recoveryCount}</span>}</button></nav>
+      {tab === 'recovery' ? <RecoveryList {...recovery} scope={document.workspace} onClose={onClose} error={error} onBusy={setWorking} /> : <>
       <div className="document-search"><input type="search" aria-label="Search saved documents" placeholder="Search saved documents…" value={query} onChange={event => { setQuery(event.target.value); setLimit(40) }} /><button className="icon-button" aria-label="Refresh saved documents" disabled={working || loading} onClick={() => { setPending(null); void refresh() }}><Icon name="refresh" size={16} /></button></div>
       <div className="document-list" aria-label="Saved documents">
         {loading && <p role="status">Loading documents…</p>}
@@ -79,10 +84,11 @@ export function DocumentManager({ document, saved, pristine, error, onList, onOp
       </div>
       {pending && <section ref={confirmation} className="document-confirm" aria-label="Document confirmation">
         <strong>{pending.kind === 'rename' ? 'Rename saved document' : pending.kind === 'discard' ? 'Discard unsaved changes?' : `Delete “${pending.record.document.name}”?`}</strong>
-        {pending.kind === 'rename' ? <input aria-label="Saved document name" value={name} maxLength={120} disabled={working} onChange={event => setName(event.target.value)} onKeyDown={event => { if (event.key === 'Enter') { event.preventDefault(); if (name.trim()) void confirm() } }} /> : <p>{pending.kind === 'discard' ? saved ? 'Returns to the saved checkpoint. The saved document is kept.' : 'Clears this unsaved document. No saved document is deleted.' : pending.record.document.id === document.id ? 'Deletes this saved document and its current unsaved changes. Component library items are kept.' : 'Deletes this saved document. Component library items and placed copies are kept.'}</p>}
+        {pending.kind === 'rename' ? <input aria-label="Saved document name" value={name} maxLength={120} disabled={working} onChange={event => setName(event.target.value)} onKeyDown={event => { if (event.key === 'Enter') { event.preventDefault(); if (name.trim()) void confirm() } }} /> : <p>{pending.kind === 'discard' ? saved ? 'Returns to the saved checkpoint. The saved document is kept.' : 'Clears this unsaved document. No saved document is deleted.' : pending.record.document.id === document.id ? 'Deletes this saved document, its recovery copies and current unsaved changes. Component library items are kept.' : 'Deletes this saved document and its recovery copies. Component library items and placed copies are kept.'}</p>}
         <div><button className="button" disabled={working} onClick={() => setPending(null)}>Cancel</button><button className={`button ${pending.kind === 'rename' ? 'primary' : 'danger-button'}`} aria-label="Confirm document action" disabled={working || (pending.kind === 'rename' && !name.trim())} onClick={() => void confirm()}>{working ? 'Working…' : pending.kind === 'rename' ? 'Rename' : pending.kind === 'delete' ? 'Delete document' : 'Discard changes'}</button></div>
       </section>}
       {(failure || error) && <p className="document-manager-error" role="alert">{error || failure}</p>}
+      </>}
     </div>
     <footer className="dialog-footer documents-footer"><span>{filtered.length} saved · {document.workspace === 'architecture' ? 'Architecture' : 'Component Editor'}</span><button className="button" disabled={working} onClick={onClose}>Done</button></footer>
   </Dialog>

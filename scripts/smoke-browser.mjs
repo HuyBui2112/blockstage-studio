@@ -75,6 +75,9 @@ try {
   const pending = new Map(), errors = []
   socket.onmessage = ({ data }) => {
     const message = JSON.parse(data)
+    if (message.method === 'Page.javascriptDialogOpening' && message.params.type === 'beforeunload') {
+      void send('Page.handleJavaScriptDialog', { accept: true }, message.sessionId).catch(() => {})
+    }
     if (message.method === 'Runtime.exceptionThrown') errors.push(message.params.exceptionDetails)
     const handler = pending.get(message.id)
     if (handler) {
@@ -96,7 +99,7 @@ try {
   const { sessionId } = await send('Target.attachToTarget', { targetId, flatten: true })
   const command = (method, params) => send(method, params, sessionId)
   const evaluate = async expression => {
-    const result = await command('Runtime.evaluate', { expression, returnByValue: true, awaitPromise: true })
+    const result = await command('Runtime.evaluate', { expression, returnByValue: true, awaitPromise: true }).catch(error => { throw new Error(`${error.message}; expression: ${expression.slice(0, 250)}`, { cause: error }) })
     if (result.exceptionDetails) throw new Error(JSON.stringify(result.exceptionDetails))
     return result.result.value
   }
@@ -128,6 +131,7 @@ try {
       throw new Error(`Peer timeout: ${expression}`)
     }
     await peerCommand('Runtime.enable')
+    await peerCommand('Page.enable')
     await peerCommand('Page.navigate', { url: process.env.BLOCKSTAGE_URL ?? 'http://127.0.0.1:5173/' })
     await peerUntil(ready)
     return { evaluate: peerEvaluate, until: peerUntil, close: () => send('Target.closeTarget', { targetId }) }
@@ -195,10 +199,10 @@ try {
   // A pre-existing project is a canary: resource operations must never touch its data.
   const preserved = { id: 'resource-test-preserved-project', arbitraryLegacyPayload: ['do', 'not', 'rewrite'], blocks: [{ unusual: true }] }
   // This is the disposable browser profile above, never the user's origin/profile.
-  // Seed the actual old database version to exercise the additive v4 -> v6 upgrade.
+  // Seed the actual old database version to exercise the additive v4 -> v7 upgrade.
   await evaluate(`new Promise((resolve,reject) => { const removal=indexedDB.deleteDatabase('blockstage-studio'); removal.onerror=()=>reject(removal.error); removal.onsuccess=()=>{ const request=indexedDB.open('blockstage-studio',4); request.onerror=()=>reject(request.error); request.onupgradeneeded=()=>{for(const name of ['projects','packs','catalogs','profiles','preferences']) request.result.createObjectStore(name,{keyPath:'id'})}; request.onsuccess=()=>{const db=request.result;const tx=db.transaction('projects','readwrite');tx.objectStore('projects').put(${JSON.stringify(preserved)});tx.oncomplete=()=>{db.close();resolve()};tx.onerror=()=>reject(tx.error)}; }; })`)
   await reload()
-  assert.equal(await evaluate(`new Promise((resolve,reject)=>{const request=indexedDB.open('blockstage-studio');request.onerror=()=>reject(request.error);request.onsuccess=()=>{const db=request.result;resolve(db.version);db.close()}})`), 6, 'Legacy storage must upgrade without rewriting the project canary')
+  assert.equal(await evaluate(`new Promise((resolve,reject)=>{const request=indexedDB.open('blockstage-studio');request.onerror=()=>reject(request.error);request.onsuccess=()=>{const db=request.result;resolve(db.version);db.close()}})`), 7, 'Legacy storage must upgrade without rewriting the project canary')
   const repositoryChecks = await runRepositoryScenarios({ evaluate })
 
   const orange = solidPng(222, 111, 48), blue = solidPng(51, 122, 219)
@@ -395,7 +399,7 @@ try {
   assert.deepEqual(errors, [], 'Browser must have no runtime exceptions')
   console.log(JSON.stringify({
     result: 'passed', resourcePack: basename(basePath), gameProfile: profilePath, repositoryChecks,
-    checks: ['empty workspace', 'v4 to v6 additive storage upgrade', 'worker import', 'actual textured 3D', 'MMB orbit', 'axis views stay orthographic', 'projection toggle', 'keyboard/button camera parity', 'legal state/camera retention', 'input focus', 'pixel-verified precedence/toggle', 'duplicate/invalid recovery', 'order/toggle/removal persistence', 'dialog keyboard', 'compact layout', 'existing project preservation', ...(profilePath && process.env.BLOCKSTAGE_RESOURCE_PACK ? ['bounded library/creative tabs', 'stairs state', 'animation cache and idle frame stop', 'unsupported fallback', 'static entity/yaw'] : [])],
+    checks: ['empty workspace', 'v4 to v7 additive storage upgrade', 'worker import', 'actual textured 3D', 'MMB orbit', 'axis views stay orthographic', 'projection toggle', 'keyboard/button camera parity', 'legal state/camera retention', 'input focus', 'pixel-verified precedence/toggle', 'duplicate/invalid recovery', 'order/toggle/removal persistence', 'dialog keyboard', 'compact layout', 'existing project preservation', ...(profilePath && process.env.BLOCKSTAGE_RESOURCE_PACK ? ['bounded library/creative tabs', 'stairs state', 'animation cache and idle frame stop', 'unsupported fallback', 'static entity/yaw'] : [])],
     screenshots: ['resource-workspace', 'resource-manager', 'resource-compact'],
   }, null, 2))
   await send('Browser.close')
