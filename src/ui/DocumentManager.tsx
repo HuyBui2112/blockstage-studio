@@ -5,6 +5,7 @@ import { Dialog } from './Dialog'
 import { Icon } from './Icon'
 import './documents.css'
 import { RecoveryList, type RecoveryProps } from './RecoveryList'
+import { StorageHealthPanel } from './StorageHealthPanel'
 
 type Props = RecoveryProps & {
   document: EditorDocument; saved: EditorDocument | null; pristine: boolean; error: string
@@ -28,7 +29,7 @@ export function DocumentManager({ document, saved, pristine, error, onList, onOp
   const [limit, setLimit] = useState(40)
   const [pending, setPending] = useState<Pending | null>(null)
   const [name, setName] = useState('')
-  const [tab, setTab] = useState<'saved' | 'recovery'>(initialRecovery ? 'recovery' : 'saved')
+  const [tab, setTab] = useState<'saved' | 'recovery' | 'storage'>(initialRecovery ? 'recovery' : 'saved')
   const confirmation = useRef<HTMLElement>(null)
   const dirty = saved !== document
   useEffect(() => {
@@ -66,8 +67,8 @@ export function DocumentManager({ document, saved, pristine, error, onList, onOp
         <div><strong>{document.name}</strong><small>{document.workspace === 'architecture' ? 'Architecture' : 'Component Editor'} · {saved ? dirty ? 'Unsaved changes' : 'Saved' : 'Not saved'}</small></div>
         <button className="button" aria-label="Discard document changes" disabled={working || !dirty || pristine} onClick={() => setPending({ kind: 'discard', current: document })}>Discard changes</button>
       </section>
-      <nav className="documents-tabs" aria-label="Document storage"><button className={tab === 'saved' ? 'active' : ''} disabled={working} onClick={() => setTab('saved')}>Saved</button><button aria-label="Recovery documents" className={tab === 'recovery' ? 'active' : ''} disabled={working} onClick={() => setTab('recovery')}>Recovery{recoveryCount > 0 && <span>{recoveryCount}</span>}</button></nav>
-      {tab === 'recovery' ? <RecoveryList {...recovery} scope={document.workspace} onClose={onClose} error={error} onBusy={setWorking} /> : <>
+      <nav className="documents-tabs" aria-label="Document storage"><button className={tab === 'saved' ? 'active' : ''} disabled={working} onClick={() => setTab('saved')}>Saved</button><button aria-label="Recovery documents" className={tab === 'recovery' ? 'active' : ''} disabled={working} onClick={() => setTab('recovery')}>Recovery{recoveryCount > 0 && <span>{recoveryCount}</span>}</button><button aria-label="Storage health tab" className={tab === 'storage' ? 'active' : ''} disabled={working} onClick={() => setTab('storage')}>Storage</button></nav>
+      {tab === 'storage' ? <StorageHealthPanel /> : tab === 'recovery' ? <RecoveryList {...recovery} scope={document.workspace} onClose={onClose} error={error} onBusy={setWorking} /> : <>
       <div className="document-search"><input type="search" aria-label="Search saved documents" placeholder="Search saved documents…" value={query} onChange={event => { setQuery(event.target.value); setLimit(40) }} /><button className="icon-button" aria-label="Refresh saved documents" disabled={working || loading} onClick={() => { setPending(null); void refresh() }}><Icon name="refresh" size={16} /></button></div>
       <div className="document-list" aria-label="Saved documents">
         {loading && <p role="status">Loading documents…</p>}

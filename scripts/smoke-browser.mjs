@@ -8,6 +8,7 @@ import { strToU8, zipSync, zlibSync } from 'fflate'
 import { runEditorScenarios } from './editor-browser-scenarios.mjs'
 import { runAnimationPixelScenario } from './animation-browser-scenarios.mjs'
 import { runRepositoryScenarios } from './repository-browser-scenarios.mjs'
+import { runStorageHealthScenarios } from './storage-health-browser-scenarios.mjs'
 
 // Reuse an installed browser and an isolated profile. No browser download or personal data.
 const browser = process.env.BLOCKSTAGE_BROWSER ?? [
@@ -204,6 +205,7 @@ try {
   await reload()
   assert.equal(await evaluate(`new Promise((resolve,reject)=>{const request=indexedDB.open('blockstage-studio');request.onerror=()=>reject(request.error);request.onsuccess=()=>{const db=request.result;resolve(db.version);db.close()}})`), 7, 'Legacy storage must upgrade without rewriting the project canary')
   const repositoryChecks = await runRepositoryScenarios({ evaluate })
+  await runStorageHealthScenarios({command,evaluate,until,click,aria,screenshot})
 
   const orange = solidPng(222, 111, 48), blue = solidPng(51, 122, 219)
   const copperPath = join(directory, 'copper-test.zip'), bluePath = join(directory, 'blue-test.zip')

@@ -110,6 +110,12 @@ recovery có thông báo thay đổi giữa tab khi browser hỗ trợ. Saved li
 merge hoặc ghi đè local edits. Lỗi bảo vệ hiện nút Retry; giới hạn 32 recovery
 copies / 64 MiB payload, mỗi snapshot tối đa 32 MiB. Không tự xóa bản cũ để dọn chỗ.
 
+**Documents → Storage** hiển thị dung lượng/quota ước tính của origin và trạng
+thái persistent storage. Chỉ khi bấm **Request persistent storage** công cụ mới
+gửi yêu cầu; trình duyệt có thể từ chối. Refresh đọc lại thông tin, không dọn/xóa
+dữ liệu. Persistence không thay backup JSON ngoài trình duyệt. Portable bundle
+chứa document/thư viện và manifest tài nguyên vẫn là bước D05 tiếp theo.
+
 ```powershell
 fnm exec --using 24.19.0 pnpm.cmd check
 ```

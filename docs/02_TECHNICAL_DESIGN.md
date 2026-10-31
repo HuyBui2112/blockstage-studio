@@ -235,6 +235,36 @@ BroadcastChannel chỉ invalidation/đếm recovery, có fallback Refresh/focus;
 là hàng rào đồng bộ. Không phải merge/multiplayer. Recovery độc lập Architecture/
 Component, đọc được dữ liệu khi thiếu assets/profile; rendering vẫn báo fallback.
 
+### 4.4 Storage health — D06
+
+Documents → Storage dùng `src/io/storage-health.ts` và `StorageHealthPanel.tsx`.
+Mở panel/Refresh chỉ gọi `estimate()` và `persisted()` độc lập; không mở/scan IDB,
+không tự yêu cầu persistence hoặc sửa document/history/draft. Chỉ click nút
+Request gọi `persist()` ngay trong user activation, không await probe trước.
+Controller gộp request đang chờ, timeout 10s và cleanup timer; unmount panel bỏ
+qua kết quả UI cũ. Timeout không hủy request nội bộ của browser.
+
+API thiếu/denied/read error/request error có trạng thái riêng. Estimate thiếu,
+NaN, âm hoặc nonfinite hiển thị Unavailable thay vì 0; quota 0 không tính ratio.
+Probe thất bại không xóa kết quả thành công của probe khác. Refresh thay snapshot
+thống kê cũ; không giữ số usage cũ như thể vừa đo lại. Cảnh báo từ ratio ≥90% là
+ngưỡng UX của Blockstage, không phải giới hạn API hay dự báo write thành công.
+Progress chỉ clamp phần vẽ; số usage/quota không bị sửa.
+
+Estimate bao gồm browser storage của **origin**, không phải dung lượng đĩa còn
+trống, không phải tổng byte riêng document hoặc chỉ IndexedDB. Persistent storage
+được browser cấp có thể giảm automatic eviction, không chống người dùng clear
+storage, mất thiết bị, origin khác hoặc lỗi write; luôn giữ backup ngoài browser.
+Không có auto-delete/cache cleanup, không nâng DB schema/dependency ở slice này.
+QuotaExceededError của Save/import/draft tiếp tục theo failure/retry của chủ IO;
+panel không bypass CAS/retention hoặc giả khôi phục một write đã lỗi.
+
+Nguồn API đối chiếu: [StorageManager.estimate](https://developer.mozilla.org/en-US/docs/Web/API/StorageManager/estimate),
+[persisted](https://developer.mozilla.org/en-US/docs/Web/API/StorageManager/persisted),
+[persist](https://developer.mozilla.org/en-US/docs/Web/API/StorageManager/persist).
+Browser acceptance dùng native read-only probe và injected grant/deny/absent/error
+để kiểm UX; không tuyên bố đã được browser cấp permission thật trên profile người dùng.
+
 ## 5. Tương tác, transform và placement
 
 ### 5.1 Input và atomic commands
@@ -580,7 +610,8 @@ Tách từng contract nhỏ để module có thể làm riêng; không đổi to
 **31/10/2026:** token storage, Save/remove, tombstone, legacy read và Saved ack
 đã có (§4.2). Committed revision, savedRevision, draft base/ack/scheduler, retention
 và Recovery compare/claim đã freeze/triển khai ở §4.3. Multi-tab merge, portable
-và storage-health/eviction workflow chưa hoàn tất; không coi cả milestone D đã đóng.
+và portable workflow chưa hoàn tất; Storage health đã có ở §4.4 nhưng không phải
+eviction-proof backup. Không coi cả milestone D đã đóng.
 
 - Phân biệt `documentId`, `sessionEpoch` của lần mở, committed `revision`,
   `savedRevision`, draft base/ack và persistent record `generation` khi delete/recreate.

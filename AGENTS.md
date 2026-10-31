@@ -55,6 +55,9 @@ document delete retires all streams atomically. Recovery claims use displayed
 epoch/revision and create a fresh stream; conflicting Saved bases require copy.
 Recovery copy clears library publication binding. Keep bounded retention without
 automatic eviction; report protection failures and retain local edits for retry/JSON.
+Documents Storage is a read-only origin health probe except explicit persist()
+opt-in. Never request persistence on mount, call quota an exact disk measurement,
+or delete user data to resolve quota. Missing API and denied/error remain distinct.
 
 - Reuse the existing React/TypeScript/Three.js base and verified asset pipeline.
 - Keep existing project data and import/export/domain code intact during changes.
