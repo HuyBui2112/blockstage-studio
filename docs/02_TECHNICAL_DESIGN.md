@@ -755,8 +755,9 @@ eviction-proof backup.
 
 ### 10.2 Operation plan và incremental consumers — K03
 
-**Subset đã triển khai cho B01:** `operation-plan.ts` và `duplicate-plan.ts` là
-planner append-only thuần dữ liệu, chưa nối UI/session. `OperationBase` gồm
+**Subset đã triển khai cho B01–B03:** `operation-plan.ts`, `copy-plan.ts` cùng các
+wrapper duplicate/paste/repeat là planner append-only thuần dữ liệu, chưa nối
+UI/session. `OperationBase` gồm
 document ID, session epoch và committed local revision (không phải storage token).
 `planDuplicate` nhận selection top-level, offset integer trong World, catalog và
 operation ID được cấp **một lần** từ caller. ID mới `operationId:ordinal` theo
@@ -781,6 +782,36 @@ validate đầy đủ; chưa có trusted fast path hay session/viewport integrat
 K03/B01 này không tự đóng B08, toàn K03 hoặc K07a. Neighbor recomputation opt-in
 phải được đưa vào cùng final preview/commit plan khi B08 nối session, không derive
 khác nhau hai lần. Chưa công bố GPU/triệu-block hoặc memory-byte benchmark.
+
+**B02 — clipboard nội bộ v1:** `clipboard.ts` tạo snapshot độc lập với nguồn,
+envelope strict `{format:'blockstage-clipboard', version:1, target, anchor, objects}`.
+Chỉ 26.2/4903 và object tree document v2 hiện tại; unknown fields/payload/version,
+incomplete pairs, cycle/depth/count overflow hoặc state không còn hợp lệ đều
+reject. Dùng bounded document schema trước recursive copy. Clipboard không chứa
+free entities, game assets hoặc live link tới library. Giữ `componentId` provenance.
+Nguồn sửa/xóa không đổi snapshot; paste sang Architecture/Component đều dùng
+base của **destination**, không dùng revision nguồn.
+
+Anchor mặc định là min occupied cell của selection (kể cả explicit air), hoặc
+anchor integer an toàn caller cấp. Snapshot giữ tọa độ gốc; paste dùng delta =
+destination position − anchor và dịch mọi pivot2 cùng cells, không normalize hoặc
+xoay state. Coordinate/pivot của kết quả vẫn tuân schema. Mỗi paste mới cần
+operation ID mới; cùng operation ID trong preview giữ IDs ổn định. ID mới không
+được trùng cả destination lẫn snapshot. Clipboard chỉ trong memory, chưa có
+system clipboard, file format import, persistence hoặc UI controls.
+
+**B03 — repeat:** `repeat-plan.ts` nhận `{axis:'x'|'y'|'z', count, spacing}` trong
+World coordinates. `count` là số **bản sao mới**, integer 1–100k, không gồm nguồn;
+spacing là khoảng dịch anchor-to-anchor bằng block, integer khác 0, cho phép âm.
+Không tự cộng kích thước footprint/gap hoặc suy Local axis từ orientation.
+Copy k dùng offset `k × spacing`, k=1..count. Count 0/âm/lẻ, spacing 0/lẻ/unsafe,
+overflow hoặc va chạm bất kỳ (nguồn/copy/obstacle) chặn cả action.
+
+Ba wrapper dùng **một** copy engine: đo source/destination và nhân tổng count
+trước cấp ID/clone, không tạo intermediate documents hoặc chạy validate mỗi bản
+lặp. Chỉ validate final candidate rồi apply guard. Một plan → một history command
+→ một Undo/Redo cho mọi bản sao. B08 vẫn phải nối đúng numeric/pointer/keymap,
+session, neighbor policy và browser acceptance; domain tests không chứng minh UI.
 
 **Phần mở rộng vẫn dự kiến:** base doc ID/revision, intent parameters, ID allocator,
 bounded candidate/patch, add/replace/remove, changed logical owners, old/new cells,

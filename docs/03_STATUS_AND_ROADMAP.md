@@ -179,7 +179,7 @@ BUG-03/04/06 đã có fixes trong scope công bố. BUG-01/02/05 còn PARTIAL; c
 | Nhóm | Trạng thái phải giữ rõ |
 | --- | --- |
 | An toàn dữ liệu | **Đã có trong scope hiện tại:** Save CAS, catalogue/delete, autosave draft, recovery, Storage health và portable v1. D07 bổ sung failed-switch, hai app pages Save/claim, corrupted records và renderer crash sau protected ack; fresh-origin/legacy được kiểm ở suites riêng. Release R1 và disk quota/power loss chưa kiểm; assets phải giữ riêng, không hứa chống mọi crash/eviction. |
-| Dựng hằng ngày | **Chưa triển khai:** duplicate selection trực tiếp, repeat/arrays, resize theo quy tắc, parametric wall/column/span, socket. Đặt nhiều bản component hiện có không tương đương array tool. |
+| Dựng hằng ngày | **Nền domain B01–B03 đã có:** duplicate, clipboard/paste và repeat planner. **Chưa có workflow UI B08:** nút/phím/ghost các thao tác này; resize theo quy tắc, parametric wall/column/span và socket vẫn chưa triển khai. Đặt nhiều bản component hiện có không tương đương array tool. |
 | Nội thất/phân vùng | **Một phần:** fly và orthographic giúp quan sát; **chưa có** workflow chuyên cho nội thất, layers/hide roof/floor/cut/clip/local isolation trong editor v2, visible-only/lasso selection. |
 | Reuse/vật liệu | **Chưa triển khai:** linked component updates/overrides và material substitution có hợp đồng tương thích. Không suy safe replacement chỉ từ tags/creative tabs. |
 | Game behavior | **Một phần:** opt-in scene connections fence/wall/gate theo game predicates đã có. Chưa slab merge/player hinge, auto-pane/stairs, dynamic shapes, support tổng quát, gravity/redstone/fluid/ticks/player collision. |
@@ -483,10 +483,28 @@ trước khi giao, không đưa nguyên cả hệ thống cho một agent.
   đạt 15/15. Không thêm dependency/schema hoặc game assets vào production output.
   Phiên này không chạy lại browser smoke vì chưa có consumer UI/runtime mới;
   native browser acceptance cho duplicate thuộc B08, không suy từ unit tests.
-- **Tiếp theo:** B02 internal clipboard envelope/paste và B03 repeat planner dùng
-  cùng nền copy/ID/budget; sau đó B08 nối numeric/pointer/keyboard, ghost/cancel,
-  neighbor policy và một Undo. Không rewrite toàn session/render chỉ để extract
-  seam. D07/B01 không đóng release R1 hoặc mở đồng thời toàn bộ backlog.
+- **B02/B03 VERIFIED tại domain (01/11/2026):** `copy-plan.ts` dùng chung cho ba
+  wrapper duplicate/paste/repeat; giữ nguyên 15 regression B01. Clipboard v1 có
+  strict envelope/target/anchor, whole-object snapshot độc lập, paste nhiều lần
+  bằng fresh IDs và base destination. Nguồn sửa/xóa không đổi clipboard; unknown
+  fields/payload/versions hoặc catalog/state không phù hợp đều reject. Không có
+  free entities, system clipboard, persistence hoặc file import clipboard.
+- Repeat World X/Y/Z: count là số bản sao **mới**, 1–100k trước budget; spacing
+  integer khác 0, cho phép âm, anchor-to-anchor. Quét và nhân tổng objects/cells
+  trước clone; mọi collision với nguồn/copy/obstacle chặn toàn bộ. Một candidate
+  chung cho preview/apply, stable IDs qua parameter previews, một Undo/Redo cho
+  mọi bản sao. ID mới không trùng cả nguồn lẫn đích, kể cả paste sang doc trống.
+- `pnpm check` đạt **331/331 test, 32 file**, typecheck/lint/build. 23 tests mới
+  (13 clipboard, 10 repeat) kiểm negative/custom anchor, cross-doc/workspace,
+  source edit/delete, strict input/unknown payload/current catalog, stable/fresh
+  nested IDs, pairs/component provenance/state/pivot, signed axis spacing/count,
+  later obstacle, aggregate pre-expansion budget, stale/cancel và atomic history.
+  Không thêm dependency/DB schema/game assets. Chưa có UI/runtime consumer mới,
+  nên không chạy lại browser smoke; B08 phải kiểm thao tác thực qua native browser.
+- **Tiếp theo: B08** nối Duplicate/Copy/Paste/Repeat với session, numeric và
+  pointer/keyboard, ghost/cancel, focus routing, neighbor preview/commit parity
+  và atomic Undo/Redo. **B01–B03 hiện chưa có nút/phím trong UI.** Không rewrite
+  session/render chỉ để extract seam hoặc đánh VERIFIED toàn K03/R1 từ domain tests.
 
 ### Slice bổ sung theo yêu cầu — import `.nbt` trong phiên
 
