@@ -460,11 +460,33 @@ trước khi giao, không đưa nguyên cả hệ thống cho một agent.
   VERIFIED. Recovery vẫn thuộc origin; portable chỉ giúp khi người dùng giữ file
   ngoài browser. Chưa backup mọi workspace/recovery hoặc linked/payload data;
   mở lại gate portable khi N06/L bổ sung schema.
-- **Tiếp theo:** quick-build theo DAG: chốt **K03 subset duplicate plan** trước
-  **B01**, rồi B02/B03 và B08. Tái sử dụng history/preview/placement hiện tại,
-  fresh nested IDs, collision/budget toàn action, một Undo; không rewrite toàn
-  session/render chỉ để extract seam. D07 không đóng release R1 hoặc mở đồng thời
-  toàn bộ backlog.
+- **K03 subset REVIEWED / B01 VERIFIED tại domain (01/11/2026):**
+  `operation-plan.ts` chốt source identity + document/epoch/local revision, budget
+  và cancel checks. `duplicate-plan.ts` tạo candidate append-only với stable
+  operation IDs, fresh nested IDs, top-level selection/owners, history patches,
+  destination chunks floor16 và object/cell cost. Giữ whole logical pairs,
+  group/component tree, provenance, pivot2, name/orientation/states; không nhân
+  free entities, không ghi storage. Nguồn vẫn chiếm chỗ; va chạm, stale/cancel,
+  depth/cycle hoặc aggregate budget reject toàn action trước commit.
+- **B01 chưa có nút/phím trong UI:** đây là planner + apply guard cho B08 tái sử
+  dụng, không đánh VERIFIED trải nghiệm Duplicate/clipboard/repeat. Preview/apply
+  trả cùng candidate/IDs; integration history hiện tại chứng minh một Undo/Redo
+  giữ nguyên snapshots. K03 tổng vẫn PARTIAL: chưa incremental consumers, generic
+  replace/remove/neighbor changeset, byte estimates hoặc full session wiring.
+- **15 tests mới** kiểm golden nested bed/door/stairs/slab/log/air, negative coords/
+  pivots/chunks, independent copy state, stable/fresh IDs, component provenance,
+  entities không bị sửa, collision/source occupied, invalid selections/limits,
+  cancellation/stale/Undo revision, tree guard, aggregate budget và early rejection
+  50.001 cells trước copy expansion. Không dùng kết quả này làm GPU/perf benchmark
+  hoặc tuyên bố game placement parity mới. Validation của phần UI vẫn chờ B08.
+  `pnpm check` đạt **308/308 test, 30 file**, typecheck/lint/build; targeted B01
+  đạt 15/15. Không thêm dependency/schema hoặc game assets vào production output.
+  Phiên này không chạy lại browser smoke vì chưa có consumer UI/runtime mới;
+  native browser acceptance cho duplicate thuộc B08, không suy từ unit tests.
+- **Tiếp theo:** B02 internal clipboard envelope/paste và B03 repeat planner dùng
+  cùng nền copy/ID/budget; sau đó B08 nối numeric/pointer/keyboard, ghost/cancel,
+  neighbor policy và một Undo. Không rewrite toàn session/render chỉ để extract
+  seam. D07/B01 không đóng release R1 hoặc mở đồng thời toàn bộ backlog.
 
 ### Slice bổ sung theo yêu cầu — import `.nbt` trong phiên
 

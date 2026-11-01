@@ -71,6 +71,12 @@ air vs sparse omission. Reject entities, block-entity payloads, multiple palette
 unknown fields/version instead of dropping them. Report stored size vs editor
 content bounds and unchanged 48-cell export policy. Confirm creates a new atomic
 Saved document after protecting current work; cancel never mutates the document.
+Duplicate B01 is domain-only: operation-plan/duplicate-plan use immutable source
+identity plus document/epoch/local revision, stable per-operation nested IDs,
+aggregate budgets before expansion and the exact preview candidate on apply.
+Keep whole groups/pairs/component copies and provenance; originals stay occupied.
+Free entities are not implicitly duplicated. Do not claim B08 UI is implemented
+or bypass the stale/cancel guard when adding clipboard/repeat/session consumers.
 
 - Reuse the existing React/TypeScript/Three.js base and verified asset pipeline.
 - Keep existing project data and import/export/domain code intact during changes.

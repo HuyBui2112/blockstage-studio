@@ -755,7 +755,34 @@ eviction-proof backup.
 
 ### 10.2 Operation plan và incremental consumers — K03
 
-Contract tối thiểu dự kiến: base doc ID/revision, intent parameters, ID allocator,
+**Subset đã triển khai cho B01:** `operation-plan.ts` và `duplicate-plan.ts` là
+planner append-only thuần dữ liệu, chưa nối UI/session. `OperationBase` gồm
+document ID, session epoch và committed local revision (không phải storage token).
+`planDuplicate` nhận selection top-level, offset integer trong World, catalog và
+operation ID được cấp **một lần** từ caller. ID mới `operationId:ordinal` theo
+thứ tự document/preorder ổn định khi đổi offset hoặc đổi thứ tự selection input;
+mọi ID nested được thay, `componentId` giữ provenance của independent copy.
+
+Plan giữ source reference + base, candidate document, selection mới, add-only
+`ObjectPatch[]` theo shape history hiện tại, cells với top-level owner, chunk keys
+16³ (floor cả tọa độ âm), và cost objects/cells trước/sau. Không có remove/replace
+hoặc old cells trong action append-only. Quét tree có cycle/depth guard và cộng
+budget **trước** cấp ID/clone: tổng tối đa 100k cells/100k objects, caller chỉ được
+siết giới hạn. Final validation dùng schema + registry + logical-pair checks hiện
+có; source vẫn chiếm chỗ, explicit air vẫn là cell, collision chặn toàn action.
+Không tự xoay mesh/state, làm phẳng group/component, normalize origin hoặc sao
+chép free entities. Pivot2 dịch `2 × delta`, state/name/orientation giữ nguyên.
+
+`applyDuplicatePlan` kiểm source identity, epoch/revision và AbortSignal rồi trả
+**đúng candidate preview**, không cấp lại ID/replan; caller gọi `executeHistory`
+một lần. Cancel trước/sau build hoặc trước apply không mutation. Đây là bounded
+synchronous planner, không tuyên bố ngắt giữa một lượt JS đang chạy. Commit vẫn
+validate đầy đủ; chưa có trusted fast path hay session/viewport integration.
+K03/B01 này không tự đóng B08, toàn K03 hoặc K07a. Neighbor recomputation opt-in
+phải được đưa vào cùng final preview/commit plan khi B08 nối session, không derive
+khác nhau hai lần. Chưa công bố GPU/triệu-block hoặc memory-byte benchmark.
+
+**Phần mở rộng vẫn dự kiến:** base doc ID/revision, intent parameters, ID allocator,
 bounded candidate/patch, add/replace/remove, changed logical owners, old/new cells,
 neighbor scope và estimated work/bytes. Một plan dùng cho ghost và commit;
 stale revision/cancelled job không commit. ID preview ổn định, commit không sinh
