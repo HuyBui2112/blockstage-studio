@@ -16,6 +16,7 @@ export function RecoveryList({ scope, onRecoveryList, onRestore, onDiscardRecove
   const [records, setRecords] = useState<DraftHead[]>([])
   const [loading, setLoading] = useState(true), [working, setWorking] = useState(false)
   const [failure, setFailure] = useState('')
+  const issues = [...new Set([error, failure].filter(Boolean))].join(' ')
   const [pending, setPending] = useState<{ head: DraftHead; kind: 'restore' | 'copy' | 'discard' } | null>(null)
   const confirmation = useRef<HTMLElement>(null)
   useEffect(() => { confirmation.current?.scrollIntoView({ block: 'nearest', behavior: 'instant' }) }, [pending])
@@ -62,6 +63,6 @@ export function RecoveryList({ scope, onRecoveryList, onRestore, onDiscardRecove
       <div className="recovery-actions"><button className="button" disabled={working} aria-label={`Restore draft ${head.name}`} onClick={() => setPending({ head, kind: 'restore' })}>Restore</button><button className="button" disabled={working} aria-label={`Recover copy ${head.name}`} onClick={() => setPending({ head, kind: 'copy' })}>Recover copy</button><button className="icon-button" disabled={working} aria-label={`Download recovery ${head.name}`} onClick={() => void backup(head)}><Icon name="file" size={15} /></button><button className="icon-button danger-button" disabled={working} aria-label={`Discard recovery ${head.name}`} onClick={() => setPending({ head, kind: 'discard' })}><Icon name="trash" size={15} /></button></div>
     </article>)}
     {pending && <section ref={confirmation} className="document-confirm" aria-label="Recovery confirmation"><strong>{pending.kind === 'discard' ? 'Discard this recovery copy?' : pending.kind === 'copy' ? 'Recover as an independent copy?' : 'Restore unsaved work?'}</strong><p>{pending.kind === 'discard' ? 'Removes this recovery copy. Saved documents and component library items are kept.' : pending.kind === 'copy' ? 'Uses a new document ID and keeps the saved checkpoint unchanged.' : 'Continues the original document only if its saved version is unchanged. Your current edits are protected before switching.'}</p><div><button className="button" disabled={working} onClick={() => setPending(null)}>Cancel</button><button className="button primary" disabled={working} aria-label="Confirm recovery action" onClick={() => void confirm()}>{working ? 'Working…' : pending.kind === 'discard' ? 'Discard recovery' : 'Restore'}</button></div></section>}
-    {(error || failure) && <p className="document-manager-error" role="alert">{error || failure}</p>}
+    {issues && <p className="document-manager-error" role="alert">{issues}</p>}
   </section>
 }

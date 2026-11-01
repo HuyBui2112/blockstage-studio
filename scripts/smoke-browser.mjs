@@ -80,6 +80,15 @@ try {
       void send('Page.handleJavaScriptDialog', { accept: true }, message.sessionId).catch(() => {})
     }
     if (message.method === 'Runtime.exceptionThrown') errors.push(message.params.exceptionDetails)
+    // Page.crash intentionally has no ordinary response. Require the native crash event,
+    // settle only its own request, and keep unexpected renderer crashes as test failures.
+    if (message.method === 'Inspector.targetCrashed') {
+      const request = [...pending.entries()].find(([, handler]) => handler.method === 'Page.crash' && handler.sessionId === message.sessionId)
+      if (request) {
+        const [id, handler] = request
+        pending.delete(id); clearTimeout(handler.timeout); handler.resolve({ crashed: true })
+      } else errors.push({ description: 'Unexpected renderer crash', sessionId: message.sessionId })
+    }
     const handler = pending.get(message.id)
     if (handler) {
       pending.delete(message.id)
@@ -92,7 +101,7 @@ try {
     const id = ++counter
     return new Promise((resolveResult, reject) => {
       const timeout = setTimeout(() => { pending.delete(id); reject(new Error(`CDP timeout: ${method}`)) }, 30000)
-      pending.set(id, { resolve: resolveResult, reject, method, timeout })
+      pending.set(id, { resolve: resolveResult, reject, method, timeout, sessionId })
       socket.send(JSON.stringify({ id, method, params, sessionId }))
     })
   }

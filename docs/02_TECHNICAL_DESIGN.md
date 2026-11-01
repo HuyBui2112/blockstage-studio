@@ -619,6 +619,30 @@ Harness dùng browser profile riêng, không cần tải browser hoặc đọc p
 `check` gồm typecheck/lint/unit/build; build không kèm game assets. Game-asset/
 oracle tests có thể skip khi checkout mới thiếu local fixtures; báo rõ số skip.
 
+**D07 — data-safety acceptance:** full browser suite chạy thêm
+`scripts/data-safety-browser-scenarios.mjs` trước Recovery. Để chạy riêng phần
+này (vẫn kiểm resources/repository baseline), giữ các biến trên và thêm:
+
+```powershell
+$env:BLOCKSTAGE_EDITOR_SLICE = 'data-safety'
+fnm exec --using 24.19.0 pnpm.cmd test:browser
+Remove-Item Env:BLOCKSTAGE_EDITOR_SLICE
+```
+
+Suite kiểm failed draft chặn New và giữ Saved/preference, download JSON/retry,
+hai app pages Save cùng base, stale recovery claim, corrupted Saved/head/payload,
+và recovery sau `Page.crash`. Harness yêu cầu sự kiện native
+`Inspector.targetCrashed`, không coi timeout là bằng chứng crash. Chỉ crash sau
+ack `protected`; mọi dữ liệu fixture thuộc profile browser riêng được hủy khi
+xong. Không chạy trên browser profile cá nhân. Report máy đọc được ở
+`artifacts/data-safety-result.json`; report chỉ được ghi sau khi mọi assertion đạt.
+Fresh-origin portable restore và legacy upgrade nằm ở suites riêng trong cùng
+full gate. Đây chưa phải thử browser kill, mất điện, disk quota thật, hay release
+journey R1. Lỗi quota là injection tại IDB; không làm đầy ổ đĩa.
+
+Saved/Recovery hiển thị đồng thời các thông báo lỗi độc lập và loại bản trùng;
+cảnh báo lúc khởi động không che cảnh báo listing hoặc lỗi thao tác mới.
+
 ### 8.4 Oracle, audit và world-readback
 
 Sau `prepare:game`, các lệnh sau phục vụ developer:

@@ -26,6 +26,7 @@ export function DocumentManager({ document, saved, pristine, error, onList, onOp
   const [loading, setLoading] = useState(true)
   const [working, setWorking] = useState(false)
   const [failure, setFailure] = useState('')
+  const issues = [...new Set([error, failure].filter(Boolean))].join(' ')
   const [query, setQuery] = useState('')
   const [limit, setLimit] = useState(40)
   const [pending, setPending] = useState<Pending | null>(null)
@@ -89,7 +90,7 @@ export function DocumentManager({ document, saved, pristine, error, onList, onOp
         {pending.kind === 'rename' ? <input aria-label="Saved document name" value={name} maxLength={120} disabled={working} onChange={event => setName(event.target.value)} onKeyDown={event => { if (event.key === 'Enter') { event.preventDefault(); if (name.trim()) void confirm() } }} /> : <p>{pending.kind === 'discard' ? saved ? 'Returns to the saved checkpoint. The saved document is kept.' : 'Clears this unsaved document. No saved document is deleted.' : pending.record.document.id === document.id ? 'Deletes this saved document, its recovery copies and current unsaved changes. Component library items are kept.' : 'Deletes this saved document and its recovery copies. Component library items and placed copies are kept.'}</p>}
         <div><button className="button" disabled={working} onClick={() => setPending(null)}>Cancel</button><button className={`button ${pending.kind === 'rename' ? 'primary' : 'danger-button'}`} aria-label="Confirm document action" disabled={working || (pending.kind === 'rename' && !name.trim())} onClick={() => void confirm()}>{working ? 'Working…' : pending.kind === 'rename' ? 'Rename' : pending.kind === 'delete' ? 'Delete document' : 'Discard changes'}</button></div>
       </section>}
-      {(failure || error) && <p className="document-manager-error" role="alert">{error || failure}</p>}
+      {issues && <p className="document-manager-error" role="alert">{issues}</p>}
       </>}
     </div>
     <footer className="dialog-footer documents-footer"><span>{filtered.length} saved · {document.workspace === 'architecture' ? 'Architecture' : 'Component Editor'}</span><button className="button" disabled={working} onClick={onClose}>Done</button></footer>

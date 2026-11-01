@@ -178,7 +178,7 @@ BUG-03/04/06 đã có fixes trong scope công bố. BUG-01/02/05 còn PARTIAL; c
 
 | Nhóm | Trạng thái phải giữ rõ |
 | --- | --- |
-| An toàn dữ liệu | **Một phần:** Save CAS, catalogue/delete, autosave draft, recovery, Storage health và portable v1 đã có. Fresh-origin restore, atomic rollback và stale writers được kiểm trong scope hữu hạn. D07/release acceptance chưa đầy đủ; assets phải giữ riêng, không hứa chống mọi crash/eviction. |
+| An toàn dữ liệu | **Đã có trong scope hiện tại:** Save CAS, catalogue/delete, autosave draft, recovery, Storage health và portable v1. D07 bổ sung failed-switch, hai app pages Save/claim, corrupted records và renderer crash sau protected ack; fresh-origin/legacy được kiểm ở suites riêng. Release R1 và disk quota/power loss chưa kiểm; assets phải giữ riêng, không hứa chống mọi crash/eviction. |
 | Dựng hằng ngày | **Chưa triển khai:** duplicate selection trực tiếp, repeat/arrays, resize theo quy tắc, parametric wall/column/span, socket. Đặt nhiều bản component hiện có không tương đương array tool. |
 | Nội thất/phân vùng | **Một phần:** fly và orthographic giúp quan sát; **chưa có** workflow chuyên cho nội thất, layers/hide roof/floor/cut/clip/local isolation trong editor v2, visible-only/lasso selection. |
 | Reuse/vật liệu | **Chưa triển khai:** linked component updates/overrides và material substitution có hợp đồng tương thích. Không suy safe replacement chỉ từ tags/creative tabs. |
@@ -431,11 +431,40 @@ trước khi giao, không đưa nguyên cả hệ thống cho một agent.
   document/revision/assets/pointer và ID conflict rejection. Đã xem ảnh
   `artifacts/portable-source-backup.png`, `artifacts/portable-import-compact.png`.
   Build không chứa assets, không thêm dependencies/schema DB.
-- **Tiếp theo:** D07 còn audit fault/fresh-origin coverage và release workflow;
-  quota thật, browser kill/power loss và toàn bộ journey R1 chưa VERIFIED. Recovery
-  vẫn thuộc origin; portable file chỉ giúp khi người dùng tải và giữ file ngoài
-  browser. Chưa backup mọi workspace/recovery hoặc linked/payload data; mở lại gate
-  portable khi N06/L bổ sung schema. Sau gate dữ liệu, chọn slice quick-build theo DAG.
+- **D07 VERIFIED cho acceptance tự động của document v2 / portable v1 (01/11/2026):**
+  thêm `data-safety-browser-scenarios.mjs`, tích hợp full browser gate và slice
+  `data-safety` chạy riêng. Lỗi quota giả lập khi bảo vệ draft chặn New, giữ nguyên
+  local/Saved/preference, JSON escape hatch dùng được, Retry bảo vệ latest rồi Save.
+  Hai app pages giữ cùng Saved base: peer thắng, Save cũ bị từ chối, local edits
+  và protected recovery không mất; reload đọc winner, restore base cũ bị chặn,
+  Recover copy tạo ID mới và giữ winner. Hai confirmation cùng recovery revision:
+  chỉ claim đầu thắng, claim stale không tạo/retire stream khác.
+- Malformed Saved/head được báo và bỏ qua listing, payload hỏng không restore;
+  so raw records trước/sau chứng minh không rewrite/delete. Phát hiện và sửa lỗi
+  Saved startup warning che recovery listing warning: cả hai panel nay giữ thông
+  báo độc lập, loại trùng, vẫn dùng một vùng alert gọn.
+- Native CDP `Page.crash` có `Inspector.targetCrashed` xác nhận: draft đã ack
+  protected vẫn phục hồi đúng ID/cells/state/name sau reload, không tự restore
+  hoặc promote Saved. Không coi reload/đóng trang bình thường hay timeout là crash.
+  Report `artifacts/data-safety-result.json` ghi browser/target/checks/giới hạn sau
+  khi assertions đạt. Code gate **293/293 test, 29 file**, typecheck/lint/build đạt;
+  regression D07 nằm trong native-browser suite, không tăng số Vitest bằng test giả.
+  **Full production browser suite đạt** sau tích hợp D07: resource/appearance,
+  placement/export/state/neighbor, Save/Documents, NBT import, portable fresh-origin,
+  D07 và Recovery; không runtime exceptions. Ảnh cảnh báo đồng thời:
+  `artifacts/editor-data-safety-alerts.png`.
+- **Gate D hiện tại:** covered bằng các suites repository + Save + Documents +
+  Recovery + Storage + Portable + D07. Fresh-origin UI restore (localhost so với
+  127.0.0.1) và legacy v5/v6→v7 giữ nguyên bằng chứng riêng; không gán chúng cho
+  D07 crash fixture. Quota thật, browser kill/power loss và toàn bộ journey R1 chưa
+  VERIFIED. Recovery vẫn thuộc origin; portable chỉ giúp khi người dùng giữ file
+  ngoài browser. Chưa backup mọi workspace/recovery hoặc linked/payload data;
+  mở lại gate portable khi N06/L bổ sung schema.
+- **Tiếp theo:** quick-build theo DAG: chốt **K03 subset duplicate plan** trước
+  **B01**, rồi B02/B03 và B08. Tái sử dụng history/preview/placement hiện tại,
+  fresh nested IDs, collision/budget toàn action, một Undo; không rewrite toàn
+  session/render chỉ để extract seam. D07 không đóng release R1 hoặc mở đồng thời
+  toàn bộ backlog.
 
 ### Slice bổ sung theo yêu cầu — import `.nbt` trong phiên
 
