@@ -454,6 +454,8 @@ trước khi giao, không đưa nguyên cả hệ thống cho một agent.
   giả lập giữ scene cũ, Saved import/reload/JSON, export preflight/download và 620px.
   Ảnh `artifacts/nbt-import-report.png`, `artifacts/nbt-import-compact.png` đã xem.
   Giao diện dialog tự tải CSS riêng, không phụ thuộc đã mở Documents trước đó.
+  Lượt xác thực lại sau phiên gián đoạn: `pnpm check` vẫn đạt 293 tests;
+  browser slice `nbt` đạt toàn bộ các bước trên, đã xem lại ảnh compact sau reload.
 - I01/I02/I03 và N01 **chỉ một phần**, không đánh VERIFIED nguyên milestone:
   entity-only/payload/format variants và independent **world** roundtrip của file
   import chưa có. Reader TAG1–12 không đồng nghĩa payload editor/lossless writer.
