@@ -43,16 +43,23 @@ function measure(objects: EditorObject[], options: CopyPlanOptions, maxObjects: 
 
 /** Shared append-only copy primitive. Sources must be validated committed objects or a clipboard snapshot. */
 export function planObjectCopies(document: EditorDocument, objects: EditorObject[], pattern: CopyPattern, catalog: Material[], options: CopyPlanOptions): ObjectCopyPlan {
-  checkPlanCancelled(options.signal); validateOperationBase(document, options.base)
+  checkPlanCancelled(options.signal);validateOperationBase(document,options.base)
   integerOffset(pattern.offset); integerOffset(pattern.step)
   if (!Number.isSafeInteger(pattern.count) || pattern.count < 1 || pattern.count > 100000) throw new Error('Copy count must be an integer between 1 and 100,000')
+  integerOffset(pattern.offset.map((value, axis) => value + pattern.step[axis] * (pattern.count - 1)) as Vec3)
+  return planObjectCopiesAt(document,objects,pattern.count,index=>pattern.offset.map((value,axis)=>value+pattern.step[axis]*index) as Vec3,catalog,options)
+}
+
+/** Trusted domain enumerator only, never a callback decoded from external data. No offset array allocation. */
+export function planObjectCopiesAt(document: EditorDocument, objects: EditorObject[], count: number, offsetAt: (index:number)=>Vec3, catalog: Material[], options: CopyPlanOptions): ObjectCopyPlan {
+  checkPlanCancelled(options.signal); validateOperationBase(document, options.base)
+  if (!Number.isSafeInteger(count) || count < 1 || count > 100000) throw new Error('Copy count must be an integer between 1 and 100,000')
   if (!objects.length) throw new Error('Copy source must contain objects')
   if (!options.operationId || options.operationId.length > 180) throw new Error('Duplicate operation ID must contain 1–180 characters')
-  integerOffset(pattern.offset.map((value, axis) => value + pattern.step[axis] * (pattern.count - 1)) as Vec3)
   const budget = operationBudget(options.budget)
   const destination = measure(document.objects, options, budget.maxObjects, budget.maxCells)
   const source = measure(objects, options, budget.maxObjects, budget.maxCells)
-  const addedObjects = source.objects * pattern.count, addedCells = source.cells * pattern.count
+  const addedObjects = source.objects * count, addedCells = source.cells * count
   if (destination.objects + addedObjects > budget.maxObjects || destination.cells + addedCells > budget.maxCells) throw new Error('Duplicate exceeds document cell/object budget')
 
   let ordinal = 0
@@ -72,8 +79,10 @@ export function planObjectCopies(document: EditorDocument, objects: EditorObject
     return { ...object, id, cells: translated, children: object.children.map(child => copy(child, delta, top)), pivot2: object.pivot2.map((value, axis) => value + 2 * delta[axis]) as Vec3 }
   }
   const copies: EditorObject[] = []
-  for (let index = 0; index < pattern.count; index++) {
-    const delta = pattern.offset.map((value, axis) => value + pattern.step[axis] * index) as Vec3
+  for (let index = 0; index < count; index++) {
+    checkPlanCancelled(options.signal)
+    const delta = offsetAt(index)
+    integerOffset(delta)
     for (const object of objects) copies.push(copy(object, delta))
   }
   const candidate = { ...document, objects: [...document.objects, ...copies] }

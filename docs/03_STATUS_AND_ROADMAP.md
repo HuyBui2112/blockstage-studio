@@ -179,7 +179,7 @@ BUG-03/04/06 đã có fixes trong scope công bố. BUG-01/02/05 còn PARTIAL; c
 | Nhóm | Trạng thái phải giữ rõ |
 | --- | --- |
 | An toàn dữ liệu | **Đã có trong scope hiện tại:** Save CAS, catalogue/delete, autosave draft, recovery, Storage health và portable v1. D07 bổ sung failed-switch, hai app pages Save/claim, corrupted records và renderer crash sau protected ack; fresh-origin/legacy được kiểm ở suites riêng. Release R1 và disk quota/power loss chưa kiểm; assets phải giữ riêng, không hứa chống mọi crash/eviction. |
-| Dựng hằng ngày | **Đã có B01–B03/B08:** menu/phím Duplicate, internal Copy/Paste và Repeat World với numeric/pointer preview, cancel và atomic Undo/Redo. Resize theo quy tắc, line/plane/box primitives, parametric wall/column/span và socket vẫn chưa triển khai. |
+| Dựng hằng ngày | **Đã có B01–B03/B08:** menu/phím Duplicate, internal Copy/Paste và Repeat World với numeric/pointer preview, cancel và atomic Undo/Redo. **B04 domain đã có** line/plane planner; UI primitives, box, resize theo quy tắc, parametric wall/column/span và socket vẫn chưa triển khai. |
 | Nội thất/phân vùng | **Một phần:** fly và orthographic giúp quan sát; **chưa có** workflow chuyên cho nội thất, layers/hide roof/floor/cut/clip/local isolation trong editor v2, visible-only/lasso selection. |
 | Reuse/vật liệu | **Chưa triển khai:** linked component updates/overrides và material substitution có hợp đồng tương thích. Không suy safe replacement chỉ từ tags/creative tabs. |
 | Game behavior | **Một phần:** opt-in scene connections fence/wall/gate theo game predicates đã có. Chưa slab merge/player hinge, auto-pane/stairs, dynamic shapes, support tổng quát, gravity/redstone/fluid/ticks/player collision. |
@@ -529,9 +529,31 @@ trước khi giao, không đưa nguyên cả hệ thống cho một agent.
   đạt cả Enter native trên Cancel (không commit), numeric Enter và focus restore.
   Không thêm dependency/DB schema, không nhúng game assets. Chưa kiểm GPU hardware
   performance, large-scene typing latency hoặc runtime world parity mới cho copy.
-- **Tiếp theo: B04** line/rectangle-plane planner, chốt endpoint/grid/anchor và
-  budget trên cùng nền K03, rồi B05 solid/hollow box và B09 UI primitives.
-  B06/B07 còn cần capability scope K02; không đánh VERIFIED toàn K03/R1 từ B08.
+- **B04 VERIFIED tại domain axis-aligned:** `primitive-plan.ts` tạo line theo
+  World X/Y/Z và rectangle-plane XY/XZ/YZ; endpoints inclusive, min anchor,
+  size abs(end−start)+1, order X→Y→Z ổn định khi đảo endpoints. Cho phép point/line
+  suy biến, reject diagonal line/oblique hoặc 3D plane. Không scale mesh tùy ý.
+  Anchor count khác occupied cell count và full footprint bounds khi dùng pairs.
+- Tái sử dụng shared copy enumerator + Design placement template có supplied ID,
+  không gọi RNG hoặc duplicate luật pair. Giữ đầy đủ bed/door/plant và explicit
+  state, source/entities không đổi. Aggregate budget trước enumeration/clone;
+  self-overlap/pair overflow/source collision/explicit air đều reject toàn action,
+  không partial fill hoặc silent skip. Apply giữ exact candidate + guards K03 và
+  một Undo/Redo. **Chưa có UI primitive; B09 sẽ nối sau B05.**
+- `pnpm check` đạt **350/350 test, 34 file**, typecheck/lint/build; 14 B04 tests
+  kiểm independent golden coords, reversed/negative/degenerate endpoints, planes,
+  registry/state/pair fidelity/overlap/out-of-plane, deterministic IDs/no RNG,
+  budget/coordinate/pivot limits, source preservation/stale/cancel và atomic history.
+  43 regression B01–B03/B08 targeted tests vẫn đạt sau shared-loop refactor.
+  Native production browser slice `quickbuild` cũng đạt (resource/repository
+  baseline, pointer/numeric/keyboard, clipboard/workspace, compact và neighbor
+  preview/commit/Undo parity), không runtime exceptions. Đây là regression B08,
+  không phải UI proof mới cho B04 chưa có consumer.
+  Không thêm dependency/DB schema/game assets; không suy world parity hoặc
+  hardware performance từ các kiểm chứng này.
+- **Tiếp theo: B05** solid/hollow box planner, unique boundary cells và degenerates,
+  rồi B09 subset UI primitives. B06/B07 còn cần capability scope K02; không đánh
+  VERIFIED toàn K03/R1 từ B04 domain hoặc B08 UI.
 
 ### Slice bổ sung theo yêu cầu — import `.nbt` trong phiên
 

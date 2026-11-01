@@ -839,6 +839,32 @@ Browser slice `BLOCKSTAGE_EDITOR_SLICE='quickbuild'` chạy qua `test:browser` v
 `quickbuild-paste-compact.png` trong artifacts; native UI kiểm preview/commit,
 pointer, focus/input, workspace/clipboard, neighbor parity và atomic Undo/Redo.
 
+**B04 — line/rectangle-plane domain:** `primitive-plan.ts` nhận kind, start/end
+integer World và explicit block state. Hai endpoint đều inclusive; anchor là min
+theo từng trục, size = abs(end − start) + 1. Đảo hai đầu không đổi thứ tự/IDs.
+Line chỉ một trục thay đổi; plane có tối đa hai trục thay đổi (XY/XZ/YZ). Điểm
+hoặc line suy biến được phép. Diagonal rasterization, oblique plane và 3D box
+không nằm trong B04; 3D box thuộc B05.
+
+Anchor grid enumerate X nhanh nhất, rồi Y, rồi Z, không cấp mảng toàn bộ offsets.
+Shared `planObjectCopiesAt` nhận bounded count + trusted internal offset enumerator,
+check aggregate destination + full-footprint cells/objects trước enumeration/clone.
+Wrapper B01–B03 giữ nguyên API và các guard cũ. `createPlacedObject` nhận optional
+ID để tạo một Design template deterministic; callers hiện tại vẫn dùng UUID mặc
+định. Planner không gọi RNG hoặc viết lại pair adapters.
+
+Mỗi anchor sinh một logical object hoàn chỉnh: bed/door/plant tự có foot/head,
+lower/upper theo Design, giữ các state còn lại. Footprint có thể vượt mặt phẳng
+anchor; `size` là anchor-grid size, **không** phải full content/model bounds.
+Nếu footprints tự đè nhau (ví dụ door dọc Y, bed dọc facing với spacing 1) hoặc
+đè bất kỳ cell sẵn có, kể cả explicit air, reject toàn action; không skip/merge.
+Coordinate/pivot/registry/pair checks dùng validator hiện tại. Plan giữ cùng K03
+base/cancel/ID/cost/patch/chunk contract và apply trả exact candidate cho một Undo.
+
+B04 mới có domain API/tests; không có nút/ghost nhập endpoint trên UI hoặc tự
+recompute neighbors. B09 phải compose neighbor policy trước preview như B08 rồi
+nối session/numeric/pointer workflow, không coi domain tests là browser/world proof.
+
 **Phần mở rộng vẫn dự kiến:** base doc ID/revision, intent parameters, ID allocator,
 bounded candidate/patch, add/replace/remove, changed logical owners, old/new cells,
 neighbor scope và estimated work/bytes. Một plan dùng cho ghost và commit;

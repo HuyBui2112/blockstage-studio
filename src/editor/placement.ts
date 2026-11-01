@@ -39,10 +39,10 @@ function cellsFor(state: BlockState, position: Vec3): Block[] {
 
 /** Design placement: the requested cell anchors the foot/lower cell, even if the
  * palette selected head/upper. Does not simulate support, hinges or neighbors. */
-export function createPlacedObject(state: BlockState, pos: Vec3, catalog: Material[], _hit?: { face?: Vec3; point?: [number, number, number] }): EditorObject {
+export function createPlacedObject(state: BlockState, pos: Vec3, catalog: Material[], _hit?: { face?: Vec3; point?: [number, number, number] }, id: string = crypto.randomUUID()): EditorObject {
   validateState(state, catalog)
   const cells = cellsFor(state, pos)
-  const object: EditorObject = { id: crypto.randomUUID(), name: state.name.slice(state.name.indexOf(':') + 1).replaceAll('_', ' '), kind: cells.length > 1 ? 'multiblock' : 'block', cells, children: [], pivot2: [2 * pos[0] + 1, 2 * pos[1] + 1, 2 * pos[2] + 1], orientation: 0 }
+  const object: EditorObject = { id, name: state.name.slice(state.name.indexOf(':') + 1).replaceAll('_', ' '), kind: cells.length > 1 ? 'multiblock' : 'block', cells, children: [], pivot2: [2 * pos[0] + 1, 2 * pos[1] + 1, 2 * pos[2] + 1], orientation: 0 }
   validateLogicalObject(object, catalog)
   return object
 }
