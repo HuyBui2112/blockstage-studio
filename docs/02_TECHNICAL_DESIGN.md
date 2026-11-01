@@ -1,6 +1,6 @@
 # 02 — Thiết kế kỹ thuật
 
-Cập nhật: **01/11/2026**. Tài liệu này mô tả hợp đồng và cách vận hành source hiện
+Cập nhật: **02/11/2026**. Tài liệu này mô tả hợp đồng và cách vận hành source hiện
 hành. Mục tiêu dài hạn ở [01 — Mục tiêu sản phẩm](01_PRODUCT_GOALS.md); trạng thái,
 ưu tiên và bằng chứng nghiệm thu ở [03 — Tiến độ](03_STATUS_AND_ROADMAP.md).
 Mục đánh dấu **định hướng** chưa phải chức năng đã triển khai.
@@ -864,6 +864,26 @@ base/cancel/ID/cost/patch/chunk contract và apply trả exact candidate cho m�
 B04 mới có domain API/tests; không có nút/ghost nhập endpoint trên UI hoặc tự
 recompute neighbors. B09 phải compose neighbor policy trước preview như B08 rồi
 nối session/numeric/pointer workflow, không coi domain tests là browser/world proof.
+
+**B05 — solid/hollow box domain:** cùng `planPrimitive` có thêm kind `solid-box`
+và `hollow-box`, giữ inclusive corners/min anchor/size/IDs/guards của B04.
+Solid enumerate toàn anchor volume. Hollow chỉ enumerate boundary anchor shell
+dày một ô, không phát sinh air hoặc xóa dữ liệu ở interior. Content sẵn có trong
+interior được giữ; collision trên shell vẫn reject toàn action.
+
+Count = volume − interior với arithmetic BigInt tạm thời, check ≤100k rồi mới
+chuyển Number và tạo template/copies. Không đưa BigInt vào document/JSON/schema.
+Hollow có đủ ba chiều >2 dùng hai Z caps và XY perimeters của các Z layer giữa,
+disjoint nên corners/edges không lặp; enumerate trực tiếp O(shell anchors), không
+duyệt/allocate interior volume. Order vẫn là X-fastest dense order lọc boundary.
+Có chiều 1 hoặc 2 thì không có interior và hollow = solid, gồm point/line/plane.
+
+API nhận corners, không nhận lengths: mọi size là abs(diff)+1 nên ≥1; tọa độ âm
+và đảo corners hợp lệ, không có khái niệm chiều dài âm/0 trong API này. B09 nếu
+thêm fields dimensions phải validate integer >0 trước đổi thành corners. Shell
+là anchor-grid boundary, không bảo đảm cavity rỗng theo model/physical footprint
+của multi-block. Full logical pairs và collision/budget vẫn theo B04; không cắt
+đôi pair để ép vào box. Đây chưa phải UI primitives hoặc công cụ carve/erase.
 
 **Phần mở rộng vẫn dự kiến:** base doc ID/revision, intent parameters, ID allocator,
 bounded candidate/patch, add/replace/remove, changed logical owners, old/new cells,
