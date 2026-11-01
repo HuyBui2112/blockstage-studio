@@ -73,6 +73,17 @@ selection. Widget XYZ hoặc Numpad 1/3/7 chuyển view trực giao; Numpad 5 đ
 projection. Một đơn vị bằng một block, **+Y lên, +X đông, +Z nam**.
 Mở **Controls** để xem phím và dùng nút viewport nếu không có numpad.
 
+**Nhân bản:** mở menu **Copy** trên toolbar để Duplicate, Copy, Paste hoặc Repeat.
+Khi focus viewport: `Shift+D` Duplicate, `Ctrl+C` Copy, `Ctrl+V` Paste,
+`Ctrl+Shift+D` Repeat. Nhập số trong panel hoặc trỏ/click vào grid để đặt preview;
+**Enter / Confirm** mới ghi vào công trình, **Esc / Cancel** hủy. Một Undo/Redo
+áp dụng cho toàn bộ action, kể cả hàng rào/tường lân cận nếu bật Auto connections.
+Các công cụ này dùng **World**; Repeat nhập số bản sao **mới** và spacing block
+khác 0 (cho phép âm). Chồng block hoặc vượt giới hạn sẽ chặn toàn action.
+Clipboard giữ whole groups/components/multi-block trong phiên app, dùng qua các
+workspace, không chứa entity rời và không phải clipboard hệ điều hành; reload sẽ
+xóa clipboard. Copy/preview không đổi document, Save và draft chỉ ghi data đã commit.
+
 ## Nhập Structure NBT
 
 Trong Architecture hoặc Component Editor, bấm **Import NBT → Choose .nbt**.

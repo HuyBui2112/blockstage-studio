@@ -71,16 +71,20 @@ air vs sparse omission. Reject entities, block-entity payloads, multiple palette
 unknown fields/version instead of dropping them. Report stored size vs editor
 content bounds and unchanged 48-cell export policy. Confirm creates a new atomic
 Saved document after protecting current work; cancel never mutates the document.
-Duplicate/clipboard/repeat B01–B03 are domain-only: shared copy-plan and wrappers use immutable source
+Duplicate/clipboard/repeat B01–B03 use shared copy-plan and B08 copy-action session/UI with immutable source
 identity plus document/epoch/local revision, stable per-operation nested IDs,
 aggregate budgets before expansion and the exact preview candidate on apply.
 Keep whole groups/pairs/component copies and provenance; originals stay occupied.
-Free entities are not implicitly duplicated. Do not claim B08 UI is implemented
-or bypass the stale/cancel guard when adding session consumers. Clipboard v1 is
+Free entities are not implicitly duplicated. Never bypass stale/cancel/policy
+guards or recompute neighbors after the final copy preview. Clipboard v1 is
 an independent in-memory, strict 26.2/4903 snapshot with an integer anchor; paste
 uses destination base and fresh IDs. Repeat count means NEW copies; signed nonzero
 integer spacing is anchor-to-anchor on World axes. Check aggregate multiplied
 budget before expansion; reject any collision atomically, never partially repeat.
+Copy UI uses a session-owned clipboard and per-operation placement key. Pointer
+stages targets; Enter/Confirm commits and Esc/Cancel cancels, with viewport focus
+restored. Inputs retain native shortcuts. World-only copy controls must stay
+explicit, Preview read-only, and ≤1000px overlays must not cover the copy panel.
 
 - Reuse the existing React/TypeScript/Three.js base and verified asset pipeline.
 - Keep existing project data and import/export/domain code intact during changes.

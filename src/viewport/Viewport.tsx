@@ -552,12 +552,14 @@ class ViewportController {
     const resourcesChanged=props.packs!==this.props.packs || props.profile!==this.props.profile || props.resolver!==this.props.resolver
     const rebuild = resourcesChanged || props.blocks !== this.props.blocks || props.entities!==this.props.entities || props.catalog!==this.props.catalog || props.clip !== this.props.clip || props.local !== this.props.local || props.local && props.selected !== this.props.selected
     const editorToolChanged=props.editor?.tool!==this.props.editor?.tool
+    const placementSessionChanged=props.editor?.placementSession!==this.props.editor?.placementSession
     const hidePreview=props.tool!==this.props.tool||props.ghost!==this.props.ghost||editorToolChanged
     const highlight=props.selected!==this.props.selected || props.previewMode!==this.props.previewMode
     const layer=props.layer!==this.props.layer
     const frame=props.frameKey!==this.props.frameKey
     const command=props.command?.id!==this.props.command?.id ? props.command : undefined
     this.props = props
+    if(placementSessionChanged)this.placementPointer=null
     if (editorToolChanged || rebuild || layer) { this.placementHoverKey = ''; this.placementCameraKey = '' }
     if (rebuild) this.rebuild(resourcesChanged)
     else {

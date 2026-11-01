@@ -1,6 +1,6 @@
 # 02 — Thiết kế kỹ thuật
 
-Cập nhật: **30/10/2026**. Tài liệu này mô tả hợp đồng và cách vận hành source hiện
+Cập nhật: **01/11/2026**. Tài liệu này mô tả hợp đồng và cách vận hành source hiện
 hành. Mục tiêu dài hạn ở [01 — Mục tiêu sản phẩm](01_PRODUCT_GOALS.md); trạng thái,
 ưu tiên và bằng chứng nghiệm thu ở [03 — Tiến độ](03_STATUS_AND_ROADMAP.md).
 Mục đánh dấu **định hướng** chưa phải chức năng đã triển khai.
@@ -756,8 +756,8 @@ eviction-proof backup.
 ### 10.2 Operation plan và incremental consumers — K03
 
 **Subset đã triển khai cho B01–B03:** `operation-plan.ts`, `copy-plan.ts` cùng các
-wrapper duplicate/paste/repeat là planner append-only thuần dữ liệu, chưa nối
-UI/session. `OperationBase` gồm
+wrapper duplicate/paste/repeat là planner append-only thuần dữ liệu. B08 đã nối
+UI/session qua adapter bên dưới; `OperationBase` gồm
 document ID, session epoch và committed local revision (không phải storage token).
 `planDuplicate` nhận selection top-level, offset integer trong World, catalog và
 operation ID được cấp **một lần** từ caller. ID mới `operationId:ordinal` theo
@@ -778,10 +778,9 @@ chép free entities. Pivot2 dịch `2 × delta`, state/name/orientation giữ ng
 **đúng candidate preview**, không cấp lại ID/replan; caller gọi `executeHistory`
 một lần. Cancel trước/sau build hoặc trước apply không mutation. Đây là bounded
 synchronous planner, không tuyên bố ngắt giữa một lượt JS đang chạy. Commit vẫn
-validate đầy đủ; chưa có trusted fast path hay session/viewport integration.
-K03/B01 này không tự đóng B08, toàn K03 hoặc K07a. Neighbor recomputation opt-in
-phải được đưa vào cùng final preview/commit plan khi B08 nối session, không derive
-khác nhau hai lần. Chưa công bố GPU/triệu-block hoặc memory-byte benchmark.
+validate đầy đủ; chưa có trusted fast path hoặc toàn pipeline incremental.
+K03/B01 riêng không đóng toàn K03/K07a. B08 tích hợp bên dưới không derive
+neighbor hai lần. Chưa công bố GPU/triệu-block hoặc memory-byte benchmark.
 
 **B02 — clipboard nội bộ v1:** `clipboard.ts` tạo snapshot độc lập với nguồn,
 envelope strict `{format:'blockstage-clipboard', version:1, target, anchor, objects}`.
@@ -798,7 +797,7 @@ destination position − anchor và dịch mọi pivot2 cùng cells, không norm
 xoay state. Coordinate/pivot của kết quả vẫn tuân schema. Mỗi paste mới cần
 operation ID mới; cùng operation ID trong preview giữ IDs ổn định. ID mới không
 được trùng cả destination lẫn snapshot. Clipboard chỉ trong memory, chưa có
-system clipboard, file format import, persistence hoặc UI controls.
+system clipboard, file format import hoặc persistence. B08 có UI controls bên dưới.
 
 **B03 — repeat:** `repeat-plan.ts` nhận `{axis:'x'|'y'|'z', count, spacing}` trong
 World coordinates. `count` là số **bản sao mới**, integer 1–100k, không gồm nguồn;
@@ -810,8 +809,35 @@ overflow hoặc va chạm bất kỳ (nguồn/copy/obstacle) chặn cả action.
 Ba wrapper dùng **một** copy engine: đo source/destination và nhân tổng count
 trước cấp ID/clone, không tạo intermediate documents hoặc chạy validate mỗi bản
 lặp. Chỉ validate final candidate rồi apply guard. Một plan → một history command
-→ một Undo/Redo cho mọi bản sao. B08 vẫn phải nối đúng numeric/pointer/keymap,
-session, neighbor policy và browser acceptance; domain tests không chứng minh UI.
+→ một Undo/Redo cho mọi bản sao. Domain tests không thay browser acceptance B08.
+
+**B08 — copy action session/UI:** `copy-action.ts` compose copy + optional neighbor
+plan đúng một lần, validate final states trước valid preview. Preview cells và
+history patches gồm cả existing neighbors; apply kiểm source/epoch/revision,
+AbortSignal và rules reference/policy, trả exact candidate. Session `commitCopy`
+đi qua history/draft revision thông thường nhưng bỏ bước derive neighbors lặp lại.
+`useCopyActions` sở hữu operation ID, parameters, cancellable lifecycle và memoized
+plan; clipboard snapshot thuộc `useEditorSession`, sống qua Assets/workspace switch,
+không được lưu DB. Copy/preview không tăng revision hoặc tạo history commands.
+
+Menu Copy + panel numeric không modal trong viewport; Shift D duplicate,
+Ctrl C/V copy/paste, Ctrl Shift D repeat khi focus canvas. Pointer/click chỉ định
+target (repeat là spacing của bản đầu theo axis đã chọn); Enter/Confirm apply,
+Esc/Cancel hủy. R không xoay nguồn trong copy mode, Place R cũ vẫn giữ. Inputs
+giữ native typing/clipboard shortcuts, Enter/Esc trong panel có routing riêng;
+Confirm/Cancel trả focus canvas. Thay selection/document/workspace, lifecycle IO
+hoặc chuyển Preview kết thúc copy session; snapshot clipboard không mất theo.
+Neighbor toggle/profile thay đổi rebuild preview giữ ID cùng operation; commit
+không sử dụng preview theo policy cũ. Mỗi operation có placement-session key để
+hover từ phiên trước không ghi đè numeric input; hover/camera tiếp tục cập nhật
+sau pointer movement thật. Invalid plan hiện lý do và disable Confirm, không dựng
+ghost candidate giả. Sidebar overlay tạm ẩn khi copy trên màn hình ≤1000px rồi
+trả lại trạng thái mở cũ; camera/navigation không sửa document.
+
+Browser slice `BLOCKSTAGE_EDITOR_SLICE='quickbuild'` chạy qua `test:browser` và
+được tích hợp full suite. Ảnh `quickbuild-duplicate-desktop.png` và
+`quickbuild-paste-compact.png` trong artifacts; native UI kiểm preview/commit,
+pointer, focus/input, workspace/clipboard, neighbor parity và atomic Undo/Redo.
 
 **Phần mở rộng vẫn dự kiến:** base doc ID/revision, intent parameters, ID allocator,
 bounded candidate/patch, add/replace/remove, changed logical owners, old/new cells,

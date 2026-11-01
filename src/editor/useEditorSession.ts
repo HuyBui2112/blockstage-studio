@@ -15,6 +15,8 @@ import { RECOVERY_CHANGED, type DraftHead } from '../io/draft-storage'
 import { createDraftController, type DraftController, type DraftStatus } from './draft-controller'
 import { planPortableRestore,type PortableBackup } from '../io/portable-backup'
 import { commitPortableRestore } from '../io/portable-repository'
+import { createClipboard, type EditorClipboard } from './clipboard'
+import { applyCopyAction, type CopyActionPlan } from './copy-action'
 
 export type EditorScope = 'architecture' | 'component'
 export type TransformIntent = { kind: 'move'; delta: Vec3 } | { kind: 'rotate'; turns: number }
@@ -35,6 +37,7 @@ export function useEditorSession(catalog: Material[], neighborRules?: NeighborRu
   const [ready, setReady] = useState(false)
   const [error, setError] = useState('')
   const [preview, setPreview] = useState<Preview | null>(null)
+  const [clipboard, setClipboard] = useState<EditorClipboard | null>(null)
   const currentSlots = useRef(slots)
   const saving = useRef(new Set<EditorScope>())
   const lifecycle = useRef(new Set<EditorScope>())
@@ -144,12 +147,12 @@ export function useEditorSession(catalog: Material[], neighborRules?: NeighborRu
     return () => { active = false }
   }, [refreshRecoveries])
 
-  function commit(scope: EditorScope, next: EditorDocument, label: string, selection?: string[]) {
+  function commit(scope: EditorScope, next: EditorDocument, label: string, selection?: string[], finalized?: {notes:string[]}) {
     if (lifecycle.current.has(scope)) throw new Error('A document operation is in progress')
     const before = slots[scope].history.document
-    const plan=autoConnections[scope] && neighborRules ? planNeighborConnections(before,next,neighborRules) : {document:next,notes:[]}
+    const plan=finalized ? {document:next,notes:finalized.notes} : autoConnections[scope] && neighborRules ? planNeighborConnections(before,next,neighborRules) : {document:next,notes:[]}
     next=plan.document
-    validateDocument(next, catalog)
+    if(!finalized)validateDocument(next, catalog)
     setConnectionNotes({scope,document:next,notes:plan.notes})
     setSlots(previous => {
       const slot = previous[scope]
@@ -166,6 +169,7 @@ export function useEditorSession(catalog: Material[], neighborRules?: NeighborRu
     catch (error) { setError(messageOf(error)); return false }
   }
   function select(scope: EditorScope, ids: string[], toggle: boolean) {
+    // Copy previews are session-only; selection changes never publish them.
     if (lifecycle.current.has(scope)) return
     setPreview(null)
     setSlots(previous => {
@@ -174,6 +178,20 @@ export function useEditorSession(catalog: Material[], neighborRules?: NeighborRu
       for (const id of ids) if (available.has(id)) { if (toggle && selection.has(id)) selection.delete(id); else selection.add(id) }
       return { ...previous, [scope]: { ...slot, selection: [...selection] } }
     })
+  }
+  function copySelection(scope: EditorScope) {
+    if (lifecycle.current.has(scope)) return false
+    try { const slot=currentSlots.current[scope];setClipboard(createClipboard(slot.history.document,slot.selection,catalog));setError('');return true }
+    catch(error){setError(messageOf(error));return false}
+  }
+  function commitCopy(scope: EditorScope, plan: CopyActionPlan) {
+    try {
+      if (plan.source.workspace!==scope) throw new Error('Copy plan belongs to another workspace')
+      const slot=currentSlots.current[scope]
+      const next=applyCopyAction(plan,slot.history.document,{documentId:slot.history.document.id,sessionEpoch:slot.epoch,revision:slot.revision},catalog,autoConnections[scope]?neighborRules:undefined)
+      commit(scope,next,plan.kind==='repeat'?'Repeat objects':plan.kind==='paste'?'Paste objects':'Duplicate objects',plan.selection,{notes:plan.notes})
+      return true
+    } catch(error){setError(messageOf(error));return false}
   }
   function history(scope: EditorScope, redo: boolean) {
     if (lifecycle.current.has(scope)) return
@@ -402,7 +420,7 @@ export function useEditorSession(catalog: Material[], neighborRules?: NeighborRu
     } catch (error) { setError(messageOf(error)) }
   }
   function configureConnections(scope:EditorScope,enabled:boolean){setPreview(null);setConnectionNotes(null);setAutoConnections(previous=>({...previous,[scope]:enabled}))}
-  return { importStructure, restorePortable, draftStatus, recoveryCount, refreshRecoveries, restoreRecovery, discardRecovery, recoveryDocument, retryDraft, busy, refreshDocuments, renameSaved, deleteDocument, discardChanges, autoConnections, connectionNotes, configureConnections, slots, components, ready, error, setError, preview, cancelPreview: () => setPreview(null), select, history, transform, place, group, ungroup, remove, updateState, setPivot, move, rotate, rename, save, newDocument, open, importDocument, saveComponent, editComponent, placeComponent, importComponent, removeComponent }
+  return { clipboard, copySelection, commitCopy, importStructure, restorePortable, draftStatus, recoveryCount, refreshRecoveries, restoreRecovery, discardRecovery, recoveryDocument, retryDraft, busy, refreshDocuments, renameSaved, deleteDocument, discardChanges, autoConnections, connectionNotes, configureConnections, slots, components, ready, error, setError, preview, cancelPreview: () => setPreview(null), select, history, transform, place, group, ungroup, remove, updateState, setPivot, move, rotate, rename, save, newDocument, open, importDocument, saveComponent, editComponent, placeComponent, importComponent, removeComponent }
 }
 
 export type EditorSession = ReturnType<typeof useEditorSession>

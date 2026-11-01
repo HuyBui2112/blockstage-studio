@@ -179,7 +179,7 @@ BUG-03/04/06 đã có fixes trong scope công bố. BUG-01/02/05 còn PARTIAL; c
 | Nhóm | Trạng thái phải giữ rõ |
 | --- | --- |
 | An toàn dữ liệu | **Đã có trong scope hiện tại:** Save CAS, catalogue/delete, autosave draft, recovery, Storage health và portable v1. D07 bổ sung failed-switch, hai app pages Save/claim, corrupted records và renderer crash sau protected ack; fresh-origin/legacy được kiểm ở suites riêng. Release R1 và disk quota/power loss chưa kiểm; assets phải giữ riêng, không hứa chống mọi crash/eviction. |
-| Dựng hằng ngày | **Nền domain B01–B03 đã có:** duplicate, clipboard/paste và repeat planner. **Chưa có workflow UI B08:** nút/phím/ghost các thao tác này; resize theo quy tắc, parametric wall/column/span và socket vẫn chưa triển khai. Đặt nhiều bản component hiện có không tương đương array tool. |
+| Dựng hằng ngày | **Đã có B01–B03/B08:** menu/phím Duplicate, internal Copy/Paste và Repeat World với numeric/pointer preview, cancel và atomic Undo/Redo. Resize theo quy tắc, line/plane/box primitives, parametric wall/column/span và socket vẫn chưa triển khai. |
 | Nội thất/phân vùng | **Một phần:** fly và orthographic giúp quan sát; **chưa có** workflow chuyên cho nội thất, layers/hide roof/floor/cut/clip/local isolation trong editor v2, visible-only/lasso selection. |
 | Reuse/vật liệu | **Chưa triển khai:** linked component updates/overrides và material substitution có hợp đồng tương thích. Không suy safe replacement chỉ từ tags/creative tabs. |
 | Game behavior | **Một phần:** opt-in scene connections fence/wall/gate theo game predicates đã có. Chưa slab merge/player hinge, auto-pane/stairs, dynamic shapes, support tổng quát, gravity/redstone/fluid/ticks/player collision. |
@@ -468,7 +468,7 @@ trước khi giao, không đưa nguyên cả hệ thống cho một agent.
   group/component tree, provenance, pivot2, name/orientation/states; không nhân
   free entities, không ghi storage. Nguồn vẫn chiếm chỗ; va chạm, stale/cancel,
   depth/cycle hoặc aggregate budget reject toàn action trước commit.
-- **B01 chưa có nút/phím trong UI:** đây là planner + apply guard cho B08 tái sử
+- **Ở mốc B01 chưa có nút/phím trong UI:** planner + apply guard cho B08 tái sử
   dụng, không đánh VERIFIED trải nghiệm Duplicate/clipboard/repeat. Preview/apply
   trả cùng candidate/IDs; integration history hiện tại chứng minh một Undo/Redo
   giữ nguyên snapshots. K03 tổng vẫn PARTIAL: chưa incremental consumers, generic
@@ -501,10 +501,37 @@ trước khi giao, không đưa nguyên cả hệ thống cho một agent.
   later obstacle, aggregate pre-expansion budget, stale/cancel và atomic history.
   Không thêm dependency/DB schema/game assets. Chưa có UI/runtime consumer mới,
   nên không chạy lại browser smoke; B08 phải kiểm thao tác thực qua native browser.
-- **Tiếp theo: B08** nối Duplicate/Copy/Paste/Repeat với session, numeric và
-  pointer/keyboard, ghost/cancel, focus routing, neighbor preview/commit parity
-  và atomic Undo/Redo. **B01–B03 hiện chưa có nút/phím trong UI.** Không rewrite
-  session/render chỉ để extract seam hoặc đánh VERIFIED toàn K03/R1 từ domain tests.
+- **B08 VERIFIED cho scope UI/session hiện tại:** menu Copy có Duplicate/Copy/Paste/Repeat; canvas
+  shortcuts Shift D, Ctrl C/V, Ctrl Shift D. Panel numeric + pointer target World,
+  click chỉ stage, Enter/Confirm ghi một history command, Esc/Cancel không mutation.
+  Copy/preview giữ nguyên document/revision/history; clipboard snapshot sống qua
+  Architecture/Component/Assets, không nằm trong Saved/draft hoặc system clipboard.
+  Read-only Preview không có copy controls. Source/state/pairs/group/provenance,
+  fresh/stable IDs và budget/collision policy B01–B03 được giữ nguyên.
+- `copy-action.ts` derive neighbors một lần trước preview, validate final candidate;
+  preview/history có cả existing neighbors. Commit kiểm epoch/revision/source,
+  cancellation và rules policy; không derive lần hai. Browser kiểm fence gốc east
+  và copy west, toggle policy rebuild giữ IDs, exact preview→commit và Undo/Redo
+  cả hai. Thay scope/selection/document hoặc mở IO dialog hủy phiên copy.
+- Đã sửa hai lỗi trong lúc nghiệm thu: sidebar phủ panel ở compact và cached hover
+  của copy trước ghi đè numeric của copy mới. Copy session key reset pointer cũ;
+  sidebar overlay tạm ẩn trong copy ≤1000px rồi khôi phục. Browser kiểm panel thực
+  sự nhìn thấy/không bị che ở **620×900**, native pointer thật đổi staged offset,
+  R không rotate source, input clipboard keys giữ native, Enter từ numeric field,
+  và Confirm trả focus canvas. Ảnh đã xem: `quickbuild-duplicate-desktop.png`,
+  `quickbuild-paste-compact.png` trong artifacts.
+- Code gate **336/336 test, 33 file**, typecheck/lint/build đạt; 5 tests mới compose
+  dispatch, neighbor final-state validation, policy/stale/cancel và one-step history.
+  Targeted production browser slice `quickbuild` đạt với client/profile local 26.2.
+  Full production browser suite đạt: resources, editor/placement/state/neighbor,
+  Save/Documents, NBT import, portable fresh-origin, quickbuild, D07 và Recovery;
+  không runtime exceptions. Sau hardening Enter routing, targeted slice chạy lại
+  đạt cả Enter native trên Cancel (không commit), numeric Enter và focus restore.
+  Không thêm dependency/DB schema, không nhúng game assets. Chưa kiểm GPU hardware
+  performance, large-scene typing latency hoặc runtime world parity mới cho copy.
+- **Tiếp theo: B04** line/rectangle-plane planner, chốt endpoint/grid/anchor và
+  budget trên cùng nền K03, rồi B05 solid/hollow box và B09 UI primitives.
+  B06/B07 còn cần capability scope K02; không đánh VERIFIED toàn K03/R1 từ B08.
 
 ### Slice bổ sung theo yêu cầu — import `.nbt` trong phiên
 

@@ -18,8 +18,10 @@ export type EditorViewportState = {
   onPlacementHover?: (hit: EditorPlacementHit | null) => void
   onPlacementRotate?: (turns: number) => void
   onPlacementCancel?: () => void
+  onPlacementConfirm?: () => void
+  placementSession?: string
   onTransform: (intent: EditorTransformIntent, phase: 'preview' | 'commit' | 'cancel') => void
-  onCommand: (name: 'undo' | 'redo' | 'delete' | 'group' | 'ungroup' | 'select-all' | 'deselect') => void
+  onCommand: (name: 'undo' | 'redo' | 'delete' | 'group' | 'ungroup' | 'select-all' | 'deselect' | 'duplicate' | 'copy' | 'paste' | 'repeat') => void
 }
 
 type Bridge = {
@@ -398,7 +400,11 @@ export class EditorInteraction {
       return !e.code.startsWith('Numpad') && !['Home', 'KeyF', 'Backquote'].includes(e.code)
     }
     if (this.dragging) return true
+    if ((e.ctrlKey || e.metaKey) && e.code==='KeyC') {state.onCommand('copy');return true}
+    if ((e.ctrlKey || e.metaKey) && e.code==='KeyV') {state.onCommand('paste');return true}
+    if (e.code==='KeyD' && e.shiftKey && !e.altKey) {state.onCommand(e.ctrlKey||e.metaKey?'repeat':'duplicate');return true}
     if (state.tool === 'place' && !e.ctrlKey && !e.metaKey && !e.altKey) {
+      if ((e.code==='Enter'||e.code==='NumpadEnter') && state.onPlacementConfirm) {state.onPlacementConfirm();return true}
       if (e.code === 'KeyR') { state.onPlacementRotate?.(e.shiftKey ? -1 : 1); return true }
       if (e.code === 'Escape') { state.onPlacementCancel?.(); return true }
       // Moving the selected object while placing is ambiguous; choose Move first.

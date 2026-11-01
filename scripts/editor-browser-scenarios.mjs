@@ -11,9 +11,11 @@ import { runRecoveryScenarios } from './recovery-browser-scenarios.mjs'
 import { runPortableScenarios } from './portable-browser-scenarios.mjs'
 import { runNbtImportScenarios } from './nbt-import-browser-scenarios.mjs'
 import { runDataSafetyScenarios } from './data-safety-browser-scenarios.mjs'
+import { runQuickBuildScenarios } from './quickbuild-browser-scenarios.mjs'
 
 /** Real input integration scenarios, called by the existing isolated-browser harness. */
 export async function runEditorScenarios({ command, evaluate, until, click, aria, input, upload, key, screenshot, directory, profilePath, createPeer }) {
+  if(process.env.BLOCKSTAGE_EDITOR_SLICE==='quickbuild')return runQuickBuildScenarios({command,evaluate,until,click,aria,input,upload,key,screenshot,directory})
   if (process.env.BLOCKSTAGE_EDITOR_SLICE === 'data-safety') return runDataSafetyScenarios({command,evaluate,until,click,aria,input,upload,screenshot,directory,createPeer})
   if (process.env.BLOCKSTAGE_EDITOR_SLICE === 'recovery') return runRecoveryScenarios({ command, evaluate, until, click, aria, input, upload, key, screenshot, createPeer, directory })
   if (process.env.BLOCKSTAGE_EDITOR_SLICE === 'nbt') return runNbtImportScenarios({command,evaluate,until,click,aria,upload,key,screenshot,directory})
@@ -248,6 +250,7 @@ export async function runEditorScenarios({ command, evaluate, until, click, aria
   await runDocumentScenarios({ command, evaluate, until, click, aria, input, upload, key, screenshot, createPeer, directory })
   await runNbtImportScenarios({command,evaluate,until,click,aria,upload,key,screenshot,directory})
   await runPortableScenarios({command,evaluate,until,click,aria,upload,screenshot,createPeer,directory})
+  await runQuickBuildScenarios({command,evaluate,until,click,aria,input,upload,key,screenshot,directory})
   await runDataSafetyScenarios({command,evaluate,until,click,aria,input,upload,screenshot,directory,createPeer})
   await runRecoveryScenarios({ command, evaluate, until, click, aria, input, upload, key, screenshot, createPeer, directory })
   await command('Emulation.setDeviceMetricsOverride', { width: 620, height: 800, deviceScaleFactor: 1, mobile: false })
