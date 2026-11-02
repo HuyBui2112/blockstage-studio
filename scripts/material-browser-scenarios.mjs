@@ -1,0 +1,73 @@
+import assert from 'node:assert/strict'
+import {writeFile,readFile,mkdir} from 'node:fs/promises'
+import {join} from 'node:path'
+import {setTimeout as delay} from 'node:timers/promises'
+
+export async function runMaterialScenarios({command,evaluate,until,click,aria,input,upload,key,screenshot,directory}){
+  const snapshot=()=>evaluate(`JSON.parse(document.querySelector('.editor-diagnostics').dataset.snapshot)`)
+  const status=()=>evaluate(`(()=>{const d=document.querySelector('.editor-diagnostics').dataset;return {revision:d.revision,history:d.history}})()`)
+  const ghost=()=>evaluate(`JSON.parse(document.querySelector('.material-action-diagnostics').dataset.snapshot)`)
+  const valid=()=>until(`document.querySelector('.material-action-diagnostics')?.dataset.valid==='true'`)
+  const noPreview=()=>until(`!document.querySelector('[aria-label="Confirm material replacement"]')`)
+  const cell=(name,pos,properties={})=>({pos,state:{name:`minecraft:${name}`,properties}})
+  const object=(id,kind,cells=[],children=[])=>({id,name:id,kind,cells,children,pivot2:[1,1,1],orientation:0})
+  const fixture={schemaVersion:2,id:'materials-browser',name:'Materials fixture',workspace:'architecture',target:{gameVersion:'26.2',dataVersion:4903},objects:[
+    object('selected','group',[],[object('x','block',[cell('oak_log',[0,0,0],{axis:'x'})]),object('copy','component',[],[object('z','block',[cell('oak_log',[2,0,0],{axis:'z'})])]),object('bed','multiblock',[cell('red_bed',[0,0,2],{facing:'east',part:'foot',occupied:'false'}),cell('red_bed',[1,0,2],{facing:'east',part:'head',occupied:'false'})])]),
+    object('outside','block',[cell('oak_log',[4,0,0],{axis:'y'})]),object('air','block',[cell('air',[5,0,0])]),
+  ],entities:[]}
+  fixture.objects[0].children[1].componentId='library-provenance'
+  await command('Emulation.setDeviceMetricsOverride',{width:1500,height:1000,deviceScaleFactor:1,mobile:false})
+  await click(aria('Architecture workspace'));await until(`document.querySelector('.editor-workspace')?.dataset.editorReady==='true'`)
+  const path=join(directory,'materials.json');await writeFile(path,JSON.stringify(fixture));await upload(aria('Import editor document'),path)
+  await until(`document.querySelector('[aria-label="Document name"]').value==='Materials fixture'`)
+  if(!await evaluate(`!!document.querySelector('.editor-inspector')`))await click(aria('Toggle editor inspector'))
+  await click(aria('Select tool'));await click('.outliner-object > button')
+  const original=await snapshot(),initial=await status()
+  await click(aria('Open materials'))
+  assert.match(await evaluate(`document.querySelector('.materials-summary').textContent`),/5 non-air · 1 explicit air/)
+  const downloads=join(directory,'material-downloads');await mkdir(downloads,{recursive:true});await command('Browser.setDownloadBehavior',{behavior:'allow',downloadPath:downloads})
+  await click(aria('Download material counts JSON'));await click(aria('Download material counts CSV'))
+  async function downloaded(name){for(let i=0;i<100;i++){try{return await readFile(join(downloads,name),'utf8')}catch{await delay(100)}}throw new Error(`Missing download ${name}`)}
+  const report=JSON.parse(await downloaded('Materials fixture.materials.json'))
+  assert.equal(report.occupiedCells,6);assert.equal(report.airCells,1)
+  assert.deepEqual(report.byId.map(row=>[row.id,row.cells]),[['minecraft:air',1],['minecraft:oak_log',3],['minecraft:red_bed',2]])
+  assert.match(await downloaded('Materials fixture.materials.csv'),/minecraft:oak_log\[axis=x\]/)
+  await input(aria('Materials count scope'),'selection')
+  assert.match(await evaluate(`document.querySelector('.materials-summary').textContent`),/4 non-air · 0 explicit air/)
+  await click('.materials-state-toggle input')
+  assert.equal(await evaluate(`document.querySelectorAll('.materials-table tbody tr').length`),4)
+  await click('.materials-state-toggle input')
+  await input(aria('Replacement source material'),'minecraft:oak_log')
+  assert.equal(await evaluate(`Array.from(document.querySelector('[aria-label="Replacement target material"]').options).some(option=>option.value==='minecraft:oak_stairs')`),false)
+  await input(aria('Replacement target material'),'minecraft:spruce_log');await click(aria('Preview material replacement'));await valid()
+  const candidate=await ghost();assert.equal(candidate.matchedCells,2)
+  assert.deepEqual(candidate.cells.map(cell=>cell.state.properties.axis),['x','z'])
+  assert.deepEqual(await snapshot(),original);assert.deepEqual(await status(),initial)
+  await screenshot('materials-replacement-desktop')
+  await click(aria('Cancel material replacement'));await noPreview();assert.deepEqual(await snapshot(),original)
+  await click(aria('Preview material replacement'));await valid()
+  await click(aria('Auto connections'));await noPreview()
+  assert.deepEqual(await snapshot(),original);assert.deepEqual(await status(),initial)
+  await click(aria('Auto connections'))
+  await click(aria('Preview material replacement'));await valid()
+  const committedCandidate=await ghost();await evaluate(`document.querySelector('canvas').focus()`);await key('Enter','Enter');await noPreview()
+  assert.deepEqual((await snapshot()).cells.filter(cell=>cell.state.name==='minecraft:spruce_log'),committedCandidate.cells)
+  assert.equal((await snapshot()).cells.find(cell=>cell.owner==='outside').state.name,'minecraft:oak_log')
+  assert.equal(Number((await status()).history),Number(initial.history)+1)
+  await click(aria('Close materials'));await click(aria('Undo editor'));assert.deepEqual(await snapshot(),original)
+  await click(aria('Redo editor'));assert.equal((await snapshot()).cells.filter(cell=>cell.state.name==='minecraft:spruce_log').length,2)
+  await click(aria('Undo editor'));await click(aria('Open materials'))
+  await input(aria('Replacement source material'),'minecraft:red_bed');await input(aria('Replacement target material'),'minecraft:blue_bed');await click(aria('Preview material replacement'));await valid()
+  const beds=await ghost();assert.equal(beds.cells.length,2)
+  await click(aria('Confirm material replacement'));await noPreview()
+  assert.deepEqual((await snapshot()).cells.filter(cell=>cell.state.name==='minecraft:blue_bed'),beds.cells)
+  await command('Emulation.setDeviceMetricsOverride',{width:620,height:900,deviceScaleFactor:1,mobile:false})
+  await screenshot('materials-compact')
+  assert.equal(await evaluate(`(()=>{const p=document.querySelector('.materials-panel'),b=p.getBoundingClientRect();return b.left>=0&&b.right<=innerWidth&&b.bottom<=innerHeight&&p.contains(document.elementFromPoint(b.left+20,b.top+20))})()`),true)
+  await click(aria('Close materials'));await command('Emulation.setDeviceMetricsOverride',{width:1500,height:1000,deviceScaleFactor:1,mobile:false})
+  await click(aria('3D Preview workspace'));await click(aria('Open materials'))
+  assert.equal(await evaluate(`!!document.querySelector('[aria-label="Replacement source material"]')`),false)
+  assert.equal(await evaluate(`!!document.querySelector('[aria-label="Download material counts JSON"]')`),true)
+  await click(aria('Close materials'))
+  console.log(JSON.stringify({materialsResult:'passed',checks:['downloaded CSV/JSON exact cells and explicit air','document vs selected roots','compatible target filter','nested logs preserve axes/provenance','preview/cancel no mutation','exact commit with oneUndoRedo','unselected content retained','complete bed pair','620px layout','read-only Preview counts']}))
+}

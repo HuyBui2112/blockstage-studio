@@ -13,9 +13,19 @@ import { runNbtImportScenarios } from './nbt-import-browser-scenarios.mjs'
 import { runDataSafetyScenarios } from './data-safety-browser-scenarios.mjs'
 import { runQuickBuildScenarios } from './quickbuild-browser-scenarios.mjs'
 import { runPrimitiveScenarios } from './primitive-browser-scenarios.mjs'
+import { runMaterialScenarios } from './material-browser-scenarios.mjs'
+import { runHouseScenarios } from './house-browser-scenarios.mjs'
+import { runVisibilityScenarios } from './visibility-browser-scenarios.mjs'
+import { runYRangeScenarios } from './y-range-browser-scenarios.mjs'
+import { runInteriorScenarios } from './interior-browser-scenarios.mjs'
 
 /** Real input integration scenarios, called by the existing isolated-browser harness. */
 export async function runEditorScenarios({ command, evaluate, until, click, aria, input, upload, key, screenshot, directory, profilePath, createPeer }) {
+  if(process.env.BLOCKSTAGE_EDITOR_SLICE==='interior')return runInteriorScenarios({command,evaluate,until,click,aria,input,key,screenshot,directory,profilePath})
+  if(process.env.BLOCKSTAGE_EDITOR_SLICE==='y-range')return runYRangeScenarios({command,evaluate,until,click,aria,input,upload,key,screenshot,directory})
+  if(process.env.BLOCKSTAGE_EDITOR_SLICE==='visibility')return runVisibilityScenarios({command,evaluate,until,click,aria,input,upload,key,screenshot,directory})
+  if(process.env.BLOCKSTAGE_EDITOR_SLICE==='house')return runHouseScenarios({command,evaluate,until,click,aria,input,key,screenshot,directory})
+  if(process.env.BLOCKSTAGE_EDITOR_SLICE==='materials')return runMaterialScenarios({command,evaluate,until,click,aria,input,upload,key,screenshot,directory})
   if(process.env.BLOCKSTAGE_EDITOR_SLICE==='primitives')return runPrimitiveScenarios({command,evaluate,until,click,aria,input,key,screenshot})
   if(process.env.BLOCKSTAGE_EDITOR_SLICE==='quickbuild')return runQuickBuildScenarios({command,evaluate,until,click,aria,input,upload,key,screenshot,directory})
   if (process.env.BLOCKSTAGE_EDITOR_SLICE === 'data-safety') return runDataSafetyScenarios({command,evaluate,until,click,aria,input,upload,screenshot,directory,createPeer})
@@ -254,6 +264,11 @@ export async function runEditorScenarios({ command, evaluate, until, click, aria
   await runPortableScenarios({command,evaluate,until,click,aria,upload,screenshot,createPeer,directory})
   await runQuickBuildScenarios({command,evaluate,until,click,aria,input,upload,key,screenshot,directory})
   await runPrimitiveScenarios({command,evaluate,until,click,aria,input,key,screenshot})
+  await runMaterialScenarios({command,evaluate,until,click,aria,input,upload,key,screenshot,directory})
+  await runHouseScenarios({command,evaluate,until,click,aria,input,key,screenshot,directory})
+  await runVisibilityScenarios({command,evaluate,until,click,aria,input,upload,key,screenshot,directory})
+  await runYRangeScenarios({command,evaluate,until,click,aria,input,upload,key,screenshot,directory})
+  await runInteriorScenarios({command,evaluate,until,click,aria,input,key,screenshot,directory,profilePath})
   await runDataSafetyScenarios({command,evaluate,until,click,aria,input,upload,screenshot,directory,createPeer})
   await runRecoveryScenarios({ command, evaluate, until, click, aria, input, upload, key, screenshot, createPeer, directory })
   await command('Emulation.setDeviceMetricsOverride', { width: 620, height: 800, deviceScaleFactor: 1, mobile: false })

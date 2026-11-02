@@ -902,7 +902,62 @@ ghi một history action chứa cả neighbor patches. Read-only Preview không 
 Typecheck/lint/build và 364 tests đã đạt. Native Edge primitive smoke đạt bốn kinds,
 exact preview/commit, pointer/numeric input, collision/budget, complete beds, cancel,
 Undo/Redo, workspace isolation và 620px panel. Không suy world parity từ smoke. B09 tổng
-thể vẫn PARTIAL: B06/B07 replace/count và house workflow chưa có.
+thể vẫn PARTIAL: primitive/replace/count UI đã có; house workflow chưa có bằng chứng.
+
+**B06 — selected material replacement domain:** `material-plan.ts` nhận source ID,
+target ID và các top-level roots được chọn; đi qua children nhưng giữ nguyên group,
+component-copy provenance, object IDs, pairs, positions/pivots và mọi property.
+`replacementCompatibility` trong `core/capabilities.ts` chỉ cấp phép cho finite
+exact-ID families pillar, planks, slab, stairs, door, bed và masonry được khai báo
+trong source, với toàn bộ property domains giống nhau và source/target state hợp lệ.
+Không suy từ suffix/tag, hình ảnh hoặc một property tình cờ trùng nhau. Source bằng
+target, không match hoặc một match không tương thích đều reject; report có cell/
+object/root counts và reason/evidence. Planner kiểm aggregate budget trước candidate,
+validate toàn document, finalize opt-in neighbors; apply dùng đúng candidate đã xem,
+source identity/document/epoch/revision/cancel và rules identity. Một Undo bao gồm
+neighbor patches. Payload replacement, acquisition và world parity không được cấp phép.
+
+**B07 — read-only placed counts domain:** `material-counts.ts` đếm whole document
+hoặc selected top-level roots, giữ closure của groups/components/pairs; duplicate
+selection IDs không đếm hai lần, missing/nested IDs reject. Report có sorted IDs,
+exact string-states với property order canonical, root count, stored occupied cells,
+non-air và explicit air (`air`, `cave_air`, `void_air`). Bed/door hai cells được đếm
+hai cells; đây không phải survival inventory/items và chưa có acquisition mapping.
+Entities và sparse omission không đóng góp. Bounded document schema kiểm trước khi
+traverse, không cần registry/assets; unknown string states được giữ, không khẳng định
+legal game state từ report. Pure CSV escape comma/quote/newline, JSON có format/version;
+cả hai xuất deterministic report mà không mutate document/history.
+
+**Materials UI:** toolbar mở panel counts Document/Selected roots, States và CSV/
+JSON; table hiện 100 rows mỗi lần mở rộng. Replace chỉ trong selected roots với
+Source/Target đã lọc qua capability resolver dùng chung, index registry một lần và
+deduplicate exact source states. Preview riêng; Confirm/viewport Enter commit,
+Cancel/Esc hủy. Selection/document/epoch/revision/catalog/resources/policy thay đổi
+làm preview cũ invalid; không recompute neighbors lúc commit. Preview workspace chỉ
+đọc counts. Count scope, table, download không thay document/history/draft.
+
+Code gate đạt **384/384 tests, 39 file**, typecheck/lint/build. Native Edge slice
+materials đạt CSV/JSON readback, ID/state counts/air, compatible targets, nested
+logs/bed pairs, exact preview/commit, cancel/policy invalidation, atomic Undo/Redo,
+outside-selection preservation và 620px layout; đã xem ảnh desktop/compact. Full
+production browser suite cũng đạt mọi scenario hiện có. Software browser không
+chứng minh GPU FPS, acquisition rules hoặc Minecraft world parity.
+
+**B09 — small-room journey:** `scripts/house-browser-scenarios.mjs` dựng từ New
+và palette qua sáu primitive UI, không nhập fixture JSON hoặc gọi editor actions.
+Phòng bounds 4×4×4 gồm sàn 16, mái 16, tường 22 ô; nội thất rỗng 2×2×2 và lối
+vào 1×2. Expected coordinates được enumerate riêng, không gọi planner/writer.
+Copy/Paste sang document mới tạo hai variants spruce/birch, giữ bản oak riêng.
+Kiểm counts, preview/cancel/one Undo/Redo; mỗi document Save/reload/mở lại qua
+Documents, download JSON và NBT được decode độc lập để so toàn bộ cells/states.
+Ảnh desktop và compact sau khi đóng panels bằng UI; report ở
+`artifacts/house-workflow.json`, NBT/expected JSON ở cùng thư mục ignored.
+
+Chạy lại với các biến URL/JAR/profile ở §8 và
+`$env:BLOCKSTAGE_EDITOR_SLICE='house'` rồi `pnpm test:browser` bằng toolchain đã nêu.
+Đây là automation một phòng nhỏ, chưa phải nghiệm thu builder/nhà hai tầng,
+usability, GPU performance hoặc Minecraft world readback. B09 full workflow/R1
+vẫn còn gate, không đồng nhất fixture pass với sản phẩm hoàn thiện.
 
 **Phần mở rộng vẫn dự kiến:** base doc ID/revision, intent parameters, ID allocator,
 bounded candidate/patch, add/replace/remove, changed logical owners, old/new cells,
@@ -917,6 +972,13 @@ và differential tests, không bỏ validation theo cảm tính. Slab merging ph
 replace/remove plan, không chỉ cho phép hai cell overlap.
 
 ### 10.3 Capability resolver và evidence — K02
+
+**Subset material contract đã triển khai:** `core/capabilities.ts` cung cấp finite
+exact-ID replacement capability, reason/family/evidence và full property-domain
+checks cho B06. Evidence phân biệt editor contract với `world-readback:unverified`.
+Không nhận payload hoặc giả lập world behavior. Đây chưa phải full capability
+resolver/G01; palette R1, matching runtime và người nghiệm thu còn cần chốt riêng.
+Các axes/envelope dưới đây vẫn là thiết kế cần hoàn thiện, không suy whole K02 done.
 
 Mỗi capability descriptor có target/version/adapter ID, supported state subset,
 required context, derived/preserved properties, error/fallback và proof reference.
@@ -934,14 +996,89 @@ policy. Có report cũ trong cache không mặc nhiên là proof cho source mớ
 
 ### 10.4 Visibility, picking và export scope — K05
 
-View/session selectors xác định drawn/editable/pickable owners/cells cho hidden,
-locked, isolate và clip. Phải có truth table cho click/hover/box/frame/ghost và
-selection đã ẩn, group bị clip một phần, translucent/fallback model, entities.
-Clip shader không tự lọc Raycaster; draw và selection phải dùng cùng policy.
+**Subset V01/V02/V03/V04 hữu hạn:** view state `{ hidden, locked, isolated, yRange? }` chỉ
+sống trong session/workspace, keyed theo document ID và epoch; không thuộc
+saved document, draft, backup hoặc history. Chỉ áp dụng root owners: group,
+component copy và logical pair luôn nhận cùng policy, không flatten.
 
-View state không sửa document/history hoặc NBT. Export full document mặc định;
-export selection cần scope riêng cùng closure/pair checks, không suy từ meshes
-đang attach vào scene. Restore visibility luôn có lối trên UI.
+| Root policy | Draw / frame | Click / hover / through-box | Edit |
+| --- | --- | --- | --- |
+| Bình thường | Có | Có | Có |
+| Hidden hoặc ngoài isolate | Không | Không | Không |
+| Locked và còn visible | Có | Không | Không |
+| Root bị cắt một phần theo Y | Chỉ cells trong khoảng | Không | Không |
+
+Hidden thắng isolate; lock giữ nguyên khi hide/isolate. Reset xóa cả ba flags. Locked
+vẫn có mesh surface để đặt block; click ray tìm ô non-air eligible gần nhất có
+thể chọn root ở phía sau locked. Fallback/translucent appearance không cấp quyền
+pick khác. Frame tính visible blocks. Hidden/locked/outside-isolate selection bị
+prune; Undo/Redo của document vẫn dùng được và không hoàn tác view state.
+
+Occupancy/collision và neighbor planning vẫn dùng toàn document, kể cả hidden.
+Final candidate phải giữ nguyên mọi protected root, kể cả thay đổi gián tiếp do
+neighbor update; nếu không thì reject cả action trước commit. Thêm root mới vẫn
+phải qua full collision/validation và tham gia active isolate để không biến mất
+sau Confirm; Undo prune IDs đã mất, Redo thêm lại vào isolate. View controls không
+tạo undo entry, không kích draft protection hoặc đổi local revision.
+
+Export NBT và counts toàn document không đổi theo visibility; selection counts
+vẫn dùng selection scope tường minh. Không suy export scope từ meshes trong scene.
+Entities chưa thuộc visibility subset. Arbitrary clip plane, automatic layers và
+roof/floor classification chưa triển khai; full K05 còn **một phần**.
+UI gồm menu View và hide/lock từng root trong outliner; có Show all, Unlock all,
+Exit isolate và Reset view. View thay đổi hủy preview/modal đang mở. Lock-only giữ
+nguyên block list để không rebuild GPU scene khi draw không đổi; root policy dùng
+Set index dùng chung trong mỗi phép chọn/guard.
+
+Code gate đạt **392/392 tests, 40 file**, typecheck/lint/build. Native browser slice
+`visibility` kiểm hide/show không sửa revision/history, whole-pair group isolation,
+locked foreground ray đi tới eligible cell phía sau, outliner/select-all eligibility,
+hidden collision, protected fence neighbor rejection, full counts/JSON export,
+workspace independence/reload reset và new-root isolate Undo/Redo. Full production
+browser regression đạt; sau sửa class CSS menu View trùng camera controls, native
+visibility slice được chạy lại. Đã xem ảnh isolated bed và menu 620px. Không có
+GPU FPS/world parity hoặc interior builder acceptance từ các phép kiểm này.
+
+**V03 — inclusive Y-range:** optional `{min,max}` trong view state, integer
+−2048…2048, min ≤ max; thiếu/null là không giới hạn. `setViewYRange` reject
+NaN/fraction/reversed/out-of-bounds, không tự swap/clamp. Chỉ vẽ cells có integer
+Y trong khoảng, giữ nguyên model hoàn chỉnh của từng cell (không cắt mesh).
+Resolver dùng full root footprint để phân biệt completely inside/partial/outside;
+root partial nhận policy protected, không cho click/box/outliner/gizmo chỉnh nửa
+group/pair. Nếu không có footprint khi range active, edit fail closed.
+Final guard reject changed/new roots vượt khoảng; unchanged clipped roots được
+giữ nguyên. Collision/support/neighbors/counts/export vẫn dùng full document.
+
+View có fields Show Y min/max, Apply, Clear và Focus selected Y (whole selected
+cell bounds); invalid input giữ policy/document/history và hiện lỗi ngắn. Thay
+range hủy pending tools; workspace độc lập, document switch/reload reset. Range
+không tham gia Save/draft/history. Menu có active-range indicator và scroll giới
+hạn chiều cao. Slice `y-range` qua `test:browser` dùng harness đã có; tests domain
+và UI kiểm negative/single layer, partial door/group, new footprint guard, counts/
+JSON export, workspace/reload và 620px. Code gate **395 tests, 40 files**, typecheck/
+lint/build đạt. Đây là nền quan sát từng tầng bằng khoảng Y, chưa phải automatic
+floor/roof helpers hoặc nghiệm thu nhà nhiều tầng.
+Full production browser suite đã đạt cùng Y-range trên build này; không có game
+assets trong dist. Xem status/roadmap để phân biệt gate automation với builder/world.
+
+**Interior workflow automation:** `scripts/interior-browser-scenarios.mjs` dựng
+fixture hai tầng từ New qua palette/Build, bounds 5×7×5: 137 ô vỏ nhà và hai
+giường hoàn chỉnh (4 ô), tổng 141 ô. Expected vỏ được enumerate riêng; JSON tải
+xuống kiểm toàn document, không dùng diagnostic snapshot bị giới hạn 64 cells.
+Y 1…2 cho tầng dưới và Y 4…5 cho tầng trên. Native top-view click chọn giường
+qua mái/sàn đã filter; `G X 1 Esc`, `G X 1 Enter`, va chạm tường và Undo/Redo
+được kiểm với full expected cells/states. Tầng kia/vỏ nhà phải giữ nguyên.
+Save/reload reset view nhưng giữ chỉnh sửa; xuất khi đang filter vẫn chứa full
+141 ô. NBT được đọc bằng independent test reader dùng chung với house scenario.
+
+Slice `BLOCKSTAGE_EDITOR_SLICE='interior'` chạy bằng `test:browser` với các biến
+URL/JAR/profile đã nêu. Report `artifacts/interior-workflow.json`, ảnh tầng dưới/
+trên và compact, NBT/expected JSON thuộc ignored artifacts. Build và lint đạt;
+native interior slice đạt. Fixture chưa có cầu thang/lối lên tầng và không phải
+complete house/builder acceptance, camera collision simulation, GPU benchmark
+hoặc Minecraft world readback. Không có thay đổi runtime editor trong slice này.
+Full production browser suite cũng đạt sau khi ghép `interior`, bao gồm các
+workflow cũ và toàn bộ Save/Documents/fault/crash/recovery.
 
 ### 10.5 Typed NBT, unknown data và portable projects — K06
 

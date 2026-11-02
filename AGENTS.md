@@ -93,14 +93,45 @@ parts. Count occupied cells and objects before expansion. B09 Build uses the sel
 block Design state, World start/end fields and pointer-staged end; Enter/Confirm
 commits the exact finalized neighbor preview once, Esc/Cancel preserves the document.
 Invalidate on document/epoch/revision, scope, palette/catalog, resource or policy
-changes; Preview stays read-only. B09 overall remains partial without B06/B07
-replace/count and house journey evidence; diagonal/oblique primitives remain unsupported.
+changes; Preview stays read-only. B09 now includes replace/count controls but
+has scripted small-room journey evidence. Full house/builder acceptance remains
+partial; diagonal/oblique primitives remain unsupported.
 Hollow boxes place a one-anchor shell, never carve existing interior content or
 fill it with air. Enumerate disjoint caps/perimeters directly, not the full volume;
 count with temporary exact arithmetic and bound before expansion. Thin dimensions
 1/2 have no interior. A future dimensions UI must reject zero/negative lengths
 before corner conversion; reversed/negative coordinate corners remain valid.
+Material replacement uses the finite exact-ID contract in core/capabilities.ts:
+same declared family and identical complete property domains, preserving every
+string property and occupied cell. Tags, suffixes and appearance grant no permission.
+Whole selected roots retain pairs/groups/component-copy identity and provenance;
+any incompatible match rejects the batch. Preview/commit share the finalized
+neighbor candidate and stale/cancel/policy guards. This K02 subset does not close
+the release palette/runtime/participant contract or G01 capability registry.
+Placed block/state counts are read-only stored-cell counts, with explicit air
+separate from non-air; bed/door pairs count two cells, never inferred survival
+items. Counts retain unknown string states without requiring assets/profile.
+Acquisition mapping, payload replacement and game/world proof remain unsupported.
+New logical roots created in active isolation join its membership; Undo prunes
+removed IDs and Redo includes restored roots. View controls never change draft
+protection/history/revision. Locked owners remain placement surfaces while ray
+selection skips to the nearest eligible cell. Protect final neighbor patches too.
+Materials targets use one registry index and deduplicated source states. Bound
+rendered count rows; exporting counts or changing count scope never edits a document.
 
+Visibility is a finite V01/V02/V04 root-owner session subset: hide/lock/isolate
+never change document/history. Locked roots stay drawn and placement surfaces but
+are not selectable; eligible cell rays may select behind them. Hidden roots remain
+occupied for full collision checks. Reject any final candidate that changes a
+hidden, locked or outside-isolate root, including indirect neighbor updates.
+Frame uses visible blocks; full export/counts remain document based. Document
+Undo/Redo remain available, with selection pruned by policy. Optional inclusive
+integer Y range filters cells; only fully contained roots remain selectable/editable.
+Partial groups/pairs draw their in-range cells but are protected as whole roots.
+Changed/new footprints outside the active Y range are rejected before commit.
+Clear Y restores the range only; Reset clears all view flags. Filtering uses cell
+coordinates, not mesh clipping; free entities remain visible. Automatic floor/roof
+layers and arbitrary clip planes remain unsupported; full K05 remains partial.
 - Reuse the existing React/TypeScript/Three.js base and verified asset pipeline.
 - Keep existing project data and import/export/domain code intact during changes.
   Do not silently migrate, delete, or overwrite user projects.

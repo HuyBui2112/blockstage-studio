@@ -28,6 +28,16 @@ function keyboard(code: string, key = '', extra = {}) {
 afterEach(() => vi.unstubAllGlobals())
 
 describe('grid-safe editor viewport input', () => {
+  it('through box selection excludes locked roots and refreshes when policy changes',()=>{
+    const {editor,state,blocks,geometry}=fixture()
+    editor.update({...state,tool:'box',selected:[],active:null,selectableOwners:['b']},blocks)
+    expect(editor.boxSelection([0,0,600,400])).toEqual(['b'])
+    editor.update({...state,tool:'box',selected:[],active:null,selectableOwners:[]},blocks)
+    expect(editor.boxSelection([0,0,600,400])).toEqual([])
+    editor.update({...state,tool:'box',selected:[],active:null},blocks)
+    expect(editor.boxSelection([0,0,600,400])).toEqual(['a','b'])
+    editor.dispose();geometry.dispose()
+  })
   it('routes placement yaw and cancel without transforming the current selection', () => {
     const { editor, state, blocks } = fixture()
     state.tool = 'place'; state.onPlacementRotate = vi.fn(); state.onPlacementCancel = vi.fn()

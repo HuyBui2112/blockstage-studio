@@ -7,6 +7,14 @@ const block = (pos: Vec3, name = 'minecraft:iron_chain', owner = pos.join(',')):
 const ray = (origin: Vec3, direction: Vec3) => new Ray(new Vector3(...origin), new Vector3(...direction).normalize())
 
 describe('editor cell picking', () => {
+  it('skips locked owners for selection while retaining their placement surfaces',()=>{
+    const locked=block([0,0,0],'minecraft:iron_chain','locked'),editable=block([0,0,2],'minecraft:stone','editable')
+    const picker=new CellPicker([locked,editable]),selectable=new Set(['editable'])
+    const sight=ray([.1,.9,-4],[0,0,1])
+    expect(picker.hit(sight,b=>selectable.has(b.owner))?.block).toBe(editable)
+    expect(picker.hit(sight,b=>b.state.name==='minecraft:iron_chain')?.block).toBe(locked)
+    expect(picker.hit(sight,()=>false)).toBeUndefined()
+  })
   it('selects empty-looking portions of thin cells without changing model geometry', () => {
     const chain = block([0, 0, 0])
     const hit = new CellPicker([chain]).hit(ray([.05, .95, -4], [0, 0, 1]))!

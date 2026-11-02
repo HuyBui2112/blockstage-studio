@@ -179,9 +179,9 @@ BUG-03/04/06 đã có fixes trong scope công bố. BUG-01/02/05 còn PARTIAL; c
 | Nhóm | Trạng thái phải giữ rõ |
 | --- | --- |
 | An toàn dữ liệu | **Đã có trong scope hiện tại:** Save CAS, catalogue/delete, autosave draft, recovery, Storage health và portable v1. D07 bổ sung failed-switch, hai app pages Save/claim, corrupted records và renderer crash sau protected ack; fresh-origin/legacy được kiểm ở suites riêng. Release R1 và disk quota/power loss chưa kiểm; assets phải giữ riêng, không hứa chống mọi crash/eviction. |
-| Dựng hằng ngày | **Đã có B01–B03/B08:** menu/phím Duplicate, internal Copy/Paste và Repeat World với numeric/pointer preview, cancel và atomic Undo/Redo. **B04/B05 + B09 primitive subset đã triển khai:** Build line/plane/solid/hollow box với World endpoints và Design state; native primitive browser đã đạt. B09 replace/count, resize theo quy tắc, parametric wall/column/span và socket vẫn chưa triển khai. |
-| Nội thất/phân vùng | **Một phần:** fly và orthographic giúp quan sát; **chưa có** workflow chuyên cho nội thất, layers/hide roof/floor/cut/clip/local isolation trong editor v2, visible-only/lasso selection. |
-| Reuse/vật liệu | **Chưa triển khai:** linked component updates/overrides và material substitution có hợp đồng tương thích. Không suy safe replacement chỉ từ tags/creative tabs. |
+| Dựng hằng ngày | **Đã có B01–B03/B08:** menu/phím Duplicate, internal Copy/Paste và Repeat World với numeric/pointer preview, cancel và atomic Undo/Redo. **B04/B05 + B09 primitive subset đã triển khai:** Build line/plane/solid/hollow box với World endpoints và Design state; native primitive browser đã đạt. B06/B07 + B09 Materials đã có replacement, ID/state counts và CSV/JSON với K02 material-contract subset; code/native browser gates đạt. Resize theo quy tắc, parametric wall/column/span và socket vẫn chưa triển khai. |
+| Nội thất/phân vùng | **Đã có finite root scope:** hide/lock/isolate/reset, click/box/frame theo policy và bảo vệ indirect neighbor edits. **Đã có thêm:** inclusive Y-range với bảo vệ partial roots. **Chưa có:** automatic layers/roof/floor, arbitrary clip planes, visible-only/lasso và nghiệm thu nội thất nhiều tầng. |
+| Reuse/vật liệu | **Đã có:** selected material replacement trong finite families, giữ state/pairs/identity. **Chưa có:** linked component updates/overrides, roles/kits. Không suy safe replacement chỉ từ tags/creative tabs. |
 | Game behavior | **Một phần:** opt-in scene connections fence/wall/gate theo game predicates đã có. Chưa slab merge/player hinge, auto-pane/stairs, dynamic shapes, support tổng quát, gravity/redstone/fluid/ticks/player collision. |
 | Payload/entities | **Chưa triển khai:** entity editing workflow, block-entity inventory/custom NBT, arbitrary payload preservation adapters, entity equipment/variants/animation. |
 | Appearance | **Một phần:** thiếu nhiều special renderer, fluid geometry/appearance, biome tint, lighting/AO parity và một số hiệu ứng động. Sprite animation hiện có không đồng nghĩa entity animation. |
@@ -352,7 +352,7 @@ trước khi giao, không đưa nguyên cả hệ thống cho một agent.
   Đường Save hiện tại đã dùng repository, epoch/snapshot ack và báo conflict giữ
   local edits; không bypass CAS qua storage API cũ. Không có dependency mới.
 - **K04 subset repository REVIEWED**, **K07a một phần** ở mốc D01. Revision và
-  controller bổ sung ở D02/D03 bên dưới. K02/K03/K05/K06 vẫn TODO; không đánh
+  controller bổ sung ở D02/D03 bên dưới. K02/K03/K06 vẫn TODO; K05 có subset visibility hữu hạn, còn một phần; không đánh
   VERIFIED toàn bộ operation/persistence contracts từ một slice.
 - Kiểm chứng: code gate **262/262 test, 25 file**, typecheck/lint/build; native
   browser dùng hai connection IDB độc lập, Save đảo thứ tự, tombstone chống
@@ -590,9 +590,59 @@ trước khi giao, không đưa nguyên cả hệ thống cho một agent.
   không phải GPU benchmark/world readback. Full production browser suite cũng đạt
   resource/appearance, editor, placement, batch state, neighbors, Save/Documents,
   NBT/portable, quickbuild, primitives, D07 fault/crash và Recovery. B09 toàn
-  bộ vẫn **PARTIAL** tới khi B06/B07 material replace/counts + house journey có
-  bằng chứng; B06/B07 còn cần capability scope K02. Không đánh VERIFIED toàn K03/R1
+  bộ vẫn **PARTIAL**; B06/B07 + UI đã đạt ở slice dưới, house journey
+  còn cần bằng chứng. Không đánh VERIFIED toàn K03/R1
   hoặc game/world parity từ code tests; không thêm dependency/DB schema/game assets.
+
+### Slice material replacement/counts — 02/11/2026
+
+- **K02 material-contract subset đã triển khai:** `core/capabilities.ts` cấp phép
+  replacement theo finite exact-ID families pillar/planks/slab/stairs/door/bed/
+  masonry và identical complete property domains, reason/evidence rõ. Tags,
+  suffixes, registry membership hoặc appearance không tự cấp phép. Evidence là
+  editor contract; world readback chưa có. Full K02 release palette/runtime và
+  participants chưa chốt, G01 registry hợp nhất chưa hoàn thành.
+- **B06 domain đã triển khai:** `material-plan.ts` thay source→target trong selected
+  top-level logical roots, preserve toàn bộ properties/footprints, pairs, IDs,
+  groups và component-copy provenance. Compatibility report đếm matched cells/
+  objects/roots; một incompatible match reject toàn batch, không partial success.
+  Budget/cancel/stale guards và finalized opt-in neighbor candidate được dùng lại
+  khi apply; một Undo chứa cả neighbor patches. Không payload/acquisition/world proof.
+- **B07 domain đã triển khai:** `material-counts.ts` report whole document hoặc
+  selected root closure, sorted ID/exact state counts, deterministic escaped CSV/
+  JSON. Counts là stored occupied cells, explicit vanilla air riêng với non-air;
+  bed/door pair hai cells không suy hai survival items. Không đếm sparse omissions/
+  entities; không acquisition mapping. Schema bounded validation độc lập registry
+  giữ unknown string states, không drop hoặc claim game legality khi thiếu profile.
+- **B06/B07 finite scope + B09 Materials UI đã kiểm chứng:** toolbar Materials có
+  Document/Selected roots counts, States, CSV/JSON và Source/Target replacement
+  với preview/Confirm/Cancel. Read-only Preview chỉ có counts. Giới hạn 100 rows
+  mỗi lần mở rộng; resolver index registry một lần và deduplicate source states.
+- `pnpm check` đạt **384/384 tests, 39 file**, typecheck/lint/build. Tests bổ sung
+  logs mixed axes, complete beds/doors, double/top slabs, stair shape/half/facing/
+  waterlogged, planks/masonry; giữ source/IDs/provenance và reject incompatible,
+  stale/cancel/policy/budget. Counts kiểm pairs/air/unknown states/CSV escaping.
+- Native Edge materials smoke đạt downloaded CSV/JSON readback, document/selection/
+  state counts, compatible targets, exact preview/commit, cancel/policy invalidation,
+  unselected content, complete bed và one Undo/Redo. Đã xem ảnh desktop/620px.
+  Full production browser suite đạt, gồm resources, editor, copy/build/materials,
+  Save/Documents, NBT/portable và fault/crash/recovery. Build không chứa game assets.
+- **B09 small-room workflow automation đã đạt:** New → chọn palette → sáu Build
+  actions dựng phòng 4×4×4, 54 ô (sàn 16/mái 16/tường 22), nội thất 2×2×2 và
+  lối vào 1×2. Expected cells/states tính riêng, không nhập document JSON hoặc
+  gọi editor actions/storage writer. Copy/Paste tạo oak/spruce/birch thành ba Saved
+  IDs riêng; replacement preview/cancel/Undo/Redo, counts, Save/reload/catalogue
+  reopen và download JSON/NBT được đọc ngược so toàn bộ 54 ô của mỗi bản.
+  Bản gốc và cả hai variants được mở lại sau cùng để kiểm không ghi đè lẫn nhau.
+  Scenario `house` đã ghép vào full browser suite; report máy đọc được ở ignored
+  `artifacts/house-workflow.json`, kèm ảnh desktop/compact và NBT/expected JSON.
+- **Tiếp theo:** workflow nhà nhiều phòng/hai tầng, component reuse và sửa nội
+  thất; cần visibility/hide/isolate để làm việc thuận tiện (K05/V lane), sau đó
+  nghiệm thu builder thật. Một phòng nhỏ qua automation không đóng toàn B09/Q04/R1.
+  K02 full palette/runtime,
+  participants, material roles/kits và world readback vẫn chưa hoàn tất; không đánh
+  toàn K02/G01/B09/R1 VERIFIED từ slice này. Browser dùng software renderer, không
+  phải GPU performance proof hoặc acquisition/survival inventory.
 
 ### Slice bổ sung theo yêu cầu — import `.nbt` trong phiên
 
@@ -686,6 +736,63 @@ D05a bắt đầu bằng snapshot/copy v2, không bắt buộc chờ linked ho�
 | V06 | Visible-only selection spike rồi implement theo kết quả. | V02, P02 | Occlusion/transparency/partial owner policy và fixture; through mode giữ nguyên. |
 
 V06 có thể sau R1 nếu click+through+hide đủ hoàn thành interior gate; giới hạn phải công bố.
+**Slice V01/V02/V04 hiện tại — một phần:** pure root-owner selectors/tests đã có
+ở `src/editor/view-state.ts`: hidden/locked/isolate ngoài document/history,
+prune stale IDs và final-candidate guard cho protected roots. Drawn = không hidden
+và thuộc isolate (nếu có); editable/selectable = drawn và không locked. Group,
+component copy và logical pair nhận policy nguyên root. Locked vẫn drawn và là
+placement surface; ray có thể chọn eligible cell phía sau locked. Hidden content
+vẫn chiếm ô trong full-document collision/neighbor planning; neighbor update đụng
+protected root phải reject nguyên action. Frame dùng visible blocks, export và
+full-document counts không đổi. Document Undo/Redo vẫn dùng được, view state không
+đi vào history và selection được prune theo policy.
+
+UI/session/viewport integration đã có menu View và outliner root controls. View
+flags theo workspace/document epoch; reset khi đổi document/reload, không ghi
+draft/Save/history. New roots tham gia active isolate, Undo/Redo cập nhật membership.
+Lock-only không rebuild block meshes; stale IDs/selection được prune.
+
+**Xác thực:** `pnpm check` đạt **392/392 tests, 40 file**, typecheck/lint/build.
+Native `visibility` kiểm hide/show, group chứa whole bed, locked ray/selection,
+hidden occupancy, reject locked neighbor update, full counts/JSON export,
+workspace/reload và thêm object trong isolate với Undo/Redo. Full browser suite
+đạt resource, editor, placement, copy/build/materials/house, visibility và toàn bộ
+Save/Documents/NBT/portable/fault/recovery. Sau chỉnh class menu View để tránh
+CSS camera cũ, chạy lại native visibility và xem ảnh 620px.
+**V03 Y-range subset đã triển khai:** View Show Y min/max integer inclusive,
+Apply/Clear, Focus selected Y và active-range indicator. Range chỉ filter cells;
+partial group/door/pair giữ whole ownership nhưng không selectable/editable.
+Final candidate mới/changed vượt khoảng bị chặn; full collision/count/export giữ
+nguyên. Min>max/NaN/fraction/out-of-bounds reject rõ, không swap hoặc đổi document.
+Range là session-only, workspace riêng và reset qua document boundary/reload.
+`pnpm check` đạt **395/395 tests, 40 file**, typecheck/lint/build. Native `y-range`
+smoke đạt negative/single layers, partial door/group protection, invalid input,
+selected bounds helper, out-of-range primitive, full counts/JSON export,
+workspace/reload và menu 620px; đã xem ảnh.
+Full production browser suite cũng đạt sau khi ghép `y-range`, gồm visibility,
+house/material/copy/build, placement/state/neighbors, resource pipeline và toàn
+bộ Save/Documents/NBT/portable/fault/crash/recovery. Dist chỉ có HTML/JS/CSS.
+Full **K05 vẫn một phần**: entities, arbitrary clip planes và visible-only/occlusion
+chưa đóng. Automatic layers/roof/floor classification chưa triển khai. Slice này
+không thay thế nghiệm thu builder làm nội thất nhà nhiều tầng.
+
+**Interior workflow automation — đã đạt trong finite fixture:**
+`scripts/interior-browser-scenarios.mjs` dựng từ rỗng mẫu 5×7×5 có hai tầng,
+ba mặt sàn/mái, 137 ô vỏ và hai giường (4 ô), tổng 141 ô. Y-range 1…2 và
+4…5 cho phép chọn/sửa độc lập mỗi tầng. Native top-view ray chọn giường; modal
+G/X/numeric kiểm cancel, move, collision và atomic Undo/Redo. JSON download so
+toàn bộ coordinates/states sau từng bước, giữ nguyên vỏ/tầng không chỉnh.
+Save/reload và NBT download khi đang cut giữ full 141 ô; NBT decoder test độc lập
+được dùng chung với house scenario, không so writer với chính nó. Đã xem ảnh
+desktop/620px; report ở ignored `artifacts/interior-workflow.json` kèm NBT/expected.
+Build/lint/syntax và native slice `interior` đạt; không phát hiện lỗi runtime cần
+sửa trong slice. Đây chưa phải house acceptance: mẫu chưa có cầu thang/lối lên,
+component reuse/đa phòng chưa nằm trong journey, chưa có participant builder,
+game world readback hoặc GPU benchmark. Full B09/Q04/V05/R1 vẫn chưa đóng.
+Full production browser regression đạt cùng interior scenario và các luồng
+resource/editor/copy/build/material/visibility/Y-range, Save/Documents, NBT/
+portable, fault/crash/recovery. Tiếp theo cần component reuse trong kiến trúc
+nhiều tầng và nghiệm thu builder trên mẫu có lối đi/cầu thang thực tế.
 
 ### G — Capability và quy tắc Minecraft
 
@@ -938,4 +1045,3 @@ chính hành vi Blockstage; giữ hệ Minecraft Y-up và shortcuts hiện hành
   ID ổn định; task con ghi task cha, tránh mất truy vết.
 - Tuân thủ [AGENTS.md](../AGENTS.md); không auto-commit/push/publish. Nghiên cứu
   lộ trình không ủy quyền triển khai tất cả task trong danh mục.
-

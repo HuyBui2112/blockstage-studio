@@ -8,6 +8,8 @@ export type EditorPlacementHit = PlacementHit
 export type EditorViewportState = {
   tool: 'select' | 'place' | 'move' | 'rotate' | 'box'
   selected: string[]
+  /** Visible, unlocked logical roots. Undefined preserves legacy editor behavior. */
+  selectableOwners?: readonly string[]
   active: string | null
   space: 'global' | 'local'
   pivot: [number, number, number]
@@ -58,6 +60,7 @@ export function rectanglesOverlap(a: number[], b: number[]) {
 export class EditorInteraction {
   state?: EditorViewportState
   blocks: SceneBlock[] = []
+  selectableOwners: Set<string> | null = null
   transform: TransformControls
   proxy = new T.Object3D()
   anchor = new T.Group()
@@ -101,6 +104,7 @@ export class EditorInteraction {
     bridge.host.append(this.rectangle)
   }
   update(state: EditorViewportState | undefined, blocks: SceneBlock[], resourcesChanged = false) {
+    if(state?.selectableOwners!==this.state?.selectableOwners)this.selectableOwners=state?.selectableOwners?new Set(state.selectableOwners):null
     const selectionKey = state?.selected.join('\u0000') ?? ''
     if ((!state || selectionKey !== this.selectedKey || blocks !== this.blocks || state.tool !== this.state?.tool) && (this.modal || this.dragging)) this.cancel()
     const selectionChanged = this.blocks !== blocks || selectionKey !== this.selectedKey || this.active !== (state?.active ?? null)
@@ -365,6 +369,7 @@ export class EditorInteraction {
     // Through-selection: every logical owner's projected cell bounds intersecting the rectangle.
     const boxes = new Map<string, T.Box3>(), canvas = this.bridge.canvas.getBoundingClientRect()
     for (const block of this.blocks) {
+      if(this.selectableOwners&&!this.selectableOwners.has(block.owner))continue
       const box = boxes.get(block.owner) ?? new T.Box3()
       box.expandByPoint(new T.Vector3(...block.pos)); box.expandByPoint(new T.Vector3(...block.pos).addScalar(1)); boxes.set(block.owner, box)
     }

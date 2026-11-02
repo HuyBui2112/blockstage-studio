@@ -105,6 +105,42 @@ Hollow box đặt lớp vỏ, giữ nguyên nội dung bên trong. Multi-block t
 footprint chồng nhau hoặc vượt giới hạn sẽ chặn toàn thao tác. Một lần Undo hoàn tác
 cả vùng và các kết nối lân cận. Đổi block/tài nguyên/workspace sẽ hủy preview đang mở.
 
+**Vật liệu:** mở **Materials** trên toolbar để đếm ô theo Document hoặc Selected
+roots, bật States để tách từng state và tải CSV/JSON. Explicit air được đếm riêng;
+đây là số ô đã đặt, chưa phải số item Survival cần thu thập.
+Chọn object/group/component, chọn Source và Target tương thích rồi **Preview
+replacement → Confirm** để thay vật liệu; Cancel hủy, một Undo khôi phục cả lần thay.
+Giữ nguyên hướng/state và đủ các phần giường/cửa, chỉ tác động các roots được chọn.
+Phạm vi hiện có: các ID được khai báo thuộc pillar/log, planks, slab, stairs, door,
+bed và masonry; không tự đổi mọi block chỉ vì cùng tag. 3D Preview chỉ xem/xuất counts.
+
+Để tạo biến thể riêng: chọn **Select**, focus viewport và nhấn `A` chọn toàn bộ,
+**Copy → Copy**, **New**, **Copy → Paste**, Confirm; sau đó thay vật liệu trong
+Materials, đặt tên và Save. Mỗi biến thể là document độc lập trong Documents.
+Workflow phòng nhỏ từ rỗng → oak/spruce/birch → lưu/mở lại → JSON/NBT đã có
+browser scenario `house`; cách chạy và giới hạn nghiệm thu ở tài liệu kỹ thuật.
+
+**Quan sát và bảo vệ object:** menu **View** có Hide selected, Show all, Lock
+selected, Unlock all, Isolate selected, Exit isolate và Reset view. Outliner có
+nút ẩn/khóa từng root; group/component/multi-block được xử lý nguyên object.
+Khóa vẫn hiển thị nhưng không cho chọn sửa; ẩn hoặc ngoài isolate không được chọn.
+Object mới tạo khi isolate sẽ tham gia vùng đang xem. Reset view khôi phục toàn bộ.
+Các flags chỉ giữ trong phiên workspace, reset khi mở document khác hoặc reload;
+không đổi Save, draft, Undo hay export. Ô bị ẩn vẫn chiếm chỗ khi đặt block.
+Undo/Redo nội dung vẫn hoạt động; Auto connections đụng object được bảo vệ sẽ bị chặn.
+**Cắt lớp theo Y:** trong View nhập **Show Y · Min/Max**, bấm **Apply**;
+hai đầu đều được tính theo tọa độ ô block. **Focus selected Y** lấy khoảng Y
+của toàn vùng chọn; **Clear** bỏ giới hạn Y, **Reset view** bỏ mọi filter/lock.
+Object hiện một phần được bảo vệ khỏi chọn/sửa; muốn chỉnh cả group/cửa hãy mở
+rộng khoảng hoặc Clear. Đặt/di chuyển object ra ngoài khoảng bị chặn.
+Đây là lọc theo ô, không cắt tam giác mesh hoặc tự nhận diện tầng/mái. Entity rời
+chưa thuộc policy này và vẫn hiển thị.
+
+Workflow nội thất mẫu hai tầng đã có browser slice `interior`: chọn giường qua
+Y-range, di chuyển/hủy/thử va chạm, Undo/Redo, lưu/reload và đối chiếu full JSON/NBT.
+Cách chạy và giới hạn fixture được ghi trong tài liệu kỹ thuật; đây chưa thay
+thế thử nghiệm builder hoặc đối chiếu đặt công trình trong Minecraft.
+
 ## Nhập Structure NBT
 
 Trong Architecture hoặc Component Editor, bấm **Import NBT → Choose .nbt**.

@@ -373,7 +373,8 @@ class ViewportController {
       const placing = this.props.editor.tool === 'place'
       // Selection uses occupied cells. Placement keeps actual model surfaces,
       // except chain attachment uses a deliberate, stable grid-cell face.
-      const cell = this.cellPicker.hit(this.ray.ray, placing ? b => CONTEXT_CHAIN_IDS.has(b.state.name) : undefined)
+      const eligible=this.editorInteraction.selectableOwners
+      const cell = this.cellPicker.hit(this.ray.ray, placing ? b => CONTEXT_CHAIN_IDS.has(b.state.name) : eligible ? b=>eligible.has(b.owner) : undefined)
       if (!placing) return cell ? { block: cell.block, adjacent: cell.block.pos.map((v, i) => v + cell.face[i]) as Vec3, face: cell.face, point: cell.point } : undefined
       if (cell) {
         const visual = this.ray.intersectObjects([...this.batches, ...this.entityMeshes], false)[0]
