@@ -85,12 +85,16 @@ Copy UI uses a session-owned clipboard and per-operation placement key. Pointer
 stages targets; Enter/Confirm commits and Esc/Cancel cancels, with viewport focus
 restored. Inputs retain native shortcuts. World-only copy controls must stay
 explicit, Preview read-only, and ≤1000px overlays must not cover the copy panel.
-B04/B05 primitive-plan is domain-only: inclusive axis-aligned line / XY-XZ-YZ anchor
+B04/B05 primitive-plan supports the B09 primitive UI subset: inclusive axis-aligned line / XY-XZ-YZ anchor
 planes and solid/hollow boxes, canonical min corner and stable X-fastest enumeration. Use the verified
 Design template with an explicit ID, no RNG or duplicate pair rules. Full logical
 footprints may extend out of the anchor plane; reject overlaps instead of skipping
-parts. Count occupied cells and objects before expansion. Do not claim B09 UI or
-diagonal/oblique primitives are implemented.
+parts. Count occupied cells and objects before expansion. B09 Build uses the selected
+block Design state, World start/end fields and pointer-staged end; Enter/Confirm
+commits the exact finalized neighbor preview once, Esc/Cancel preserves the document.
+Invalidate on document/epoch/revision, scope, palette/catalog, resource or policy
+changes; Preview stays read-only. B09 overall remains partial without B06/B07
+replace/count and house journey evidence; diagonal/oblique primitives remain unsupported.
 Hollow boxes place a one-anchor shell, never carve existing interior content or
 fill it with air. Enumerate disjoint caps/perimeters directly, not the full volume;
 count with temporary exact arithmetic and bound before expansion. Thin dimensions

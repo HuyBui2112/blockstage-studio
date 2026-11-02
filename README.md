@@ -35,6 +35,19 @@ fnm exec --using 24.19.0 pnpm.cmd dev --host 127.0.0.1
 
 Mở URL Vite in ra, thường `http://127.0.0.1:5173/`.
 
+**Dừng dev server trên Windows:** trong terminal đang chạy Vite, gõ `q` rồi
+`Enter` để đóng server và watcher trước khi trở về prompt. Nếu `Ctrl+C` làm
+terminal VS Code chậm/treo, chạy trực tiếp Node để tránh các lớp batch của pnpm:
+
+```powershell
+fnm exec --using 24.19.0 node node_modules/vite/bin/vite.js --host 127.0.0.1
+```
+
+Đây là đường chạy tương đương cho dev, vẫn dùng dependency của dự án. Lỗi
+Ctrl+C tương tự đã được [báo cáo trên Windows](https://github.com/pnpm/pnpm/issues/8022);
+chưa xác nhận cùng nguyên nhân với máy này. Không cần đổi PowerShell profile,
+cài runtime khác hoặc tắt toàn bộ tiến trình Node.
+
 ## Bắt đầu sử dụng
 
 1. Trong **Resources**, nhập client vanilla `26.2.jar` hoặc resource pack ZIP
@@ -83,6 +96,14 @@ khác 0 (cho phép âm). Chồng block hoặc vượt giới hạn sẽ chặn t
 Clipboard giữ whole groups/components/multi-block trong phiên app, dùng qua các
 workspace, không chứa entity rời và không phải clipboard hệ điều hành; reload sẽ
 xóa clipboard. Copy/preview không đổi document, Save và draft chỉ ghi data đã commit.
+
+**Dựng vùng:** chọn block và state trong palette, rồi mở **Build → Line / Plane /
+Solid box / Hollow box**. Nhập hai endpoint nguyên **Start/End** (tính cả hai đầu),
+trỏ/click để chỉnh End; **Enter / Confirm** dựng, **Esc / Cancel** hủy.
+Các vùng theo trục World và dùng state **Design**, độc lập tùy chọn Context.
+Hollow box đặt lớp vỏ, giữ nguyên nội dung bên trong. Multi-block tạo đủ các phần;
+footprint chồng nhau hoặc vượt giới hạn sẽ chặn toàn thao tác. Một lần Undo hoàn tác
+cả vùng và các kết nối lân cận. Đổi block/tài nguyên/workspace sẽ hủy preview đang mở.
 
 ## Nhập Structure NBT
 

@@ -179,7 +179,7 @@ BUG-03/04/06 đã có fixes trong scope công bố. BUG-01/02/05 còn PARTIAL; c
 | Nhóm | Trạng thái phải giữ rõ |
 | --- | --- |
 | An toàn dữ liệu | **Đã có trong scope hiện tại:** Save CAS, catalogue/delete, autosave draft, recovery, Storage health và portable v1. D07 bổ sung failed-switch, hai app pages Save/claim, corrupted records và renderer crash sau protected ack; fresh-origin/legacy được kiểm ở suites riêng. Release R1 và disk quota/power loss chưa kiểm; assets phải giữ riêng, không hứa chống mọi crash/eviction. |
-| Dựng hằng ngày | **Đã có B01–B03/B08:** menu/phím Duplicate, internal Copy/Paste và Repeat World với numeric/pointer preview, cancel và atomic Undo/Redo. **B04/B05 domain đã có** line/plane/solid/hollow box planner; UI primitives, resize theo quy tắc, parametric wall/column/span và socket vẫn chưa triển khai. |
+| Dựng hằng ngày | **Đã có B01–B03/B08:** menu/phím Duplicate, internal Copy/Paste và Repeat World với numeric/pointer preview, cancel và atomic Undo/Redo. **B04/B05 + B09 primitive subset đã triển khai:** Build line/plane/solid/hollow box với World endpoints và Design state; native primitive browser đã đạt. B09 replace/count, resize theo quy tắc, parametric wall/column/span và socket vẫn chưa triển khai. |
 | Nội thất/phân vùng | **Một phần:** fly và orthographic giúp quan sát; **chưa có** workflow chuyên cho nội thất, layers/hide roof/floor/cut/clip/local isolation trong editor v2, visible-only/lasso selection. |
 | Reuse/vật liệu | **Chưa triển khai:** linked component updates/overrides và material substitution có hợp đồng tương thích. Không suy safe replacement chỉ từ tags/creative tabs. |
 | Game behavior | **Một phần:** opt-in scene connections fence/wall/gate theo game predicates đã có. Chưa slab merge/player hinge, auto-pane/stairs, dynamic shapes, support tổng quát, gravity/redstone/fluid/ticks/player collision. |
@@ -539,7 +539,7 @@ trước khi giao, không đưa nguyên cả hệ thống cho một agent.
   state, source/entities không đổi. Aggregate budget trước enumeration/clone;
   self-overlap/pair overflow/source collision/explicit air đều reject toàn action,
   không partial fill hoặc silent skip. Apply giữ exact candidate + guards K03 và
-  một Undo/Redo. **Chưa có UI primitive; B09 sẽ nối sau B05.**
+  một Undo/Redo. UI primitive được nối ở B09 subset bên dưới.
 - `pnpm check` đạt **350/350 test, 34 file**, typecheck/lint/build; 14 B04 tests
   kiểm independent golden coords, reversed/negative/degenerate endpoints, planes,
   registry/state/pair fidelity/overlap/out-of-plane, deterministic IDs/no RNG,
@@ -571,11 +571,28 @@ trước khi giao, không đưa nguyên cả hệ thống cho một agent.
   regression tests giữ nguyên. Không thay runtime UI/shared copy engine ở slice B05;
   chưa chạy browser mới cho primitive chưa có UI, bằng chứng B08 browser trước đó
   được giữ riêng. Không thêm dependency/DB schema/game assets.
-- **Tiếp theo: B09 subset UI primitives** nối line/plane/solid/hollow với
-  palette/state, endpoint/numeric/pointer preview, session/neighbor policy và Undo.
-  Không chờ B06/B07 để giao slice UI primitives độc lập; B09 toàn bộ vẫn PARTIAL
-  tới khi material replace/counts + house journey có bằng chứng. B06/B07 còn cần
-  capability scope K02; không đánh VERIFIED toàn K03/R1 từ domain tests.
+- **B09 primitive UI subset đã triển khai (02/11/2026):** Build menu line/plane/
+  solid/hollow trong Architecture và Component, dùng selected block Design state.
+  Panel World Start/End X/Y/Z, counts cells/anchors, errors/notes; pointer hover/
+  click stage End, Enter/Confirm commit, Esc/Cancel hủy và restore viewport focus.
+  Chưa có dimensions fields hoặc axis/plane snapping; Preview vẫn read-only.
+- `primitive-action` finalize neighbor policy chung với copy trước ghost; candidate
+  chứa state cuối của objects mới và existing neighbors. Apply dùng exact preview,
+  rules identity và stale/cancel guards, một Undo/Redo gồm neighbor patches.
+  Session giữ source/scope/epoch/revision, palette/catalog/resource/policy và stable
+  operation ID; thay dependencies hoặc copy/tool action hủy session cũ.
+- Typecheck/lint/build và **364/364 tests, 36 file** đạt, gồm 4 action regressions:
+  final neighbor preview/commit + atomic history, policy changes, invalid derived
+  states, stale identity/revision/epoch, collision và cancellation. Native Edge primitive
+  smoke **đạt** bốn kinds, exact ghost/commit, numeric/pointer, collision/budget,
+  complete beds/self-overlap, cancel/Undo/Redo, workspace boundary/read-only và
+  620px panel visible. Đã xem ảnh desktop/compact; smoke dùng software renderer,
+  không phải GPU benchmark/world readback. Full production browser suite cũng đạt
+  resource/appearance, editor, placement, batch state, neighbors, Save/Documents,
+  NBT/portable, quickbuild, primitives, D07 fault/crash và Recovery. B09 toàn
+  bộ vẫn **PARTIAL** tới khi B06/B07 material replace/counts + house journey có
+  bằng chứng; B06/B07 còn cần capability scope K02. Không đánh VERIFIED toàn K03/R1
+  hoặc game/world parity từ code tests; không thêm dependency/DB schema/game assets.
 
 ### Slice bổ sung theo yêu cầu — import `.nbt` trong phiên
 

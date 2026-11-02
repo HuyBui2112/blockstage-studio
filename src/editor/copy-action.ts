@@ -27,13 +27,19 @@ export function planCopyAction(document: EditorDocument, ids: string[], intent: 
     : intent.kind === 'paste'
       ? planPaste(document, clipboard!, intent.position, catalog, options)
       : planRepeat(document, ids, intent, catalog, options)
+  return finalizeCopyPlan(plan,catalog,rules)
+}
+
+/** Finalize scene connections once for both copies and primitive grids. */
+export function finalizeCopyPlan<T extends ObjectCopyPlan>(plan:T,catalog:Material[],rules?:NeighborRules):T & {notes:string[];rules?:NeighborRules} {
   if (!rules) return { ...plan, notes: [] }
+  const document=plan.source
   const neighbors = planNeighborConnections(document, plan.document, rules)
   validateDocument(neighbors.document,catalog)
-  checkPlanCancelled(options.signal)
+  checkPlanCancelled(plan.signal)
   const previewKeys = new Set([...plan.cells, ...neighbors.changed].map(cell => key(cell.pos)))
   const cells = sceneBlocks(neighbors.document).filter(cell => previewKeys.has(key(cell.pos)))
-  const history = executeHistory({ document, past: [], future: [] }, neighbors.document, intent.kind)
+  const history = executeHistory({ document, past: [], future: [] }, neighbors.document, 'Build objects')
   return {
     ...plan, document: neighbors.document, rules, notes: neighbors.notes, cells,
     patches: history.past[0].patches,

@@ -17,6 +17,7 @@ import { planPortableRestore,type PortableBackup } from '../io/portable-backup'
 import { commitPortableRestore } from '../io/portable-repository'
 import { createClipboard, type EditorClipboard } from './clipboard'
 import { applyCopyAction, type CopyActionPlan } from './copy-action'
+import { applyPrimitiveAction, type PrimitiveActionPlan } from './primitive-action'
 
 export type EditorScope = 'architecture' | 'component'
 export type TransformIntent = { kind: 'move'; delta: Vec3 } | { kind: 'rotate'; turns: number }
@@ -192,6 +193,16 @@ export function useEditorSession(catalog: Material[], neighborRules?: NeighborRu
       commit(scope,next,plan.kind==='repeat'?'Repeat objects':plan.kind==='paste'?'Paste objects':'Duplicate objects',plan.selection,{notes:plan.notes})
       return true
     } catch(error){setError(messageOf(error));return false}
+  }
+  function commitPrimitive(scope: EditorScope, plan: PrimitiveActionPlan) {
+    if (lifecycle.current.has(scope)) return false
+    try {
+      if(plan.source.workspace!==scope)throw new Error('Primitive plan belongs to another workspace')
+      const slot=currentSlots.current[scope]
+      const next=applyPrimitiveAction(plan,slot.history.document,{documentId:slot.history.document.id,sessionEpoch:slot.epoch,revision:slot.revision},catalog,autoConnections[scope]?neighborRules:undefined)
+      commit(scope,next,'Build '+plan.kind,plan.selection,{notes:plan.notes})
+      return true
+    }catch(error){setError(messageOf(error));return false}
   }
   function history(scope: EditorScope, redo: boolean) {
     if (lifecycle.current.has(scope)) return
@@ -420,7 +431,7 @@ export function useEditorSession(catalog: Material[], neighborRules?: NeighborRu
     } catch (error) { setError(messageOf(error)) }
   }
   function configureConnections(scope:EditorScope,enabled:boolean){setPreview(null);setConnectionNotes(null);setAutoConnections(previous=>({...previous,[scope]:enabled}))}
-  return { clipboard, copySelection, commitCopy, importStructure, restorePortable, draftStatus, recoveryCount, refreshRecoveries, restoreRecovery, discardRecovery, recoveryDocument, retryDraft, busy, refreshDocuments, renameSaved, deleteDocument, discardChanges, autoConnections, connectionNotes, configureConnections, slots, components, ready, error, setError, preview, cancelPreview: () => setPreview(null), select, history, transform, place, group, ungroup, remove, updateState, setPivot, move, rotate, rename, save, newDocument, open, importDocument, saveComponent, editComponent, placeComponent, importComponent, removeComponent }
+  return { clipboard, copySelection, commitCopy, commitPrimitive, importStructure, restorePortable, draftStatus, recoveryCount, refreshRecoveries, restoreRecovery, discardRecovery, recoveryDocument, retryDraft, busy, refreshDocuments, renameSaved, deleteDocument, discardChanges, autoConnections, connectionNotes, configureConnections, slots, components, ready, error, setError, preview, cancelPreview: () => setPreview(null), select, history, transform, place, group, ungroup, remove, updateState, setPivot, move, rotate, rename, save, newDocument, open, importDocument, saveComponent, editComponent, placeComponent, importComponent, removeComponent }
 }
 
 export type EditorSession = ReturnType<typeof useEditorSession>

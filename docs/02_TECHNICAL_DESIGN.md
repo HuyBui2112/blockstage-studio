@@ -861,9 +861,10 @@ Nếu footprints tự đè nhau (ví dụ door dọc Y, bed dọc facing với s
 Coordinate/pivot/registry/pair checks dùng validator hiện tại. Plan giữ cùng K03
 base/cancel/ID/cost/patch/chunk contract và apply trả exact candidate cho một Undo.
 
-B04 mới có domain API/tests; không có nút/ghost nhập endpoint trên UI hoặc tự
-recompute neighbors. B09 phải compose neighbor policy trước preview như B08 rồi
-nối session/numeric/pointer workflow, không coi domain tests là browser/world proof.
+B09 subset đã nối domain này vào Build UI; primitive planner vẫn thuần và không
+tự recompute neighbors. `primitive-action.ts` compose `finalizeCopyPlan` dùng chung
+với B08: preview chứa state cuối của objects mới và neighbors cũ bị đổi. Apply
+giữ exact candidate cùng rules identity, không tính lại connections ở commit.
 
 **B05 — solid/hollow box domain:** cùng `planPrimitive` có thêm kind `solid-box`
 và `hollow-box`, giữ inclusive corners/min anchor/size/IDs/guards của B04.
@@ -883,7 +884,25 @@ và đảo corners hợp lệ, không có khái niệm chiều dài âm/0 trong 
 thêm fields dimensions phải validate integer >0 trước đổi thành corners. Shell
 là anchor-grid boundary, không bảo đảm cavity rỗng theo model/physical footprint
 của multi-block. Full logical pairs và collision/budget vẫn theo B04; không cắt
-đôi pair để ép vào box. Đây chưa phải UI primitives hoặc công cụ carve/erase.
+đôi pair để ép vào box. Đây không phải công cụ carve/erase.
+
+**B09 — primitive UI subset:** Build menu trong Architecture/Component có Line,
+Plane, Solid box và Hollow box khi chọn Blocks; dùng block state Design đang chọn,
+không dùng component như primitive template. Panel ghi rõ World · Design, có Start/
+End X/Y/Z integer, counts cells/anchors, error và notes. Pointer hover/click chỉ
+stage End; Enter/Confirm mới commit, Esc/Cancel hủy và trả focus viewport. Inputs
+giữ native shortcuts; invalid endpoint/collision/budget không có valid ghost/commit.
+UI hiện dùng corners, chưa có dimensions fields hoặc axis/plane snapping.
+
+`usePrimitiveActions` giữ source identity, scope, epoch/local revision, catalog,
+palette state, resource key, policy và một operation ID/cancellation controller.
+Thay dependency làm session cũ invalid; copy/tool action hủy primitive session.
+`commitPrimitive` kiểm workspace/lifecycle lock và apply guards, chọn objects mới,
+ghi một history action chứa cả neighbor patches. Read-only Preview không có Build.
+Typecheck/lint/build và 364 tests đã đạt. Native Edge primitive smoke đạt bốn kinds,
+exact preview/commit, pointer/numeric input, collision/budget, complete beds, cancel,
+Undo/Redo, workspace isolation và 620px panel. Không suy world parity từ smoke. B09 tổng
+thể vẫn PARTIAL: B06/B07 replace/count và house workflow chưa có.
 
 **Phần mở rộng vẫn dự kiến:** base doc ID/revision, intent parameters, ID allocator,
 bounded candidate/patch, add/replace/remove, changed logical owners, old/new cells,
