@@ -6,6 +6,8 @@ import type { PlacementHit } from '../editor/placement-plan'
 export type EditorTransformIntent = { kind: 'move'; delta: Vec3 } | { kind: 'rotate'; turns: number }
 export type EditorPlacementHit = PlacementHit
 export type EditorViewportState = {
+  /** Measurement acknowledgement only; never a persistence or plan token. */
+  revisionKey?: string
   tool: 'select' | 'place' | 'move' | 'rotate' | 'box'
   selected: string[]
   /** Visible, unlocked logical roots. Undefined preserves legacy editor behavior. */

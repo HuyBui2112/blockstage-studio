@@ -544,8 +544,8 @@ Render theo thay đổi; loop liên tục chỉ khi navigation/animation cần. 
 `.png.mcmeta`, chỉ giữ frame loop khi texture animation thực sự được dùng. Ghost/
 selection tách overlay, không rebuild base scene theo hover. Commit document vẫn
 rebuild scene batches; dirty chunks, face culling/greedy meshing và DDA chưa có.
-Outliner và block library phân trang; component library hiện render toàn bộ
-`assets.map`, chưa được coi là list lazy. Không đưa toàn bộ document vào DOM diagnostics.
+Outliner và block library phân trang; component catalogue render 24 cards mỗi
+đợt, nhưng storage restore vẫn đọc toàn list. Không đưa toàn bộ document vào DOM diagnostics.
 
 `texture-animation.ts` validate PNG/grid/frame/time trước decode, áp frame đầu
 khai báo và lặp theo tick 50ms. Inset 0.01 texel ngăn nearest sampling lấy pixel
@@ -560,9 +560,73 @@ renderer, không thay model, blockstate hoặc selection bounds.
 
 **Định hướng tối ưu:** đo baseline trước, ghi CPU/GPU/driver/browser, cảnh và mix
 model, p95 commit/picking, draw calls/triangles, memory và idle frames; sau đó mới
-chọn incremental chunks, worker jobs, meshing hoặc picking mới. Cảnh 10k/100k/1M
+chọn incremental chunks, worker jobs, meshing hoặc picking mới. Cảnh 1k/10k/100k
 là tập benchmark dự kiến; không phải dung lượng đã bảo đảm. Software WebGL/CPU
 flatten không chứng minh FPS hoặc VRAM trên GPU thật.
+
+### 6.1 Bộ đo P01/P02 và giới hạn số đo
+
+`scripts/performance-fixtures.mjs` sinh scene deterministic 1k/10k/100k theo seed:
+dense, sparse, mixed, transparent, pairs, component và entity. Giới hạn input
+trước expansion; odd pair count có stone remainder, không tạo nửa giường/cửa.
+Metadata có SHA-256 document, counts/bounds/chunks, nested depth và move commands
+không va chạm theo Y+256. Không chứa game assets; không tăng import/history budget.
+
+Lệnh dưới cần production preview đang chạy và các env URL/JAR/profile ở §8.3:
+
+```powershell
+fnm exec --using 24.19.0 pnpm.cmd measure:editor --cells 1000,10000,100000 --kinds dense --samples 30 --warmup 3 --renderer hardware --output editor-performance-hardware-dense-v2.json
+```
+
+Default đo root đầu tiên, dùng `--selection all` để đo cả scene. Các profile/kích
+thước chưa chạy không tự nhận kết quả từ dense. `--renderer software` dùng
+SwiftShader; hardware yêu cầu D3D11 nhưng report luôn lấy renderer thực tế để
+phát hiện software/unknown, không gán đạt chỉ từ flag. Report local ở `artifacts/`
+với basename do `--output` chỉ định; lỗi giữ report incomplete, không tính pass.
+
+URL `?measure=1` bật `PerformanceProbe` tại ownership viewport. URL thường không
+ghi measurement telemetry hoặc đọc timer/info mỗi frame cho probe. Revision key
+chỉ là frame acknowledgement, không thay storage token/stale-plan guard. Native
+pointer/key timestamp lấy trước editor handler; frame ack ghi sau render CPU
+submission. Chọn xác nhận đúng owner/count; preview xác nhận đúng first-cell
+position cuối; commit/Undo đối chiếu revision. V2 không chấp nhận preview của
+chữ số trước trong cùng numeric input. Không dùng frame chỉ có boolean preview
+để gọi là exact intent acknowledgement.
+
+Warmup tách khỏi 30 mẫu p50/p95; chỉ đo pick, modal preview, commit, Undo. Ghi
+import-to-frame của document trong process đã warm resource, CPU frame work,
+draw calls/triangles, renderer resource counts, JS heap nếu API có, long tasks
+theo từng case và idle frames trong một giây sau draft protection. Các phần
+camera/save/retention dài hạn, GPU execution/presentation/FPS, VRAM/driver đầy
+đủ và cold browser/cache chưa được đo. Render fallback blocks phải bằng 0 trước
+khi lấy mẫu real-assets; resource/profile SHA-256 được ghi trong report.
+
+Trong mỗi round so tối đa 64 cell diagnostics để tránh tải cả document vào DOM;
+cuối case tải public JSON và so toàn bộ objects/cells/states/entities với fixture
+ban đầu sau Undo. Số đo chạy headless với overhead probe; chưa tự trở thành SLO
+phát hành. Move fixture Y+256 có thể đặt root khỏi camera, chỉ đo submitted
+state/CPU pipeline; không phải GPU draw latency của root luôn nhìn thấy. Không
+sửa gameplay, lịch sử hay user data để làm đẹp số liệu.
+
+### 6.2 Kiểm kê Fabric chỉ đọc
+
+`pnpm check:fabric` tìm metadata versions ở vị trí `.minecraft` thông thường;
+không đọc accounts/worlds/options/logs. Chọn instance bằng đường dẫn rõ ràng:
+
+```powershell
+fnm exec --using 24.19.0 pnpm.cmd check:fabric --instance 'C:\path\to\instance' --output artifacts/fabric-runtime-instance.json
+```
+
+Script đọc exact version JSON, embedded client version, loader coordinates,
+root mod `fabric.mod.json` và SHA-256, resource-pack manifests/hashes, known mise
+Java release metadata. Có budget entry/archive/aggregate và containment chống
+junction; output chỉ trong workspace artifacts. `--probe-java` là opt-in chạy
+`java --version` trên JDK mise đã có; không cài hay sửa launcher.
+
+Kết quả là inventory, không tự chọn cấu hình đang chơi, resolve enabled/nested
+mods hay Java launcher. Không launch Minecraft/server, accept EULA, đọc/sửa world
+hoặc cài bridge. `worldReadback` luôn UNVERIFIED. Q02 chỉ đóng sau enable/reload/
+place/readback trên world thử với runtime định danh; không suy từ metadata.
 
 ## 7. Export và giao tiếp game
 

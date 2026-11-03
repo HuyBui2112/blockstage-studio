@@ -22,9 +22,11 @@ import { runComponentReuseScenarios } from './component-reuse-browser-scenarios.
 import { runComponentLibraryScenarios } from './component-library-browser-scenarios.mjs'
 import { runInteractionScenarios } from './interaction-browser-scenarios.mjs'
 import { runR1HouseScenarios } from './r1-house-browser-scenarios.mjs'
+import { runPerformanceScenarios } from './performance-browser-scenarios.mjs'
 
 /** Real input integration scenarios, called by the existing isolated-browser harness. */
 export async function runEditorScenarios({ command, evaluate, until, click, aria, input, upload, key, screenshot, directory, profilePath, createPeer }) {
+  if(process.env.BLOCKSTAGE_EDITOR_SLICE==='performance')return runPerformanceScenarios({command,evaluate,until,click,aria,upload,key,screenshot,directory})
   if(process.env.BLOCKSTAGE_EDITOR_SLICE==='r1-house')return runR1HouseScenarios({command,evaluate,until,click,aria,input,key,screenshot,directory})
   if(process.env.BLOCKSTAGE_EDITOR_SLICE==='interaction')return runInteractionScenarios({command,evaluate,until,click,aria,input,upload,key,screenshot,directory,profilePath})
   if(process.env.BLOCKSTAGE_EDITOR_SLICE==='component-library')return runComponentLibraryScenarios({command,evaluate,until,click,aria,input,upload,screenshot,directory})

@@ -18,6 +18,7 @@ import { EditorInteraction, type EditorViewportState, type EditorPlacementHit } 
 import { CellPicker } from './cell-picking'
 import { CONTEXT_CHAIN_IDS } from '../editor/placement-plan'
 import { bakeSpecialBlock, specialBlockAppearance } from '../render/special-blocks'
+import { PerformanceProbe } from './performance-probe'
 
 export type { ViewCommand, ViewCommandKind } from './view-commands'
 export type { EditorViewportState, EditorTransformIntent, EditorPlacementHit } from './editor-interaction'
@@ -81,6 +82,7 @@ class ViewportController {
   placementCameraKey = ''
   placementRegion: { pointerId: number; start: EditorPlacementHit; axis: number; plane: T.Plane; session?: string } | null = null
   editorInteraction: EditorInteraction
+  measurement:PerformanceProbe|null=null
   constructor(host: HTMLDivElement, props: Props) {
     this.host = host
     this.props = props
@@ -92,6 +94,7 @@ class ViewportController {
     this.renderer.domElement.tabIndex = 0
     this.renderer.domElement.setAttribute('aria-label', '3D preview. Middle mouse to orbit; Shift and middle mouse to pan; Home to frame all.')
     host.append(this.renderer.domElement)
+    if(new URL(globalThis.location.href).searchParams.get('measure')==='1')this.measurement=new PerformanceProbe(this.renderer.domElement)
     this.camera.position.set(14, 12, 17)
     this.controls = this.makeControls()
     this.controls.target.set(2, 2, 2); this.controls.update()
@@ -141,6 +144,7 @@ class ViewportController {
   }
   invalidate = () => { if (!this.frame && !this.disposed) this.frame = requestAnimationFrame(this.render) }
   render = (time: number) => {
+    const measureStarted=this.measurement?performance.now():0
     this.frame = 0
     if (this.flying) {
       const dt = Math.min((time - this.lastTime) / 1000 || 0, .05)
@@ -168,6 +172,7 @@ class ViewportController {
       if (this.renderer.domElement.dataset.editorCamera !== cameraData) this.renderer.domElement.dataset.editorCamera = cameraData
     }
     this.editorInteraction.publishHandles()
+    this.measurement?.frame(this.renderer,measureStarted,this.props.editor?.revisionKey,!!this.props.editor?.ghost,this.props.editor?.selected.length??0,this.props.editor?.active??null,this.props.editor?.ghost?.blocks[0]?.pos??null)
     if (this.props.onMetrics) {
       const { render, memory }=this.renderer.info
       const metrics: RenderMetrics={drawCalls:render.calls,triangles:render.triangles,geometries:memory.geometries,textures:memory.textures}

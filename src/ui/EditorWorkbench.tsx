@@ -217,6 +217,7 @@ export function EditorWorkbench({ resources, session, workspace, onWorkspace, on
     else if (name === 'deselect') session.select(scope, [], false)
   }
   const editor: EditorViewportState | undefined = readOnly || !loaded ? undefined : {
+    revisionKey:`${scope}:${document.id}:${slot.epoch}:${slot.revision}`,
     selectableOwners,
     tool:materialActions.active||primitiveActions.active||copyActions.active?'place':tool, selected: slot.selection, active: slot.selection.at(-1) ?? null, space,
     pivot: pivot2.map(value => value / 2) as [number, number, number], localYaw: active?.orientation ?? 0,

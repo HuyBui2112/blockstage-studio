@@ -230,7 +230,7 @@ BUG-03/04/06 đã có fixes trong scope công bố. BUG-01/02/05 còn PARTIAL; c
 | Appearance | **Một phần:** thiếu nhiều special renderer, fluid geometry/appearance, biome tint, lighting/AO parity và một số hiệu ứng động. Sprite animation hiện có không đồng nghĩa entity animation. |
 | Formats/versions | **Một phần:** import Java Structure NBT raw/gzip blocks-only 26.2/4903 đã có, registry exact state, complete pairs và report/atomic commit. Chưa nhập entity/BE payload, multi-palettes, `.schem`, `.litematic`, multi-version migration hoặc Fabric bridge. |
 | Môi trường game | **Chưa kiểm chứng:** instance Fabric/modded của người dùng, ZIP bật qua UI client Fabric, command rotation/mirror, các block/state/entity ngoài fixture. |
-| Hiệu suất | **Chưa kiểm chứng:** GPU Windows thật, p95 end-to-end, memory dài hạn và cảnh triệu block. Schema v2 hiện giới hạn 100.000 cells/document; benchmark 1M đòi hỏi kế hoạch dữ liệu riêng. |
+| Hiệu suất | **Đã có baseline hữu hạn:** native input→CPU frame submission trên Intel UHD/D3D11, dense 1k/10k/100k, 30 mẫu sau warmup; chưa GPU execution/FPS, retention dài hạn, mọi profile/selection hay SLO R1. 100k có độ trễ edit rõ rệt; xem slice P01/P02. Schema v2 vẫn giới hạn 100.000 cells/document; 1M ngoài envelope hiện tại. |
 | Phân phối | **Chưa triển khai:** desktop installer, cloud/AI/marketplace. Chỉ cân nhắc khi workflow thực tế cần, không là điều kiện hoàn thành editor local-first. |
 
 Không giữ các kết luận lịch sử “chưa đọc model JSON”, “chỉ resource workspace”,
@@ -1028,6 +1028,64 @@ component reuse/library, visibility/Y-range/interior và Save/fault/recovery.
 A01/A02/A03a–c có thể phát triển copies trước L05; chỉ gate linked R2 chờ đủ L/A.
 
 ### P — Đo và tối ưu theo bằng chứng
+
+**Slice P01/P02 + Q02 inventory — 03/11/2026:** đã có scene generators deterministic
+và lệnh `pnpm measure:editor`, cùng `pnpm check:fabric`. Code gate mới đạt
+**518/518 tests, 46 file**, typecheck/lint/build. P01 đã có dense/sparse/mixed/
+transparent/pairs/component/entity và strict tests: count/budget trước expansion,
+seed thay geometry, negative chunks, complete pairs, nested depth, bounded pig
+entities và move destinations không va chạm. Không tăng schema/import budgets.
+Full native production regression trên URL thường cũng đạt sau tích hợp,
+gồm resource/animation, editor, R1 house, import/export, library, interaction và
+fault/recovery; có assertion measurement telemetry không được bật ngầm.
+
+P02 hiện đo **native event→matching CPU frame submission** qua opt-in `?measure=1`,
+không phải GPU completion/presentation hay FPS. V2 ack đúng tọa độ first-cell của
+preview numeric cuối và revision commit/Undo. Baseline trước V2 chỉ là lịch sử,
+không dùng preview boolean của nó để suy exact intent latency. Normal URL không
+bật telemetry. Từng round so snapshot bounded; cuối case public JSON đối chiếu
+toàn objects/cells/states/entities sau Undo. Không mutate DB/history bằng script.
+
+Lượt dense V2: **Windows 11 10.0.26200, i7-13650HX, 20 threads, ~16 GiB RAM,
+Edge 156 headless, Intel UHD Graphics 0xA78B qua ANGLE D3D11, 1500×1000/DPR1**.
+30 mẫu sau 3 warmup, root đầu tiên dịch Y+256 và Undo, không phải chọn toàn bộ:
+
+| Dense cells | Pick p95 ms | Preview p95 ms | Commit p95 ms | Undo p95 ms | CPU frame work p95 ms |
+| --- | --- | --- | --- | --- | --- |
+| 1.000 | 10,8 | 6,6 | 17,4 | 13,2 | 4,0 |
+| 10.000 | 13,2 | 32,4 | 115,7 | 63,5 | 3,8 |
+| 100.000 | 52,1 | 878,5 | 1.033,4 | 381,7 | 5,0 |
+
+Report `artifacts/editor-performance-hardware-dense-v2.json` ghi seed/resource
+SHA-256, raw samples, import-to-frame, drawcalls/triangles, JS heap và long tasks.
+Import-to-frame lần lượt 58,1/166,9/1.233,7 ms trong process đã warm resources;
+không gọi là cold browser/cache. Sau draft protected, idle one-second bằng 0 frame
+ở ba case; final full document khớp fixture. Move Y+256 có thể đưa root khỏi camera,
+nên số liệu không là phép thử GPU vẽ đối tượng di chuyển đang nhìn thấy.
+
+Các sáu profile còn lại đạt smoke ở **1k, 3 mẫu/1 warmup**, có assert fallback=0,
+đúng preview và full JSON cuối; chọn-all pairs/component 1k cũng đạt cùng smoke.
+Chỉ xác nhận harness/correctness, không dùng ba mẫu để chốt SLO hoặc suy 10k/100k
+cho mọi profile. Report: `editor-performance-hardware-matrix-smoke.json` và
+`editor-performance-hardware-selection-smoke.json`. Bộ đo mới ghi phase/progress
+và giữ incomplete report khi lỗi; long tasks reset theo từng case.
+
+**Quyết định tiếp theo:** P02 phase attribution cho validation/operation/history/
+React/scene rebuild trước khi chọn fast path P03 hoặc dirty chunks P04. Commit
+10k chưa đạt mục tiêu thử 100 ms, 100k chưa mượt; chưa biết cost nào trội trong
+các phase chưa đo. Không bỏ validation ở trust boundary hay đổi scene cap để
+che vấn đề. Driver đầy đủ/GPU execution, camera/save/history byte retention và
+human builder performance gate vẫn UNVERIFIED; P02/P07 tổng chưa đóng.
+
+**Q02:** audit chỉ đọc tìm bốn candidate version manifests, báo
+`INSTANCE_SELECTION_REQUIRED`. Một candidate `content 26.2` có embedded
+26.2/4903, Fabric Loader 0.19.5, Fabric API 0.161.0+26.2, 12 available root mod
+JARs và metadata JDK mise 25.0.4. SHA-256 nằm trong ignored report
+`artifacts/fabric-runtime-content-26.2.json`; discovery ở
+`artifacts/fabric-runtime-readiness.json`. Không tự coi đây là instance người
+dùng chọn. Enabled/nested mods, launcher Java, packs và world behavior chưa
+resolve; không launch/cài/sửa game hoặc đọc world/accounts/options/logs.
+`worldReadback=UNVERIFIED`; Q02 còn mở đến khi có world thử và cấu hình định danh.
 
 | ID | Đầu ra / phạm vi ghi dự kiến | Phụ thuộc | Nghiệm thu |
 | --- | --- | --- | --- |

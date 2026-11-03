@@ -170,6 +170,17 @@ layers and arbitrary clip planes remain unsupported; full K05 remains partial.
 
 ## Architecture and performance
 
+- P01 fixtures and `measure:editor` are developer QA, never a replacement for
+  user import validation. `?measure=1` alone enables frame telemetry. Normal
+  viewport stays free of probe timers/serialization. Acknowledgement includes
+  actual preview first-cell position and committed revision, not preview presence.
+  Record renderer identity; hardware request is not GPU execution/FPS proof.
+  Compare full downloaded document after measured Undo; keep incomplete reports.
+- `check:fabric` is bounded read-only inventory. No launcher/world/account/options
+  modifications or implicit EULA, downloads, installs or game launch. Metadata
+  presence never closes Q02; selected Java/enabled mods and world readback remain
+  separate verification tasks.
+
 - Keep pure domain logic in `src/core`, import/persistence in `src/io`, resource
   orchestration in `src/resources`, UI in `src/ui`, and GPU work in `src/viewport`
   and `src/render`. React components must not parse archives or implement game rules.

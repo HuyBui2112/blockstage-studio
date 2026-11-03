@@ -249,3 +249,9 @@ có gate riêng.
 
 Không đóng gói game JAR, extracted textures/profile, secrets, cache, world thử
 hoặc browser storage vào Git/build. Không tự commit/push khi chưa được yêu cầu.
+
+**Đo hiệu năng và kiểm kê Fabric:** đã có `pnpm measure:editor` (scene deterministic,
+renderer identity, 30 mẫu mặc định) và `pnpm check:fabric` (chỉ đọc metadata/hash,
+không chạy game hoặc sửa world). Cách chọn sizes/profiles, GPU/software và instance
+ở [thiết kế kỹ thuật §6.1–6.2](docs/02_TECHNICAL_DESIGN.md). Report nằm trong
+`artifacts/`; số đo CPU submission và inventory không thay thế FPS/world readback.
