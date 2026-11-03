@@ -1,6 +1,6 @@
 # 03 — Hiện trạng và lộ trình Blockstage Studio
 
-Mốc đối chiếu: **30/10/2026**. Tài liệu này trả lời công cụ đang làm được gì,
+Mốc đối chiếu hiện tại: **03/11/2026**; các bằng chứng cũ giữ ngày riêng. Tài liệu này trả lời công cụ đang làm được gì,
 bằng chứng tới đâu và nên phát triển tiếp theo thứ tự nào. Định hướng sản phẩm ở
 [01_PRODUCT_GOALS.md](01_PRODUCT_GOALS.md); hợp đồng dữ liệu, kiến trúc và cách
 chạy kiểm chứng ở [02_TECHNICAL_DESIGN.md](02_TECHNICAL_DESIGN.md).
@@ -93,6 +93,49 @@ fixture dương dùng dirt. Warning hiện tại không thay thế phép thử t
 
 ## Khoảng trống hiện hành
 
+### Chuẩn hóa thao tác editor — 03/11/2026
+
+Phản ánh mới của người dùng được ưu tiên trước lane thư viện tiếp theo. Đã sửa
+input routing hiện có, giữ domain/persistence/schema thay vì viết lại editor:
+
+- Select mặc định khi đổi document/session/workspace; Q Select, E Place lại
+  palette gần nhất. Alt+click chọn ô ngay trong Place rồi về Select. G chuyển
+  sang Move và mở modal khi có selection; không chọn thì chỉ đổi tool, không
+  cảnh báo. R trong Place vẫn xoay ghost; ngoài Place chuyển Rotate. Q/E/G/R
+  hủy/thay modal chưa commit; các phím nhập liệu vẫn theo focus.
+- Kéo chuột thường chọn vùng xuyên whole eligible roots, Shift toggle; Ctrl/Meta+A
+  hoặc A chọn tất cả được phép sửa, Alt+A clear. Giữ B/Box và gizmo, tôn trọng
+  hidden/locked/isolate/Y range. Cancel không tạo selection/commit ngoài ý muốn.
+- Ctrl+kéo trong Place block tạo Plane theo mặt đầu, resolve Context/yaw một lần,
+  giữ complete logical pairs. Panel ẩn trong lúc giữ chuột để không chặn/rung
+  viewport; thả đóng băng endpoints, Enter commit đúng preview, Esc hủy, một Undo.
+  Dùng lại primitive planner, stable IDs/budgets/collision/neighbors/view guards.
+  Input cập nhật operation theo functional state để không mất điểm khi React
+  chưa publish render bắt đầu; không đổi sang Select trung gian trong gesture.
+- Ghost dùng texture/model bán trong suốt, material clone riêng, invalid tint đỏ;
+  batching bằng InstancedMesh và disposal đúng ownership, animation map chia sẻ.
+  Không còn wireframe placement box trong editor. Giữ fallback khi thiếu model.
+
+Code gate đạt **408/408 tests, 41 file**, typecheck/lint/build; warning chunk Three.js
+>500 kB hiện có vẫn còn. Native interaction slice đã đạt với JAR/profile 26.2 thật:
+Ctrl/Meta+A, whole group/bed selection, Shift drag/click, Q/E/Alt click/G/R,
+native text editing, fixed XY/XZ planes, exact commit/Undo/Redo/cancel và ghost
+texture. Full production browser regression cũng đạt: resources/animation/pack
+precedence, editor/gizmo/state/neighbors, NBT/export, Save/portable/recovery/fault,
+house/interior/component reuse/library và interaction. Slice mới xác nhận thêm
+ba giường đủ sáu cells/Undo, vùng va chạm không commit và gesture không resize
+viewport khi đang giữ chuột. QA ảnh phát hiện grid còn giữ cột sau khi sidebar
+ẩn ở 900px; đã sửa CSS để preview tận dụng chiều ngang. Native interaction slice
+sau sửa CSS đã đạt, có assertion viewport >90% chiều ngang và ảnh đã được xem.
+Quickbuild slice sau CSS cũng đạt, gồm Copy/Paste/Repeat và panel 620px.
+Không dùng kết quả này để đóng R1 hoặc tuyên bố FPS
+GPU/world parity. Ảnh local: `artifacts/interaction-face-plane-ghost.png`,
+`interaction-held-plane.png`, `interaction-plane-compact.png`.
+
+Giới hạn chủ động: đây là plane kéo trên mặt ban đầu, chưa freehand brush/đường
+chéo; component dùng Place/Repeat. Chọn vùng hiện xuyên theo projected logical
+bounds, chưa chế độ chỉ chọn bề mặt nhìn thấy. Không thay đổi game-state adapters.
+
 ### Đợt sửa lỗi tương tác/appearance — 30/10/2026
 
 - **Code gate mới: 241/241 test, 21 file**, typecheck/lint/build đạt. Không thêm
@@ -180,7 +223,7 @@ BUG-03/04/06 đã có fixes trong scope công bố. BUG-01/02/05 còn PARTIAL; c
 | --- | --- |
 | An toàn dữ liệu | **Đã có trong scope hiện tại:** Save CAS, catalogue/delete, autosave draft, recovery, Storage health và portable v1. D07 bổ sung failed-switch, hai app pages Save/claim, corrupted records và renderer crash sau protected ack; fresh-origin/legacy được kiểm ở suites riêng. Release R1 và disk quota/power loss chưa kiểm; assets phải giữ riêng, không hứa chống mọi crash/eviction. |
 | Dựng hằng ngày | **Đã có B01–B03/B08:** menu/phím Duplicate, internal Copy/Paste và Repeat World với numeric/pointer preview, cancel và atomic Undo/Redo. **B04/B05 + B09 primitive subset đã triển khai:** Build line/plane/solid/hollow box với World endpoints và Design state; native primitive browser đã đạt. B06/B07 + B09 Materials đã có replacement, ID/state counts và CSV/JSON với K02 material-contract subset; code/native browser gates đạt. Resize theo quy tắc, parametric wall/column/span và socket vẫn chưa triển khai. |
-| Nội thất/phân vùng | **Đã có finite root scope:** hide/lock/isolate/reset, click/box/frame theo policy và bảo vệ indirect neighbor edits. **Đã có thêm:** inclusive Y-range với bảo vệ partial roots. **Chưa có:** automatic layers/roof/floor, arbitrary clip planes, visible-only/lasso và nghiệm thu nội thất nhiều tầng. |
+| Nội thất/phân vùng | **Đã có finite root scope:** hide/lock/isolate/reset, click/box/frame theo policy và bảo vệ indirect neighbor edits; inclusive Y-range bảo vệ partial roots. **Đã có scripted journey:** nhà hai tầng/phòng/cầu thang và interior edit với complete JSON/NBT. **Chưa có:** automatic layers/roof/floor, arbitrary clip planes, visible-only/lasso hoặc nghiệm thu builder thật. |
 | Reuse/vật liệu | **Đã có:** selected material replacement trong finite families, giữ state/pairs/identity. **Chưa có:** linked component updates/overrides, roles/kits. Không suy safe replacement chỉ từ tags/creative tabs. |
 | Game behavior | **Một phần:** opt-in scene connections fence/wall/gate theo game predicates đã có. Chưa slab merge/player hinge, auto-pane/stairs, dynamic shapes, support tổng quát, gravity/redstone/fluid/ticks/player collision. |
 | Payload/entities | **Chưa triển khai:** entity editing workflow, block-entity inventory/custom NBT, arbitrary payload preservation adapters, entity equipment/variants/animation. |
@@ -280,6 +323,67 @@ Gate chung R1/R2:
    control giả, game assets/secrets trong package hoặc compatibility claim thiếu proof.
 
 ## 3. Work packages và quan hệ thật
+
+### Phạm vi ứng viên R1 đã chốt để nghiệm thu — 03/11/2026
+
+Nguồn dữ liệu chính xác là [`scripts/fixtures/r1-scope.json`](../scripts/fixtures/r1-scope.json),
+ID **r1-candidate-1**. Đây là mục tiêu nghiệm thu, không phải bộ lọc palette của
+app hoặc tuyên bố release READY. Người dùng vẫn có thể thử các registry entries
+ngoài tập này với giới hạn hiện hành; chúng không tự nhận coverage R1.
+
+- **29 block IDs / 461 tổ hợp state** từ profile 26.2/4903 và client SHA-1 trong
+  manifest: stone/cobblestone/stone_bricks; oak/spruce/birch planks/log/stairs/slab/
+  door; stone_brick_slab, glass, red/blue bed, oak fence/gate, cobblestone_wall,
+  persistent oak_leaves, iron_chain, lantern và explicit air. Tất cả property phải
+  đầy đủ và hợp lệ trong profile; chỉ dry/non-powered, bed unoccupied, foliage
+  persistent distance=7. Không hứa fluid/redstone/tick simulation.
+- **Entity tối thiểu:** pig, position/yaw, finite static appearance/basic export;
+  vẫn cần N04/N05 để đặt/chọn/sửa qua UI. Không biến fixture pig cũ thành full
+  entity editor hoặc world proof mới cho release.
+- **Block entity tối thiểu:** dry single chest, bốn facing, empty và một inventory
+  fixture hữu hạn. Chưa có typed payload/editor/import/export; item contract phải
+  đối chiếu runtime 26.2 trước khi triển khai. Không nhận chest vào blocks-only
+  subset chỉ vì đã render được.
+- **Formats:** giữ document v2, portable v1 copies, Structure NBT 26.2 blocks-only
+  raw/gzip single palette và NBT/datapack export ≤48 mỗi chiều. Định dạng có entity/
+  BE payload vẫn phải bị từ chối cho đến khi adapter và roundtrip đã được kiểm.
+
+| Chiều nghiệm thu độc lập | Bằng chứng hiện tại / việc còn cần |
+| --- | --- |
+| Registry/state/Design/pairs/yaw | Test palette duyệt toàn bộ 461 state, 4 yaw về bản gốc, preflight và NBT import/export roundtrip; game assets/profile là optional local gate. |
+| Geometry/texture | Resolve/bake mọi state không-air, kiểm texture thật và không fallback; wall `up=false` + bốn phía `none` đúng là mesh rỗng, không sửa thành cube. Chưa pixel parity hoặc GPU lifecycle coverage đầy đủ. |
+| Context/neighbors/support | Chỉ adapter/fixture đã công bố; chưa đánh toàn palette world-exact. |
+| Copy/group/library/material/persistence | Các suites hiện có; house journey mới phải kiểm đường UI tổng hợp. Material compatibility vẫn theo contract, không theo tên nhóm trong manifest. |
+| Runtime | Vanilla toàn candidate và Fabric định danh còn UNVERIFIED; giữ Q02/Q05 và hash loader/mod/pack/profile. |
+| Entity/payload | N04/N05 và N01→N02→N03/N06 vẫn pending; Save→portable→fresh-origin→export→world là gate khi schema được mở rộng. |
+| Perf/UX | CDP/software browser chỉ kiểm chức năng và timing harness; P01/P02 trên GPU thật cùng builder sessions Q04 vẫn UNVERIFIED. |
+
+Thứ tự tiếp sau slice này: **P01/P02 + Q02 baseline** và **R01 coverage/world
+fixtures** có thể làm độc lập; **N04/N05 pig UI** song song **N01–N03 chest contract**
+sau khi ownership/schema chốt; sau đó N06, Q05 và nghiệm thu builder. Không bỏ
+entity/BE/Fabric/perf gates để đóng R1 sớm. Các mục R2 linked/kits/sockets giữ sau R1.
+
+**Bằng chứng slice K02/Q04 — 03/11/2026:** code gate **467/467 tests, 42 file**,
+typecheck/lint/build đạt (59 tests mới gồm hai contract tests độc lập game và 57
+optional local asset cases). Native `r1-house` đạt: dựng từ rỗng 526 cells,
+9×9×10, hai tầng/bốn phòng, bốn cửa sổ, cửa đủ pair, hai giường, bốn stair rises
+có shaft/support/headroom và approach/landing; author component rồi đặt hai
+copies qua actual pointer. Lower Y-cut move/cancel/collision/Undo/Redo, sửa riêng
+copy/source bất biến và timber material variant đều so complete downloaded JSON.
+Save/reload và independently decoded NBT dưới upper Y cut giữ đủ công trình.
+Đã xem ảnh exterior/interiors/620px, dữ liệu local ở `artifacts/r1-house*`.
+
+Đo thử tám primitive confirm bằng CDP/software renderer: p50 **117,7 ms**, p95
+**266 ms** trong lượt slice đầu; chứa harness/IPC/frame overhead, mẫu nhỏ và
+scene nhỏ, không chốt SLO hay suy ra GPU performance. Script ghi mẫu/tổng thời
+gian từng lượt vào `artifacts/r1-house-workflow.json`; không chọn số đẹp giữa
+các lượt để gọi là benchmark. Full native production regression sau tích hợp đã
+đạt, gồm `r1-house`, component library/interaction và data-safety/recovery tiếp
+sau. Lượt full ghi p50 **172,6 ms**, p95 **330,8 ms** cho cùng tám mẫu harness;
+dao động này càng không cho phép dùng timing đó làm SLO GPU thật.
+Đây là scripted builder journey và geometric access, không human acceptance,
+player traversal, world survival hoặc vanilla/Fabric readback mới. K02/Q04/R1
+tổng vẫn PARTIAL theo các gate ở trên.
 
 **P0** an toàn, **P1** R1, **P2** R2, **X** extension. Gate phát hành khác dependency
 để viết code: planner Duplicate có thể song song repository, release vẫn chờ recovery.
@@ -794,6 +898,22 @@ resource/editor/copy/build/material/visibility/Y-range, Save/Documents, NBT/
 portable, fault/crash/recovery. Tiếp theo cần component reuse trong kiến trúc
 nhiều tầng và nghiệm thu builder trên mẫu có lối đi/cầu thang thực tế.
 
+**Component-copy reuse hai tầng — native automation đã đạt:** tạo mẫu hai logs
+axis X trong Component Editor, publish và export baseline thư viện; Architecture
+hai sàn có hai copies ở Y1/Y4, bản trên yaw 90° với span/axis X→Z. Pointer thật
+kiểm ghost/commit positions/states. Full JSON kiểm fresh nested IDs/provenance,
+whole-copy move/cancel/collision/Undo/Redo, material replacement chỉ một copy;
+copy còn lại và exported library asset không đổi. Save/reload và full NBT export
+55 cells khi đang Y-filter đạt independent readback. Slice `component-reuse`
+đã ghép vào browser harness; build/lint/syntax và targeted native smoke đạt.
+Đã xem ảnh từng tầng; report ở `artifacts/component-reuse-workflow.json` ignored.
+Không có thay đổi runtime editor trong slice kiểm chứng này. Đây không phải
+linked instances và chưa đóng toàn L01 categories/preview/import-export UX,
+house có cầu thang/đa phòng, builder acceptance hoặc Minecraft world gate.
+Full production browser suite cũng đạt cùng `component-reuse` và toàn bộ editor,
+interior/Y-range, Save/Documents, import/export/portable, fault/crash/recovery.
+Không cần sửa runtime editor; không thêm dependency/schema/commits trong slice.
+
 ### G — Capability và quy tắc Minecraft
 
 | ID | Đầu ra / phạm vi ghi dự kiến | Phụ thuộc | Nghiệm thu |
@@ -876,6 +996,21 @@ release scope chọn export lớn/ecosystem. Format và version là axes độc 
 | L05 | Source edit/publish/update/override UI + persistence. | L04, K07a, K07b | Preview/diff + keep/fork/detach/update rõ; library publish khác doc transaction; legacy copies nguyên vẹn. |
 | L06 | Architectural roles/material slots/typed kits/locks và coverage report. | B06, K06 | Ba variants giữ pairs/state/payload; missing/incompatible có quyết định rõ; làm trên copies không cần linked. |
 | L07 | Kit preview/batch apply/revert/library assignment UI. | L06, K07b | Một command, legal states thay vì đổi texture/runtime IDs; coverage/loss/footprint changes trước commit. |
+
+**L01 catalogue subset đã triển khai:** tách ComponentLibrary; tìm theo tên và
+stored block IDs, hỗ trợ tiếng Việt không dấu + nhiều token AND; sort Name/Cells,
+24-card increments, Showing/total, empty-search/clear và kích thước/số ô. Giữ nguyên
+asset references và callbacks; index tree một lần khi asset list đổi, query/sort
+không làm đổi document/history/revision. Không thay schema/DB/dependencies.
+`pnpm check` đạt **400/400 tests, 41 file**, typecheck/lint/build. Native
+`component-library` đạt nhập 25 mẫu UI, bounded cards, show-more/reset, accent/
+block search, sorting, chọn mẫu, unchanged export, reload và input visible 620px;
+đã xem ảnh desktop/compact. Counts bao gồm explicit air, không phải survival items.
+**Còn thiếu trong L01:** manual metadata/categories, 3D thumbnails, duplicate/
+rename library UX, missing-resource guidance; storage loading vẫn restore toàn
+list, chưa lazy data. Không đánh full L01/R1 hoàn tất từ slice search này.
+Full production browser regression cũng đạt sau extraction, gồm editor cũ,
+component reuse/library, visibility/Y-range/interior và Save/fault/recovery.
 
 ### A — Anchors/sockets và generators hữu hạn
 

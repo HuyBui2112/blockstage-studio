@@ -54,4 +54,5 @@
 .copy-action-menu summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 @media (max-width: 1000px) {
   .editor-workspace.copying .editor-library, .editor-workspace.copying .editor-inspector { display: none; }
+  .editor-workspace.copying .editor-workbench { grid-template-columns: minmax(0, 1fr); }
 }

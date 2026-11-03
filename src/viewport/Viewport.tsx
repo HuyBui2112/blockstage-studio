@@ -79,6 +79,7 @@ class ViewportController {
   placementHoverKey = ''
   placementPointer: [number, number] | null = null
   placementCameraKey = ''
+  placementRegion: { pointerId: number; start: EditorPlacementHit; axis: number; plane: T.Plane; session?: string } | null = null
   editorInteraction: EditorInteraction
   constructor(host: HTMLDivElement, props: Props) {
     this.host = host
@@ -99,7 +100,7 @@ class ViewportController {
       canvas: this.renderer.domElement, host, scene: this.scene, camera: () => this.camera,
       navigation: enabled => { this.controls.enabled = enabled && !this.flying },
       invalidate: this.invalidate, message: message => this.props.onMessage(message),
-      geometry: block => this.ghostGeometry(block),
+      renderBlock: block => this.ghostRender(block), onGhostChange: () => this.refreshAnimations(),
     })
     this.selection.visible = this.preview.visible = false
     this.scene.add(new T.HemisphereLight(0xe3f4ff, 0x535c54, 2.1))
@@ -109,6 +110,7 @@ class ViewportController {
     canvas.addEventListener('pointerdown', this.pointerDown, true)
     canvas.addEventListener('pointermove', this.pointerMove, true)
     canvas.addEventListener('pointerleave', this.pointerLeave)
+    canvas.addEventListener('pointercancel', this.pointerCancel)
     window.addEventListener('pointerup', this.pointerUp)
     canvas.addEventListener('contextmenu', this.contextMenu)
     canvas.addEventListener('keydown', this.keyDown)
@@ -177,6 +179,7 @@ class ViewportController {
     for (const b of this.batches) b.dispose()
     this.batches = []; this.entityMeshes=[]; this.group.clear(); this.animations=[]
     if (!clearCaches) return
+    this.editorInteraction.clearGhostMaterials()
     this.textureImages.clear()
     this.geometryCache.forEach(g => g.dispose()); this.geometryCache.clear()
     for (const b of this.baked.values()) b.geometry.dispose()
@@ -222,27 +225,56 @@ class ViewportController {
     const materials=surfaces.map(s=>{const settings={map:this.texture(s.texture),color:s.color??(s.tint?tint:'white'),alphaTest:.1,transparent:transparent||s.translucent,side:s.singleSided?T.FrontSide:T.DoubleSide};return s.shade?new T.MeshLambertMaterial(settings):new T.MeshBasicMaterial(settings)})
     this.materialCache.set(key,materials);return materials
   }
-  ghostGeometry(block: SceneBlock) {
+  ghostRender(block: SceneBlock) {
     if (this.props.packs.some(pack => pack.enabled)) {
       try {
-        const special=specialBlockAppearance(block.state)
-        if(special){
+        const appearance=specialBlockAppearance(block.state)
+        const special=blockEntityAppearance(block.state.name,block.state.properties)
+        let mesh: BakedMesh
+        if(appearance){
           const renderKey='special:'+stateKey(block.state)
-          let mesh=this.baked.get(renderKey)
-          if(!mesh){mesh=bakeSpecialBlock(block.state,this.props.profile,this.resolver)!;this.baked.set(renderKey,mesh)}
-          return mesh.geometry
+          mesh=this.baked.get(renderKey)??bakeSpecialBlock(block.state,this.props.profile,this.resolver)!
+          this.baked.set(renderKey,mesh)
+        } else if (special && this.props.profile?.entityModels[special.layer] && this.resolver.files.has(special.texture)) {
+          const renderKey=stateKey(block.state)
+          mesh=this.baked.get(renderKey)??bakeEntity(this.props.profile.entityModels[special.layer],special.texture,'block')
+          if(!this.baked.has(renderKey)) {
+            mesh.geometry.rotateY(-(['south','west','north','east'].indexOf(block.state.properties.facing))*Math.PI/2)
+            this.baked.set(renderKey,mesh)
+          }
+        } else {
+          const resolved = this.resolver.resolve(block.state, block.pos)
+          const renderKey = block.state.name + resolved.key
+          const cached=this.baked.get(renderKey)
+          if (cached) mesh=cached
+          else {
+            const material=this.props.catalog.find(material=>material.id===block.state.name)
+            mesh=bakeBlock(resolved,this.resolver,material?.source==='game-profile'&&!material.hasBlockEntity)
+            this.baked.set(renderKey,mesh)
+          }
         }
-        const resolved = this.resolver.resolve(block.state, block.pos)
-        const renderKey = block.state.name + resolved.key
-        let mesh = this.baked.get(renderKey)
-        if (!mesh) { mesh = bakeBlock(resolved, this.resolver); this.baked.set(renderKey, mesh) }
-        return mesh.geometry
-      } catch { /* A visible cell outline remains useful when a model is unsupported. */ }
+        return {geometry:mesh.geometry,materials:this.modelMaterials(mesh.surfaces,block.state)}
+      } catch { /* Keep unsupported models visible with the existing placeholder appearance. */ }
     }
-    const id = 'editor-ghost-cell'
+    const id = stateKey(block.state)
     let geometry = this.geometryCache.get(id)
-    if (!geometry) { geometry = new T.BoxGeometry(1, 1, 1); this.geometryCache.set(id, geometry) }
-    return geometry
+    if (!geometry) { geometry = blockGeometry(block.state); this.geometryCache.set(id, geometry) }
+    return {geometry,materials:this.materials(block.state)}
+  }
+  refreshAnimations() {
+    // Ghosts share texture objects with the committed model, including UV animation.
+    const activeTextures = new Set<T.Texture>()
+    for (const mesh of [...this.batches, ...this.entityMeshes, ...this.editorInteraction.ghost.children as T.Mesh[]]) {
+      for (const material of Array.isArray(mesh.material) ? mesh.material : [mesh.material]) {
+        const texture = (material as T.MeshLambertMaterial).map
+        if (texture) activeTextures.add(texture)
+      }
+    }
+    this.animations = []
+    for (const texture of activeTextures) {
+      const animation = this.animationCache.get(texture)
+      if (animation) this.animations.push(animation)
+    }
   }
   rebuild(resourcesChanged=false) {
     // Reuse geometry/material/texture objects for state, yaw and clip changes.
@@ -330,22 +362,6 @@ class ViewportController {
         this.entityMeshes.push(mesh);this.group.add(mesh)
       }
     }
-    // Cached materials can reuse animated textures without calling texture().
-    // Derive active animations from attached materials so hidden cached assets
-    // cannot keep requesting frames after switching to a static preview.
-    const activeTextures=new Set<T.Texture>()
-    for (const mesh of [...this.batches,...this.entityMeshes]) {
-      const materials=Array.isArray(mesh.material) ? mesh.material : [mesh.material]
-      for (const material of materials) {
-        const texture=(material as T.MeshLambertMaterial).map
-        if (texture) activeTextures.add(texture)
-      }
-    }
-    this.animations=[]
-    for (const texture of activeTextures) {
-      const animation=this.animationCache.get(texture)
-      if (animation) this.animations.push(animation)
-    }
     diagnostics.issues=[...issues]
     const diagnosticsKey=JSON.stringify(diagnostics)
     if (diagnosticsKey!==this.diagnosticsKey) { this.diagnosticsKey=diagnosticsKey; this.props.onDiagnostics(diagnostics) }
@@ -365,12 +381,12 @@ class ViewportController {
     const { min, size } = bounds(positions.map(pos => ({ pos })))
     helper.box.set(new T.Vector3(...min).addScalar(-.015), new T.Vector3(...min.map((v, i) => v + size[i]) as Vec3).addScalar(.015))
   }
-  hit(e: PointerEvent) {
+  hit(e: PointerEvent, selection = false) {
     const rect = this.renderer.domElement.getBoundingClientRect()
     this.pointer.set((e.clientX - rect.left) / rect.width * 2 - 1, -(e.clientY - rect.top) / rect.height * 2 + 1)
     this.ray.setFromCamera(this.pointer, this.camera)
     if (this.props.editor) {
-      const placing = this.props.editor.tool === 'place'
+      const placing = this.props.editor.tool === 'place' && !selection && !e.altKey
       // Selection uses occupied cells. Placement keeps actual model surfaces,
       // except chain attachment uses a deliberate, stable grid-cell face.
       const eligible=this.editorInteraction.selectableOwners
@@ -397,12 +413,24 @@ class ViewportController {
   pointerDown = (e: PointerEvent) => {
     this.renderer.domElement.focus()
     if (this.flying) return
+    if (e.button === 2 && this.placementRegion) { this.endPlacementRegion(true); e.stopImmediatePropagation(); e.preventDefault(); return }
     if (!this.props.previewMode && this.editorInteraction.pointerDown(e)) { this.down = null; e.stopImmediatePropagation(); e.preventDefault(); return }
+    if (e.button === 0 && e.ctrlKey && !e.altKey && this.props.editor?.onPlacementRegionStart) {
+      const hit = this.hit(e)
+      if (hit) {
+        const start = this.placementHit(hit), axis = start.face.findIndex(value => value !== 0)
+        this.placementRegion = { pointerId: e.pointerId, start, axis, plane: new T.Plane().setFromNormalAndCoplanarPoint(new T.Vector3(...start.face), new T.Vector3(...start.point)) }
+        this.down = null; this.placementPointer = null
+        if(!this.props.editor.onPlacementRegionStart(start))this.endPlacementRegion(true)
+        e.stopImmediatePropagation(); e.preventDefault(); return
+      }
+    }
     if (this.editorInteraction.suppressClick) this.down = null
     if (e.button === 1 && e.ctrlKey) { this.ctrlZoom = true; this.controls.enabled = false; e.stopImmediatePropagation(); e.preventDefault(); this.down = [e.clientX, e.clientY]; return }
     if (e.button === 0 && !this.editorInteraction.suppressClick) this.down = [e.clientX, e.clientY]
   }
   pointerMove = (e: PointerEvent) => {
+    if (this.placementRegion) { this.pointPlacementRegion(e); return }
     this.placementPointer = [e.clientX, e.clientY]
     if (this.ctrlZoom && this.down) {
       const factor = Math.exp((e.clientY - this.down[1]) * .01)
@@ -416,10 +444,11 @@ class ViewportController {
     const hit = this.hit(e)
     if (!hit) { this.pointerLeave(); return }
     if (this.props.editor?.tool === 'place') {
-      this.publishPlacementHover(e, hit)
+      if (e.altKey) { this.props.editor.onPlacementHover?.(null); this.placementHoverKey = '' }
+      else this.publishPlacementHover(e, hit)
     }
     if (key(hit.adjacent) !== key(this.hover)) { this.hover = hit.adjacent; this.props.onHover(this.hover) }
-    this.preview.visible = this.props.editor ? this.props.editor.tool === 'place' && !this.props.editor.ghost : this.props.tool === 'block' || this.props.tool === 'component'
+    this.preview.visible = !this.props.editor && (this.props.tool === 'block' || this.props.tool === 'component')
     if (this.preview.visible) {
       const positions = (this.props.tool === 'component' ? this.props.ghost : [[0, 0, 0] as Vec3]).map(p => p.map((v, i) => v + hit.adjacent[i]) as Vec3)
       this.setBox(this.preview, positions)
@@ -429,11 +458,17 @@ class ViewportController {
   }
   pointerLeave = () => {
     this.placementPointer = null
+    if (this.placementRegion) return
     this.preview.visible = false
     if (this.placementHoverKey) { this.placementHoverKey = ''; this.props.editor?.onPlacementHover?.(null) }
     this.invalidate()
   }
   pointerUp = (e: PointerEvent) => {
+    if (e.button === 0 && this.placementRegion?.pointerId === e.pointerId) {
+      const outside = !this.renderer.domElement.contains(e.target as Node)
+      if (!outside) this.pointPlacementRegion(e)
+      this.endPlacementRegion(outside); return
+    }
     if (this.ctrlZoom) { this.ctrlZoom = false; this.controls.enabled = true; this.down = null; this.editorInteraction.pointerUp(e); return }
     if (!this.props.previewMode && this.editorInteraction.pointerUp(e)) { this.down = null; return }
     if (e.button !== 0 || !this.down || this.flying) return
@@ -441,13 +476,32 @@ class ViewportController {
     this.down = null
     if (this.props.previewMode) return
     if (click && this.props.editor && this.renderer.domElement.contains(e.target as Node)) {
-      const hit = this.hit(e), editor = this.props.editor
-      if (editor.tool === 'place' && hit) editor.onPlace(this.placementHit(hit))
+      const editor = this.props.editor, quickSelect = editor.tool === 'place' && e.altKey
+      const hit = this.hit(e, quickSelect)
+      if (quickSelect) { editor.onTool?.('select'); editor.onSelect(hit?.block ? [hit.block.owner] : [], e.shiftKey) }
+      else if (editor.tool === 'place' && hit) editor.onPlace(this.placementHit(hit))
       else editor.onSelect(hit?.block ? [hit.block.owner] : [], e.shiftKey)
       return
     }
     if (click && this.renderer.domElement.contains(e.target as Node)) { const hit = this.hit(e); if (hit) { if ('entityId' in hit && hit.entityId && (this.props.tool==='select'||this.props.tool==='erase')) this.props.onEntityPick(hit.entityId); else this.props.onPick(hit.block, hit.adjacent) } }
   }
+  pointPlacementRegion(e: PointerEvent) {
+    const region = this.placementRegion
+    if (!region || region.pointerId !== e.pointerId) return
+    const rect = this.renderer.domElement.getBoundingClientRect()
+    this.ray.setFromCamera(new T.Vector2((e.clientX-rect.left)/rect.width*2-1,1-(e.clientY-rect.top)/rect.height*2),this.camera)
+    const point = this.ray.ray.intersectPlane(region.plane,new T.Vector3())
+    if (!point) return
+    const pos = point.toArray().map(Math.floor) as Vec3
+    pos[region.axis] = region.start.pos[region.axis]
+    this.props.editor?.onPlacementRegionPoint?.(pos)
+  }
+  endPlacementRegion(cancel: boolean) {
+    if (!this.placementRegion) return
+    this.placementRegion = null; this.down = null; this.placementPointer = null
+    this.props.editor?.onPlacementRegionEnd?.(cancel)
+  }
+  pointerCancel = () => { this.endPlacementRegion(true); this.down = null; this.editorInteraction.cancel() }
   placementHit(hit: NonNullable<ReturnType<ViewportController['hit']>>): EditorPlacementHit {
     const look = this.camera.getWorldDirection(new T.Vector3()).toArray()
     return { pos: hit.adjacent, face: hit.face, point: hit.point, look, ...(hit.block ? { target: hit.block.pos } : {}) }
@@ -519,6 +573,7 @@ class ViewportController {
     if (this.flying) return
     const target=e.target
     if (target instanceof HTMLElement && (target.matches('input, textarea, select') || target.isContentEditable)) return
+    if (e.code === 'Escape' && this.placementRegion) { this.endPlacementRegion(true); e.preventDefault(); return }
     if (!this.props.previewMode && this.editorInteraction.keyDown(e)) { e.preventDefault(); return }
     const command=keyViewCommand(e.code,e.ctrlKey,e.shiftKey)
     if (command) { e.preventDefault(); this.command(command); return }
@@ -536,7 +591,7 @@ class ViewportController {
   }
   flyKeyDown = (e: KeyboardEvent) => { if (this.flying) { this.keys.add(e.code); e.preventDefault() } }
   keyUp = (e: KeyboardEvent) => { this.keys.delete(e.code) }
-  blur = () => { this.keys.clear(); this.ctrlZoom = false; if (this.editorInteraction.modal || this.editorInteraction.dragging) this.editorInteraction.cancel(); this.controls.enabled = !this.flying; if (this.flying) document.exitPointerLock() }
+  blur = () => { this.keys.clear(); this.ctrlZoom = false; this.endPlacementRegion(true); if (this.editorInteraction.modal || this.editorInteraction.dragging || this.editorInteraction.boxStart || this.editorInteraction.boxArmed) this.editorInteraction.cancel(); this.down = null; this.controls.enabled = !this.flying; if (this.flying) document.exitPointerLock() }
   lockChange = () => {
     this.controls.enabled = !this.flying; this.keys.clear()
     if (!this.flying) { this.controls.target.copy(this.camera.position).addScaledVector(this.camera.getWorldDirection(new T.Vector3()), 4); this.controls.update() }
@@ -560,6 +615,10 @@ class ViewportController {
     const frame=props.frameKey!==this.props.frameKey
     const command=props.command?.id!==this.props.command?.id ? props.command : undefined
     this.props = props
+    if (this.placementRegion) {
+      if (rebuild || layer || props.previewMode || props.editor?.tool!=='place' || !props.editor.onPlacementRegionPoint || (this.placementRegion.session !== undefined && this.placementRegion.session !== props.editor.placementSession)) this.endPlacementRegion(true)
+      else this.placementRegion.session = props.editor.placementSession
+    }
     if(placementSessionChanged)this.placementPointer=null
     if (editorToolChanged || rebuild || layer) { this.placementHoverKey = ''; this.placementCameraKey = '' }
     if (rebuild) this.rebuild(resourcesChanged)
@@ -584,6 +643,7 @@ class ViewportController {
     this.renderer.domElement.removeEventListener('pointerdown', this.pointerDown, true)
     this.renderer.domElement.removeEventListener('pointermove', this.pointerMove, true)
     this.renderer.domElement.removeEventListener('pointerleave', this.pointerLeave)
+    this.renderer.domElement.removeEventListener('pointercancel', this.pointerCancel)
     this.renderer.domElement.removeEventListener('contextmenu', this.contextMenu)
     this.renderer.domElement.removeEventListener('keydown', this.keyDown)
     this.renderer.domElement.removeEventListener('wheel', this.wheel, true)

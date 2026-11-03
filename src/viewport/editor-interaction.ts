@@ -16,7 +16,11 @@ export type EditorViewportState = {
   localYaw: number
   ghost?: { blocks: SceneBlock[]; valid: boolean }
   onSelect: (ids: string[], toggle: boolean) => void
+  onTool?: (tool: EditorViewportState['tool']) => void
   onPlace: (hit: EditorPlacementHit) => void
+  onPlacementRegionStart?: (hit: EditorPlacementHit) => boolean
+  onPlacementRegionPoint?: (pos: Vec3) => void
+  onPlacementRegionEnd?: (cancel: boolean) => void
   onPlacementHover?: (hit: EditorPlacementHit | null) => void
   onPlacementRotate?: (turns: number) => void
   onPlacementCancel?: () => void
@@ -26,6 +30,10 @@ export type EditorViewportState = {
   onCommand: (name: 'undo' | 'redo' | 'delete' | 'group' | 'ungroup' | 'select-all' | 'deselect' | 'duplicate' | 'copy' | 'paste' | 'repeat') => void
 }
 
+export type EditorBlockRender = {
+  geometry: T.BufferGeometry
+  materials: (T.MeshLambertMaterial | T.MeshBasicMaterial)[]
+}
 type Bridge = {
   canvas: HTMLCanvasElement
   host: HTMLDivElement
@@ -34,7 +42,8 @@ type Bridge = {
   navigation: (enabled: boolean) => void
   invalidate: () => void
   message: (text: string) => void
-  geometry: (block: SceneBlock) => T.BufferGeometry
+  renderBlock: (block: SceneBlock) => EditorBlockRender
+  onGhostChange?: () => void
 }
 type Modal = {
   kind: 'move' | 'rotate'; origin: T.Vector3; startX: number; startY: number
@@ -66,7 +75,7 @@ export class EditorInteraction {
   anchor = new T.Group()
   outlines = new T.Group()
   ghost = new T.Group()
-  ghostMaterial = new T.MeshBasicMaterial({ color: '#8ce1af', wireframe: true, transparent: true, opacity: .65, depthTest: false })
+  ghostMaterials = new Map<T.Material, { valid: T.MeshLambertMaterial | T.MeshBasicMaterial; invalid: T.MeshLambertMaterial | T.MeshBasicMaterial }>()
   selectedKey = ''
   active: string | null = null
   ghostState?: EditorViewportState['ghost']
@@ -84,6 +93,9 @@ export class EditorInteraction {
   handleMetadataKey = ''
   boxStart: [number, number] | null = null
   boxArmed = false
+  boxExplicit = false
+  boxToggle = false
+  pendingModal: {kind:Modal['kind'];from:EditorViewportState['tool'];blocks:SceneBlock[];selection:string} | null = null
   rectangle: HTMLDivElement
   bridge: Bridge
   constructor(bridge: Bridge) {
@@ -106,7 +118,7 @@ export class EditorInteraction {
   update(state: EditorViewportState | undefined, blocks: SceneBlock[], resourcesChanged = false) {
     if(state?.selectableOwners!==this.state?.selectableOwners)this.selectableOwners=state?.selectableOwners?new Set(state.selectableOwners):null
     const selectionKey = state?.selected.join('\u0000') ?? ''
-    if ((!state || selectionKey !== this.selectedKey || blocks !== this.blocks || state.tool !== this.state?.tool) && (this.modal || this.dragging)) this.cancel()
+    if ((!state || selectionKey !== this.selectedKey || blocks !== this.blocks || state.tool !== this.state?.tool) && (this.modal || this.dragging || this.boxStart || this.boxArmed)) this.cancel()
     const selectionChanged = this.blocks !== blocks || selectionKey !== this.selectedKey || this.active !== (state?.active ?? null)
     this.state = state; this.blocks = blocks; this.selectedKey = selectionKey
     this.active = state?.active ?? null
@@ -125,15 +137,62 @@ export class EditorInteraction {
       for (const [id, box] of boxes) this.outlines.add(new T.Box3Helper(box, id === state?.active ? '#ffe3a1' : '#8ce1af'))
     }
     if (resourcesChanged || state?.ghost !== this.ghostState) {
-      this.ghost.clear(); this.ghostState = state?.ghost
-      this.ghostMaterial.color.set(state?.ghost?.valid === false ? '#ff6c69' : '#8ce1af')
+      this.clearGhostMeshes(); this.ghostState = state?.ghost
+      const textured = new Set<T.Material>(), opacities = new Set<number>()
+      const batches = new Map<string, { geometry: T.BufferGeometry; materials: (T.MeshLambertMaterial | T.MeshBasicMaterial)[]; positions: Vec3[] }>()
+      let cells = 0
       for (const block of state?.ghost?.blocks ?? []) {
-        const mesh = new T.Mesh(this.bridge.geometry(block), this.ghostMaterial)
-        mesh.position.set(block.pos[0] + .5, block.pos[1] + .5, block.pos[2] + .5)
+        if (['minecraft:air', 'minecraft:cave_air', 'minecraft:void_air'].includes(block.state.name)) continue
+        const rendered = this.bridge.renderBlock(block)
+        const batchKey = `${rendered.geometry.id}|${rendered.materials.map(material => material.uuid).join(',')}`
+        const existing = batches.get(batchKey)
+        cells++
+        if (existing) { existing.positions.push(block.pos); continue }
+        const materials = rendered.materials.map(source => {
+          let variants = this.ghostMaterials.get(source)
+          if (!variants) {
+            const valid = source.clone()
+            valid.transparent = true; valid.opacity *= .45; valid.alphaTest *= .45; valid.depthWrite = false
+            valid.wireframe = false; valid.polygonOffset = true; valid.polygonOffsetFactor = -1; valid.polygonOffsetUnits = -1
+            const invalid = valid.clone()
+            invalid.color.lerp(new T.Color('#ff6c69'), .65)
+            variants = { valid, invalid }; this.ghostMaterials.set(source, variants)
+          }
+          const material = state?.ghost?.valid === false ? variants.invalid : variants.valid
+          if (material.map) textured.add(material)
+          opacities.add(material.opacity)
+          return material
+        })
+        batches.set(batchKey, { geometry: rendered.geometry, materials, positions: [block.pos] })
+      }
+      const matrix = new T.Matrix4()
+      for (const batch of batches.values()) {
+        const mesh = new T.InstancedMesh(batch.geometry, batch.materials, batch.positions.length)
+        batch.positions.forEach((pos, index) => mesh.setMatrixAt(index, matrix.makeTranslation(pos[0] + .5, pos[1] + .5, pos[2] + .5)))
+        mesh.instanceMatrix.needsUpdate = true; mesh.computeBoundingBox(); mesh.computeBoundingSphere()
         mesh.renderOrder = 5; this.ghost.add(mesh)
       }
+      this.bridge.canvas.dataset.editorGhostCells = String(cells)
+      this.bridge.canvas.dataset.editorGhostBatches = String(batches.size)
+      this.bridge.canvas.dataset.editorGhostTexturedMaterials = String(textured.size)
+      this.bridge.canvas.dataset.editorGhostOpacity = [...opacities].sort((a, b) => a - b).join(',')
+      this.bridge.onGhostChange?.()
+    }
+    const requested = this.pendingModal
+    if (requested) {
+      if(!state||blocks!==requested.blocks||selectionKey!==requested.selection||![requested.from,requested.kind].includes(state.tool))this.pendingModal=null
+      else if(state.tool===requested.kind){this.pendingModal=null;this.startModal(requested.kind)}
     }
     this.syncTransform(); this.bridge.invalidate()
+  }
+  clearGhostMeshes() {
+    for (const mesh of this.ghost.children) (mesh as T.InstancedMesh).dispose()
+    this.ghost.clear()
+  }
+  clearGhostMaterials() {
+    this.clearGhostMeshes(); this.ghostState = undefined
+    for (const variants of this.ghostMaterials.values()) { variants.valid.dispose(); variants.invalid.dispose() }
+    this.ghostMaterials.clear()
   }
   syncTransform() {
     this.transform.camera = this.bridge.camera()
@@ -223,6 +282,7 @@ export class EditorInteraction {
     this.cancelled = true
     if (this.dragging) { this.transform.reset(); this.transform.dragging = false }
     this.dragging = false; this.modal = null; this.lastIntent = ''; this.boxStart = null; this.boxArmed = false
+    this.suppressClick = true
     this.rectangle.style.display = 'none'; this.transform.enabled = true; this.bridge.navigation(true)
     this.state?.onTransform(intent, 'cancel')
     this.bridge.canvas.dataset.gizmoEvent = 'cancel'
@@ -255,15 +315,22 @@ export class EditorInteraction {
   }
   startModal(kind: Modal['kind']) {
     const state = this.state
-    if (!state?.selected.length) { this.bridge.message('Select an object first.'); return }
+    if (!state?.selected.length) return
     if (this.modal || this.dragging) this.cancel()
     this.lastIntent = ''
     const [startX, startY] = this.lastPointer
     this.modal = { kind, origin: this.planePoint(startX, startY, new T.Vector3(...state.pivot)), startX, startY, axis: kind === 'rotate' ? 1 : null, plane: false, numeric: '', intent: kind === 'move' ? { kind, delta: [0, 0, 0] } : { kind, turns: 0 }, base: [0, 0, 0], baseTurns: 0, navigating: false }
     this.transform.detach(); this.transform.enabled = false
     this.bridge.canvas.dataset.transformMode = kind
-    this.bridge.message(kind === 'move' ? 'Move: X/Y/Z axis · Shift+axis plane · type blocks · Enter/click confirm · Esc/right click cancel' : 'Rotate Y: type degrees (90° steps) · Enter/click confirm · Esc/right click cancel')
     this.emit(this.modal.intent); this.bridge.invalidate()
+  }
+  requestTool(tool: EditorViewportState['tool'], modal = false) {
+    if (this.modal || this.dragging || this.boxStart || this.boxArmed) this.cancel()
+    this.pendingModal = modal && (tool === 'move' || tool === 'rotate') && this.state ? {kind:tool,from:this.state.tool,blocks:this.blocks,selection:this.selectedKey} : null
+    this.state?.onTool?.(tool)
+    if (this.pendingModal && (this.state?.tool === tool || !this.state?.onTool)) {
+      const {kind} = this.pendingModal; this.pendingModal = null; this.startModal(kind)
+    }
   }
   updateModal(x = this.lastPointer[0], y = this.lastPointer[1]) {
     const modal = this.modal, state = this.state
@@ -305,20 +372,26 @@ export class EditorInteraction {
       return false
     }
     if (e.button !== 0) return false
-    if (this.state.tool === 'box' || this.boxArmed) {
-      this.boxStart = [e.clientX, e.clientY]; this.rectangle.style.display = 'block'
-      this.drawRectangle(e.clientX, e.clientY); return true
-    }
     if (this.transform.object) {
       const rect = this.bridge.canvas.getBoundingClientRect()
       this.transform.pointerHover({ x: (e.clientX - rect.left) / rect.width * 2 - 1, y: -(e.clientY - rect.top) / rect.height * 2 + 1, button: e.button } as unknown as PointerEvent)
       if (this.transform.axis) { this.suppressClick = true; return false }
     }
+    if (this.state.tool !== 'place' || this.boxArmed) {
+      this.boxExplicit = this.state.tool === 'box' || this.boxArmed
+      this.boxToggle = e.shiftKey
+      this.boxStart = [e.clientX, e.clientY]
+      // Ordinary editing distinguishes a click from a rectangle by a small drag threshold.
+      if (this.boxExplicit) { this.drawRectangle(e.clientX, e.clientY); return true }
+    }
     return false
   }
   pointerMove(e: PointerEvent) {
     this.lastPointer = [e.clientX, e.clientY]
-    if (this.boxStart) { this.drawRectangle(e.clientX, e.clientY); return true }
+    if (this.boxStart) {
+      if (this.boxExplicit || Math.hypot(e.clientX-this.boxStart[0], e.clientY-this.boxStart[1]) >= 5) this.drawRectangle(e.clientX, e.clientY)
+      return true
+    }
     if (this.modal) { if (!this.modal.navigating) this.updateModal(e.clientX, e.clientY); return true }
     if (this.dragging && this.transform.mode === 'rotate' && this.rotationStartVector) {
       const end = this.yPlaneVector(e.clientX, e.clientY), start = this.rotationStartVector
@@ -354,16 +427,18 @@ export class EditorInteraction {
     }
     if (e.button === 0 && this.boxStart) {
       const [x, y] = this.boxStart
+      const dragged = this.boxExplicit || Math.hypot(e.clientX-x, e.clientY-y) >= 5
       const rect = [Math.min(x, e.clientX), Math.min(y, e.clientY), Math.max(x, e.clientX), Math.max(y, e.clientY)]
-      this.state?.onSelect(this.boxSelection(rect), e.shiftKey)
-      this.boxStart = null; this.boxArmed = false; this.rectangle.style.display = 'none'; return true
+      this.boxStart = null; this.boxArmed = false; this.rectangle.style.display = 'none'
+      if (dragged) this.state?.onSelect(this.boxSelection(rect), this.boxToggle)
+      return dragged
     }
     if (this.suppressClick) { this.suppressClick = false; return true }
     return Boolean(this.modal || this.dragging)
   }
   drawRectangle(x: number, y: number) {
     const [sx, sy] = this.boxStart!, host = this.bridge.host.getBoundingClientRect()
-    Object.assign(this.rectangle.style, { left: `${Math.min(x, sx) - host.left}px`, top: `${Math.min(y, sy) - host.top}px`, width: `${Math.abs(x - sx)}px`, height: `${Math.abs(y - sy)}px` })
+    Object.assign(this.rectangle.style, { display: 'block', left: `${Math.min(x, sx) - host.left}px`, top: `${Math.min(y, sy) - host.top}px`, width: `${Math.abs(x - sx)}px`, height: `${Math.abs(y - sy)}px` })
   }
   boxSelection(rect: number[]) {
     // Through-selection: every logical owner's projected cell bounds intersecting the rectangle.
@@ -391,8 +466,14 @@ export class EditorInteraction {
   keyDown(e: KeyboardEvent) {
     const state = this.state
     if (!state) return false
+    const plain = !e.ctrlKey && !e.metaKey && !e.altKey
+    if (plain && (e.code === 'KeyQ' || e.code === 'KeyE')) {
+      if (!e.repeat) this.requestTool(e.code === 'KeyQ' ? 'select' : 'place')
+      return true
+    }
     if (e.code === 'Escape' && (this.modal || this.dragging || this.boxArmed || this.boxStart)) { this.cancel(); return true }
     if (this.modal) {
+      if (plain && (e.code === 'KeyG' || e.code === 'KeyR')) { if (!e.repeat) this.requestTool(e.code === 'KeyG' ? 'move' : 'rotate', true); return true }
       if (e.code === 'Enter' || e.code === 'NumpadEnter') { this.commitModal(); return true }
       const axis = ['KeyX', 'KeyY', 'KeyZ'].indexOf(e.code)
       if (axis >= 0) {
@@ -412,21 +493,20 @@ export class EditorInteraction {
       if ((e.code==='Enter'||e.code==='NumpadEnter') && state.onPlacementConfirm) {state.onPlacementConfirm();return true}
       if (e.code === 'KeyR') { state.onPlacementRotate?.(e.shiftKey ? -1 : 1); return true }
       if (e.code === 'Escape') { state.onPlacementCancel?.(); return true }
-      // Moving the selected object while placing is ambiguous; choose Move first.
-      if (e.code === 'KeyG') return true
     }
     if (e.code === 'KeyG' && (e.ctrlKey || e.metaKey)) { state.onCommand(e.altKey ? 'ungroup' : 'group'); return true }
     if (e.code === 'KeyZ' && (e.ctrlKey || e.metaKey)) { state.onCommand(e.shiftKey ? 'redo' : 'undo'); return true }
     if (e.code === 'Delete' || e.code === 'Backspace') { state.onCommand('delete'); return true }
-    if (e.code === 'KeyA' && !e.ctrlKey && !e.metaKey) { state.onCommand(e.altKey ? 'deselect' : 'select-all'); return true }
-    if (e.code === 'KeyG' || e.code === 'KeyR') { this.startModal(e.code === 'KeyG' ? 'move' : 'rotate'); return true }
-    if (e.code === 'KeyB') { this.boxArmed = true; this.bridge.message('Drag a rectangle to select through logical object bounds. Shift adds/removes selection.'); return true }
+    if (e.code === 'KeyA' && !e.shiftKey) { if (state.tool === 'place') this.requestTool('select'); state.onCommand(e.altKey ? 'deselect' : 'select-all'); return true }
+    if (plain && (e.code === 'KeyG' || e.code === 'KeyR')) { if (!e.repeat) this.requestTool(e.code === 'KeyG' ? 'move' : 'rotate', true); return true }
+    if (plain && e.code === 'KeyB') { this.requestTool('box'); this.boxArmed = true; return true }
+    if (e.code === 'Escape') { this.requestTool('select'); return true }
     return false
   }
   dispose() {
     this.transform.dispose()
     this.bridge.scene.remove(this.anchor, this.transform.getHelper(), this.outlines, this.ghost)
     for (const child of this.outlines.children) (child as T.Box3Helper).dispose()
-    this.ghostMaterial.dispose(); this.rectangle.remove()
+    this.clearGhostMaterials(); this.rectangle.remove()
   }
 }

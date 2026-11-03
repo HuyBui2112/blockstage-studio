@@ -1,3 +1,5 @@
 .primitive-action-material { display: block; margin-bottom: 12px; color: var(--muted); overflow-wrap: anywhere; }
 .primitive-action-panel .copy-action-vector + .copy-action-vector { margin-top: 12px; }
 .primitive-action-panel .copy-action-heading { gap: 8px; flex-wrap: wrap; }
+.editor-workspace[data-region-dragging="true"] .primitive-action-panel { visibility: hidden; pointer-events: none; }
+.pointer-region-panel { top: auto; bottom: 14px; left: 14px; transform: none; width: 330px; }

@@ -22,14 +22,18 @@ export function usePrimitiveActions({document,scope,revision,epoch,catalog,rules
     catch(error){return {plan:null,error:error instanceof Error?error.message:String(error)}}
   },[active,document,catalog,epoch,revision,rules])
   function cancel(){owned.current?.abort();owned.current=null;setOperation(null)}
-  function begin(kind:PrimitiveKind,start:Vec3){
+  function begin(kind:PrimitiveKind,start:Vec3,templateState:BlockState=state){
     if(!enabled)return
     cancel()
     const controller=new AbortController();owned.current=controller
-    setOperation({source:document,scope,revision,epoch,catalog,rules,state,resourceKey,id:crypto.randomUUID(),controller,intent:{kind,start:[...start],end:[...start],state:structuredClone(state)}})
+    setOperation({source:document,scope,revision,epoch,catalog,rules,state,resourceKey,id:crypto.randomUUID(),controller,intent:{kind,start:[...start],end:[...start],state:structuredClone(templateState)}})
   }
   function change(intent:PrimitiveIntent){setOperation(previous=>previous?{...previous,intent:{...intent,state:previous.intent.state}}:previous)}
-  function point(end:Vec3){if(active&&end.some((value,index)=>value!==active.intent.end[index]))change({...active.intent,end:[...end]})}
-  function confirm(){if(active&&result?.plan&&onCommit(scope,result.plan))cancel()}
+  function point(end:Vec3){
+    // Native pointer events can arrive before React publishes begin()'s render.
+    // Update the queued operation, preserving its identity and captured template.
+    setOperation(previous=>previous&&enabled&&previous.source===document&&previous.scope===scope&&previous.revision===revision&&previous.epoch===epoch&&previous.catalog===catalog&&previous.rules===rules&&previous.state===state&&previous.resourceKey===resourceKey&&end.some((value,index)=>value!==previous.intent.end[index])?{...previous,intent:{...previous.intent,end:[...end]}}:previous)
+  }
+  function confirm(){if(active&&result?.plan&&onCommit(scope,result.plan)){cancel();return true}return false}
   return {active,result,begin,change,point,confirm,cancel}
 }

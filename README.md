@@ -67,7 +67,10 @@ cài runtime khác hoặc tắt toàn bộ tiến trình Node.
 4. Chọn block/component rồi đặt. **Design** giữ palette state; **Context** derive
    một số axis/half/facing theo mặt click và camera. `R`/`Shift+R` xoay ghost 90°,
    `Esc` hủy. Support notes có giới hạn, không phải mô phỏng game đầy đủ.
-5. Select/Shift-click chọn ô block gần nhất (kể cả model mảnh), hoặc `B` chọn vùng;
+5. `Q` về Select, `E` đặt lại block/component vừa chọn. Click chọn ô gần nhất
+   (kể cả model mảnh), kéo chuột chọn vùng xuyên; Shift-click/kéo thêm hoặc bỏ chọn.
+   `Ctrl+A` chọn tất cả object được phép sửa; `Alt+A` bỏ chọn. Khi đang Place,
+   `Alt+click` chọn nhanh rồi về Select; `G` chuyển thẳng sang Move.
    `G`/`R` transform, nhập số, `Enter`
    commit và `Esc` hủy. `Ctrl+G`/`Ctrl+Alt+G` Group/Ungroup;
    `Ctrl+Z`/`Ctrl+Shift+Z` Undo/Redo. **Save / Ctrl+S** lưu document.
@@ -105,6 +108,14 @@ Hollow box đặt lớp vỏ, giữ nguyên nội dung bên trong. Multi-block t
 footprint chồng nhau hoặc vượt giới hạn sẽ chặn toàn thao tác. Một lần Undo hoàn tác
 cả vùng và các kết nối lân cận. Đổi block/tài nguyên/workspace sẽ hủy preview đang mở.
 
+**Đặt nhanh bằng chuột:** trong Place block, giữ `Ctrl` và kéo để tạo preview mặt
+phẳng theo mặt click đầu tiên (XY/XZ/YZ). Thả chuột giữ preview, `Enter` xác nhận,
+`Esc` hủy; một Undo hoàn tác cả vùng. Hướng/state được chốt ở điểm đầu, kể cả
+Context/yaw; các phần multi-block luôn đầy đủ. Va chạm chặn cả vùng, không bỏ ô
+ngầm. Cách kéo này dành cho block; component dùng Place/Repeat. Ghost dùng model
+và texture bán trong suốt; chỗ va chạm có màu đỏ. `Q`/`E` hủy preview đang mở khi
+chuyển công cụ, không ghi thay đổi. Document/workspace mới bắt đầu ở Select.
+
 **Vật liệu:** mở **Materials** trên toolbar để đếm ô theo Document hoặc Selected
 roots, bật States để tách từng state và tải CSV/JSON. Explicit air được đếm riêng;
 đây là số ô đã đặt, chưa phải số item Survival cần thu thập.
@@ -140,6 +151,18 @@ Workflow nội thất mẫu hai tầng đã có browser slice `interior`: chọn
 Y-range, di chuyển/hủy/thử va chạm, Undo/Redo, lưu/reload và đối chiếu full JSON/NBT.
 Cách chạy và giới hạn fixture được ghi trong tài liệu kỹ thuật; đây chưa thay
 thế thử nghiệm builder hoặc đối chiếu đặt công trình trong Minecraft.
+
+**Dùng lại component:** tạo mẫu trong Component Editor, đặt tên rồi **Save to
+component library**. Trong Architecture mở tab **Components**, chọn mẫu và click
+để đặt; `R` xoay preview. Các bản đặt là copies độc lập: di chuyển/đổi vật liệu một
+bản không cập nhật các bản khác hay mẫu thư viện. Luồng đặt ở hai tầng, xoay,
+sửa riêng một copy và lưu/xuất đã có browser slice `component-reuse`.
+
+Trong **Components**, ô tìm kiếm nhận tên mẫu hoặc block ID bên trong; có thể gõ
+không dấu và nhiều từ, ví dụ `cot oak_log`. Sort theo tên hoặc số ô. Danh sách
+hiển thị 24 mẫu mỗi lượt, **Show more components** mở thêm; thẻ có kích thước và
+số ô lưu trữ. Tìm/sort không chỉnh mẫu hoặc công trình. Chưa có categories hay
+thumbnail 3D; Edit, Import, Export và Remove vẫn hoạt động như trước.
 
 ## Nhập Structure NBT
 
@@ -215,6 +238,14 @@ fnm exec --using 24.19.0 pnpm.cmd check
 Code gate, production browser smoke và game oracle có hướng dẫn tập trung trong
 [tài liệu kỹ thuật](docs/02_TECHNICAL_DESIGN.md). Kết quả đã ghi nhận và những phần
 chưa kiểm chứng nằm trong [hiện trạng](docs/03_STATUS_AND_ROADMAP.md).
+
+Phạm vi nghiệm thu **R1 candidate** nằm ở
+[manifest](scripts/fixtures/r1-scope.json), không phải giới hạn palette trong app
+hoặc tuyên bố bản 1.0 đã sẵn sàng. Gate palette chạy qua `pnpm check`; cần JAR và
+profile local cho phần game assets. Browser slice `r1-house` dựng nhà hai tầng từ
+scene rỗng, có cầu thang/phòng/component và kiểm toàn bộ JSON/NBT; cách chạy nằm
+ở tài liệu kỹ thuật §8.3. Entity/payload/Fabric/GPU thật và nghiệm thu builder vẫn
+có gate riêng.
 
 Không đóng gói game JAR, extracted textures/profile, secrets, cache, world thử
 hoặc browser storage vào Git/build. Không tự commit/push khi chưa được yêu cầu.

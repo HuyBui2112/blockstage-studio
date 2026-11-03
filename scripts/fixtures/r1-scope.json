@@ -1,0 +1,43 @@
+{
+  "schemaVersion": 1,
+  "id": "r1-candidate-1",
+  "status": "candidate",
+  "target": { "gameVersion": "26.2", "dataVersion": 4903 },
+  "clientSha1": "2dc72797acbc1b63fc16a11c4ac393605f453754",
+  "purpose": "Acceptance target only. Not a supported-block allowlist or release-ready declaration. The editor remains able to use other legal registry entries.",
+  "statePolicy": "Every property must be present and legal in the matching profile. Enumerate all legal values except the explicit per-group restrictions below. No fluid, power, AI or tick simulation is promised.",
+  "blockGroups": [
+    { "role": "structure", "ids": ["minecraft:stone", "minecraft:cobblestone", "minecraft:stone_bricks", "minecraft:oak_planks", "minecraft:spruce_planks", "minecraft:birch_planks"], "restrictions": {} },
+    { "role": "beams", "ids": ["minecraft:oak_log", "minecraft:spruce_log", "minecraft:birch_log"], "restrictions": {} },
+    { "role": "stairs", "ids": ["minecraft:oak_stairs", "minecraft:spruce_stairs", "minecraft:birch_stairs"], "restrictions": { "waterlogged": ["false"] } },
+    { "role": "slabs", "ids": ["minecraft:stone_brick_slab", "minecraft:oak_slab", "minecraft:spruce_slab", "minecraft:birch_slab"], "restrictions": { "waterlogged": ["false"] } },
+    { "role": "windows", "ids": ["minecraft:glass"], "restrictions": {} },
+    { "role": "doors", "ids": ["minecraft:oak_door", "minecraft:spruce_door", "minecraft:birch_door"], "restrictions": { "powered": ["false"] } },
+    { "role": "beds", "ids": ["minecraft:red_bed", "minecraft:blue_bed"], "restrictions": { "occupied": ["false"] } },
+    { "role": "fence", "ids": ["minecraft:oak_fence"], "restrictions": { "waterlogged": ["false"] } },
+    { "role": "gate", "ids": ["minecraft:oak_fence_gate"], "restrictions": { "powered": ["false"] } },
+    { "role": "wall", "ids": ["minecraft:cobblestone_wall"], "restrictions": { "waterlogged": ["false"] } },
+    { "role": "foliage", "ids": ["minecraft:oak_leaves"], "restrictions": { "persistent": ["true"], "distance": ["7"], "waterlogged": ["false"] } },
+    { "role": "chain", "ids": ["minecraft:iron_chain"], "restrictions": { "waterlogged": ["false"] } },
+    { "role": "light", "ids": ["minecraft:lantern"], "restrictions": { "waterlogged": ["false"] } },
+    { "role": "clearing", "ids": ["minecraft:air"], "restrictions": {} }
+  ],
+  "entityCandidate": { "id": "minecraft:pig", "scope": "Position and yaw; static appearance/basic export. Editor operations/UI remain pending. No equipment, AI or arbitrary NBT." },
+  "blockEntityCandidate": { "id": "minecraft:chest", "scope": "Dry single chest, four facings, empty and one finite inventory fixture. Typed 26.2 item payload contract and editor/import/export are pending; appearance alone is not payload support." },
+  "formats": { "document": "v2 JSON", "portable": "v1 independent component copies, resource fingerprints only", "structureImport": "26.2/4903 raw/gzip, single palette, complete blocks/pairs; entities and block-entity payloads rejected", "export": "gzip Structure NBT / datapack ZIP; current 48 cells per axis; sparse omission differs from explicit air" },
+  "requiredGates": [
+    "registry-and-complete-state-domains", "appearance-and-pack-lifecycle", "design-placement-and-logical-pairs",
+    "context-placement-by-adapter", "selection-transform-group-component-copy", "material-replacement-by-contract",
+    "neighbors-and-support-by-fixture", "save-recovery-portable-roundtrip", "structure-import-nbt-datapack-export",
+    "basic-entity-editor", "typed-chest-payload", "vanilla-world-readback", "named-fabric-world-readback",
+    "real-hardware-performance", "human-builder-acceptance", "distribution-and-clean-checkout"
+  ],
+  "releaseBlockers": [
+    { "gate": "basic-entity-editor", "status": "pending", "task": "N04/N05" },
+    { "gate": "typed-chest-payload", "status": "pending", "task": "N01/N02/N03/N06" },
+    { "gate": "vanilla-world-readback", "status": "unverified-for-candidate", "task": "R01/G07/Q05" },
+    { "gate": "named-fabric-world-readback", "status": "unverified", "task": "Q02/Q05" },
+    { "gate": "real-hardware-performance", "status": "unverified", "task": "P01/P02/P07" },
+    { "gate": "human-builder-acceptance", "status": "unverified", "task": "Q04" }
+  ]
+}

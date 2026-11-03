@@ -118,6 +118,12 @@ protection/history/revision. Locked owners remain placement surfaces while ray
 selection skips to the nearest eligible cell. Protect final neighbor patches too.
 Materials targets use one registry index and deduplicated source states. Bound
 rendered count rows; exporting counts or changing count scope never edits a document.
+Component catalogue indexes validated assets once per asset-list change, searches
+name/stored block IDs with accent-insensitive token AND matching, and sorts with
+deterministic name/ID ties. Render 24 cards per increment; query/sort are UI only.
+Keep original asset references for actions, counts as stored cells including air,
+and preserve component schema. Categories, thumbnails and lazy storage reads are
+not implied by this L01 catalogue subset.
 
 Visibility is a finite V01/V02/V04 root-owner session subset: hide/lock/isolate
 never change document/history. Locked roots stay drawn and placement surfaces but
@@ -141,6 +147,11 @@ layers and arbitrary clip planes remain unsupported; full K05 remains partial.
   and a Fabric bridge remain outside the current editor milestone.
 
 ## Data contracts
+
+- `scripts/fixtures/r1-scope.json` is an acceptance candidate, not an application
+  palette filter or release READY declaration. Keep pig editing, typed single
+  chest payload, named Fabric/world, real-hardware and human builder gates open.
+  R1 house browser automation and palette bake/NBT tests do not close these gates.
 
 - Minecraft Java **26.2 / DataVersion 4903** is the supported game profile.
 - Coordinates: **+Y up, +X east, +Z south**. A block occupies integer cell `(x,y,z)`;
@@ -191,6 +202,21 @@ layers and arbitrary clip planes remain unsupported; full K05 remains partial.
   alternatives. Minecraft Y is vertical even though Blender usually uses Z-up.
 - Route input by focus and interaction state. Do not intercept typing in fields.
   Camera/view state is independent of the document and asset selection.
+- Select is the default on document/session/workspace boundaries. Q selects, E
+  places the last palette; both cancel staged edits without committing. Normal
+  edit drag selects through whole eligible owner bounds, Shift toggles, Ctrl/Meta+A
+  selects all eligible roots, Alt+A clears. Alt+click in Place selects cells and
+  exits Place. G switches to Move even from Place; empty selection switches tool
+  quietly. R in Place remains ghost yaw; elsewhere it starts legal rotation.
+  Tool transitions wait for updated viewport state before starting modal transforms.
+- Ctrl+drag in block Place stages a fixed-first-face plane via the existing
+  primitive action, with orientation resolved once at the first placement hit.
+  Release freezes the preview; Enter commits, Esc cancels, one Undo removes all.
+  Preserve complete pairs, budgets, collision/neighbor/view guards and stale IDs.
+  Components use Place/Repeat; this gesture is not freehand painting.
+- Ghosts share baked geometry/maps, own cached translucent material clones, batch
+  identical appearances and dispose instance resources on preview replacement.
+  Never mutate committed materials or dispose shared textures/geometry.
 - Future editing: `G` move, `R` legal rotation, `S` resize/repeat (never float voxel
   scaling); isolated preview, explicit atomic commit, cancel without mutation,
   one undo action, collision rejection by default, legal per-family adapters.

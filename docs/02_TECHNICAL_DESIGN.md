@@ -1,6 +1,6 @@
 # 02 — Thiết kế kỹ thuật
 
-Cập nhật: **02/11/2026**. Tài liệu này mô tả hợp đồng và cách vận hành source hiện
+Cập nhật: **03/11/2026**. Tài liệu này mô tả hợp đồng và cách vận hành source hiện
 hành. Mục tiêu dài hạn ở [01 — Mục tiêu sản phẩm](01_PRODUCT_GOALS.md); trạng thái,
 ưu tiên và bằng chứng nghiệm thu ở [03 — Tiến độ](03_STATUS_AND_ROADMAP.md).
 Mục đánh dấu **định hướng** chưa phải chức năng đã triển khai.
@@ -458,9 +458,13 @@ Các edit có thay đổi cells (place/delete/transform/batch states/component p
 | 2D theo trục | Widget XYZ hoặc Numpad 1/3/7; view tự chuyển orthographic |
 | Góc đối diện / projection | Ctrl+Numpad 1/3/7; Numpad 5 hoặc nút projection |
 | Fly | Shift+grave, WASD, Q/E, Shift tăng tốc, Esc thoát; chưa collision |
-| Selection | Click, Shift+click; B/Box chọn xuyên logical bounds |
-| Transform | G/R, axis keys, nhập số, Enter/click commit; Esc/RMB cancel |
+| Chuyển công cụ | Q Select; E Place palette gần nhất; hủy staged edit, giữ selection |
+| Selection | Click; kéo ≥5px chọn vùng xuyên; Shift-click/kéo toggle; B/Box vẫn có |
+| Select all / clear | Ctrl/Meta+A hoặc A chọn editable roots; Alt+A bỏ chọn |
+| Chọn trong Place | Alt+click chọn theo occupied cell và về Select; không đặt block |
+| Transform | G chuyển Move từ mọi tool; R chuyển Rotate ngoài Place; axis/nhập số, Enter/click commit; Esc/RMB cancel |
 | Place yaw | R/Shift+R hoặc nút mũi tên, không transform selection |
+| Dựng vùng bằng chuột | Ctrl+LMB kéo trong Place block; mặt phẳng theo mặt đầu; thả để giữ preview, Enter commit / Esc cancel |
 | Group / Ungroup | Ctrl+G / Ctrl+Alt+G |
 | Save / Undo / Redo / Delete | Ctrl+S / Ctrl+Z / Ctrl+Shift+Z / Delete |
 
@@ -469,6 +473,28 @@ Giữ dark surfaces, typography/khoảng cách/icon nhất quán; giải thích 
 tooltip/help/details, không rải đoạn mô tả thường trực. Có keyboard focus, tên
 truy cập, empty/loading/error và nút thay phím numpad; không đặt control giả.
 Camera orbit/zoom không sửa document hoặc state. Ý nghĩa trục giữ Minecraft Y-up.
+
+Select là mặc định khi mở/chuyển document, session hoặc workspace. Click/drag
+được phân biệt trước khi sửa selection; gizmo bắt handle trước rectangle. Shift
+được chốt lúc bắt đầu kéo. G/R có selection thì chuyển tool rồi mở modal trên
+state mới; chưa chọn thì chỉ bật gizmo tool, không phát cảnh báo. Q/E có thể hủy
+modal để chuyển trực tiếp; G/R trong modal thay thao tác mà không commit bước cũ.
+Các hướng dẫn modal nằm trong Controls/HUD, không đẩy vào thông báo lỗi document.
+
+Ctrl+kéo tái sử dụng `usePrimitiveActions`/`PrimitiveActionPlan`, không tạo writer
+riêng. Chốt state từ `planBlockPlacement` ở điểm đầu (Design/Context + yaw), rồi
+repeat template nguyên vẹn. Ray trong suốt gesture giao với mặt phẳng cố định
+theo face đầu, khóa tọa độ anchor theo trục pháp tuyến; không re-pick bề mặt khác.
+Release giữ nguyên End cho đến khi sửa số/Confirm; di chuột sau release không
+đổi plan. Enter commit đúng finalized preview cùng stable operation IDs, revision,
+budget/collision/neighbor/view guards; Undo một bước. Esc, pointer cancel, release
+ngoài canvas hoặc mất window focus hủy gesture. Đổi nguồn/policy/tool/doc hủy
+preview theo lifecycle hiện có. Giữ Place trong lúc bắt đầu gesture, dùng functional
+state cho các endpoint đến trước render mới để tránh hủy/mất điểm do cập nhật
+React đang chờ. Panel ẩn khi giữ chuột, hiện ở góc dưới khi thả; ở ≤1000px,
+sidebar ẩn thì grid viewport cũng thu về một cột chiếm đủ chiều ngang.
+Chỉ block palette; component vẫn Place/Repeat.
+Không phải freehand paint hoặc dựng đường chéo.
 
 Editor Select/Move/Rotate click chọn ô chiếm chỗ gần nhất, bỏ explicit air; không
 phải click đúng triangle của chain/plant/model mảnh. `CellPicker` xây index chunk
@@ -481,6 +507,16 @@ quy ước tương tác editor, không phải tuyên bố game có hitbox full c
 preview/legacy picking giữ đường raycast model hiện có.
 
 ## 6. Renderer và hiệu năng
+
+Editor ghost dùng chung baked geometry/texture/animation maps với committed
+model, clone/cache material riêng theo source material, opacity nhân 0.45,
+depthWrite=false, giữ depth test/cutout/tint; invalid preview nhuộm đỏ. Không sửa
+material gốc hoặc dùng wireframe thay texture. Các cell cùng geometry/material
+được gom InstancedMesh; khi đổi preview chỉ dispose instance resources, resource
+invalidation/teardown mới dispose clone materials. Không dispose geometry/maps
+mượn từ renderer. Explicit air không tạo ghost mesh; unsupported model giữ fallback
+hiện có, không tuyên bố có model thật. Animation chỉ chạy khi material gắn scene
+hoặc ghost đang sử dụng texture động. Đây chưa phải bằng chứng FPS GPU thật.
 
 Resolver đọc parent/texture aliases, variants/weighted/multipart, elements/faces/
 UV/uvlock/element rotation/rescale từ effective pack index. Baked geometry,
@@ -618,6 +654,29 @@ cần JAR/profile. `BLOCKSTAGE_BROWSER` chọn Chromium đã cài nếu không t
 Harness dùng browser profile riêng, không cần tải browser hoặc đọc profile cá nhân.
 `check` gồm typecheck/lint/unit/build; build không kèm game assets. Game-asset/
 oracle tests có thể skip khi checkout mới thiếu local fixtures; báo rõ số skip.
+
+**R1 candidate:** `scripts/fixtures/r1-scope.json` là target nghiệm thu finite,
+không đổi palette/app schema. `src/core/release-scope.test.ts` kiểm contract và
+giữ các release blockers tường minh; optional local gate xác thực client/profile
+SHA-1, mọi tổ hợp state bị giới hạn, whole-pair yaw, NBT roundtrip và baked JSON
+geometry/texture. Không đồng nhất với pixel parity, Context/world behavior hay
+runtime Fabric. Không có JAR/profile thì phần asset gate skip, hai contract tests
+vẫn chạy. Lệnh riêng:
+
+```powershell
+fnm exec --using 24.19.0 pnpm.cmd exec vitest run src/core/release-scope.test.ts
+$env:BLOCKSTAGE_EDITOR_SLICE = 'r1-house'
+fnm exec --using 24.19.0 pnpm.cmd test:browser
+Remove-Item Env:BLOCKSTAGE_EDITOR_SLICE
+```
+
+Giữ URL/JAR/profile env như ví dụ trên. Full suite cũng gọi `r1-house` sau
+component reuse. Script dựng từ scene rỗng qua public UI, không import authored
+document hoặc inject actions/storage. So toàn bộ file JSON tải về với expected
+map độc lập rồi dùng NBT reader độc lập để so file xuất, kể cả dưới Y filter.
+Report và NBT/expected/screenshot local ở `artifacts/r1-house*`, không đưa game
+assets vào Git. Timing report chỉ là 8 mẫu CDP confirm→hai animation frames với
+software renderer, có harness overhead; không là GPU/FPS/SLO hoặc P02 đã đạt.
 
 **D07 — data-safety acceptance:** full browser suite chạy thêm
 `scripts/data-safety-browser-scenarios.mjs` trước Recovery. Để chạy riêng phần
@@ -1079,6 +1138,52 @@ complete house/builder acceptance, camera collision simulation, GPU benchmark
 hoặc Minecraft world readback. Không có thay đổi runtime editor trong slice này.
 Full production browser suite cũng đạt sau khi ghép `interior`, bao gồm các
 workflow cũ và toàn bộ Save/Documents/fault/crash/recovery.
+
+**Component reuse hai tầng:** `scripts/component-reuse-browser-scenarios.mjs`
+tạo mẫu hai oak logs axis X trong Component Editor từ New/Build, publish thư viện
+và download component JSON làm baseline. Architecture có hai sàn Y0/Y3 và blocker,
+hai copies được đặt bằng pointer ở Y1/Y4, bản trên yaw 90° đổi span X→Z và axis
+X→Z theo expected độc lập. JSON full-scene kiểm nested IDs mới, componentId nguồn,
+move/cancel/collision/Undo/Redo, đổi vật liệu riêng bản dưới; bản trên và exported
+library asset phải deep-equal baseline. Source object IDs không được dùng lại ở
+copies; sửa copy giữ IDs/provenance hiện tại. Save/reload rồi NBT export khi đang
+Y-filter vẫn giữ full 55 cells, size 5×5×5, đối chiếu decoder test độc lập.
+
+Chạy slice `component-reuse` bằng harness/biến URL/JAR/profile đã nêu. Report ở
+ignored `artifacts/component-reuse-workflow.json`, NBT và ảnh từng tầng cùng nơi.
+Build/lint/syntax và native slice đạt. Fixture là component hai logs, chưa có
+logical pair trong cùng reuse journey; pair/copy tests khác không biến nó thành
+full house acceptance. Đây là independent copies với source provenance, không
+linked instance/update propagation. Chưa có builder participant, GPU hoặc world
+readback; phần L01 metadata/categories/preview và full Q04/R1 vẫn có công việc riêng.
+Full production browser regression cũng đạt sau khi ghép reuse scenario; fixture
+tự mở Inspector và chọn lại tool sau view changes, không phụ thuộc panel của bài
+trước. Không thêm dependency hoặc thay đổi runtime/persistence schema.
+
+**L01 catalogue subset:** `ComponentLibrary.tsx` được tách khỏi Workbench, giữ
+callbacks Edit/Select/Import/Export/Remove hiện có. Pure `component-catalogue.ts`
+index validated assets bằng iterative tree traversal, không flatten/clone toàn bộ
+cells. Entries giữ nguyên asset reference, unique block IDs, stored-cell count và
+normalized search text. Index memo theo asset-list identity; query/sort không quét
+lại object tree. Search NFKD + bỏ dấu/đ + lowercase, whitespace tokens theo AND,
+match tên hoặc stored block IDs, không cần resource/profile. Sort Name/Cells asc/
+desc có tie-break normalized name, original name, asset ID xác định độc lập locale.
+
+UI có query/clear, sort, Showing/total, empty-library/no-match và 24-card increments;
+query/sort reset rendered limit, không mutate selection identity/document/history.
+Mỗi thẻ hiển thị tên, declared size và occupied stored cells (bao gồm explicit air,
+không phải survival items). Đây là bounded DOM rendering, không phải lazy storage
+loading: repository vẫn restore danh sách assets theo luồng hiện có. Không đổi
+component schema/DB/dependencies; categories, 3D thumbnails, duplicate/rename quản
+lý thư viện riêng và missing-resource relink chưa được bổ sung.
+
+Code gate đạt **400/400 tests, 41 file**, typecheck/lint/build; 5 catalogue tests
+kiểm accent/token search, stable ties, nested pair/air counts, identity/no-mutation.
+Native slice `component-library` nhập 25 fixtures qua UI, kiểm 24-card/show-more,
+sort/query/clear/selection, unchanged full component export, document/revision/
+history, reload và ảnh 620px. Đã xem ảnh desktop/compact. Full L01 vẫn một phần.
+Full production browser suite cũng đạt với catalogue mới, giữ các luồng Edit/
+publish/place/import/export component và Save/fault/recovery trước đây.
 
 ### 10.5 Typed NBT, unknown data và portable projects — K06
 

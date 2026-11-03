@@ -23,6 +23,7 @@ sót nền tảng, nhưng chưa được gom thành một nguyên nhân khi chư
 | BUG-05 | Đặt đèn treo vào chain khó/sai vị trí hoặc bị đè | **PARTIAL / bounded fix:** mặt ô chain + Context hanging dọc + cảnh báo support hữu hạn; còn side fallback/fluid/support khác | Đã kiểm tra vanilla 26.2; Fabric chưa kiểm chứng | K05/K03, G01/G05/G07, V02 |
 | BUG-06 | Block mảnh/nhỏ khó click để chọn | **RESOLVED trong editor hiện hành:** click theo occupied cell gần nhất, không phụ thuộc mesh mảnh | Theo dõi scene lớn; chưa có GPU/performance claim | K05, V01/V02/V06, P02/P04 |
 | BUG-07 | Open saved tích tụ Untitled component/bản làm dở, không có nút xóa | **RESOLVED cho quản lý v2 hiện tại:** Documents mở/rename/delete, discard; draft riêng/Recovery và chống ghi lại sau xóa đã có | Tiếp tục portable/storage health, không coi recovery là backup ngoài origin | K04, D01–D04, D07 |
+| BUG-08 | Chuyển Select/Place/Move rườm rà, G bị bỏ qua trong Place, thiếu Ctrl+A/kéo chọn trực tiếp; ghost chỉ wireframe | **Đã sửa trong interaction subset:** Q/E, Alt-click trong Place, G chuyển Move, Ctrl/Meta+A, kéo chọn trực tiếp; Ctrl+kéo plane và ghost texture | Xem bằng chứng và giới hạn cập nhật trong tài liệu 03 | G03, B09, V02/Q04 |
 
 BUG-05 đã có oracle lantern/chain riêng; fixture block khác không chứng minh luật
 treo đèn. Không tự gán mọi renderer hoặc block chức năng là lỗi. Nội dung “đã đọc
