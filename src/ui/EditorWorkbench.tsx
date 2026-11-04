@@ -163,6 +163,8 @@ export function EditorWorkbench({ resources, session, workspace, onWorkspace, on
   const pivot2 = useMemo(() => active ? selectionPivot2(document, slot.selection, pivotMode) : [0, 0, 0] as Vec3, [document, slot.selection, pivotMode, active])
   const copyActions=useCopyActions(session,scope,!readOnly&&session.ready&&resources.ready&&!session.busy[scope]&&!documentsOpen&&!structureImportOpen&&!exportSnapshot,resources.catalog,session.autoConnections[scope]?resources.profile?.neighborRules:undefined)
   const primitiveResourceKey=useMemo(()=>({resolver:resources.resolver,profile:resources.profile,packs:resources.packs,viewState}),[resources.resolver,resources.profile,resources.packs,viewState])
+  const transformConnections=session.autoConnections[scope]
+  const transformContext=useMemo(()=>({resources:primitiveResourceKey,catalog:resources.catalog,connections:transformConnections,scope,pivotMode}),[primitiveResourceKey,resources.catalog,transformConnections,scope,pivotMode])
   const primitiveActions=usePrimitiveActions({document,scope,revision:slot.revision,epoch:slot.epoch,catalog:resources.catalog,rules:session.autoConnections[scope]?resources.profile?.neighborRules:undefined,state,enabled:!readOnly&&session.ready&&resources.ready&&!session.busy[scope]&&!documentsOpen&&!structureImportOpen&&!exportSnapshot&&libraryTab==='blocks',resourceKey:primitiveResourceKey,onCommit:session.commitPrimitive})
   const materialActions=useMaterialActions({document,scope,revision:slot.revision,epoch:slot.epoch,selection:slot.selection,catalog:resources.catalog,rules:session.autoConnections[scope]?resources.profile?.neighborRules:undefined,enabled:!readOnly&&session.ready&&resources.ready&&!session.busy[scope]&&!documentsOpen&&!structureImportOpen&&!exportSnapshot,resourceKey:primitiveResourceKey,onCommit:session.commitMaterial})
   function protectionError(plan: { document: EditorDocument } | undefined | null) { if (!plan) return ""; try { assertViewEdit(document, plan.document, viewState); return "" } catch (error) { return error instanceof Error ? error.message : "Protected objects cannot be changed" } }
@@ -218,6 +220,7 @@ export function EditorWorkbench({ resources, session, workspace, onWorkspace, on
   }
   const editor: EditorViewportState | undefined = readOnly || !loaded ? undefined : {
     revisionKey:`${scope}:${document.id}:${slot.epoch}:${slot.revision}`,
+    transformContext,
     selectableOwners,
     tool:materialActions.active||primitiveActions.active||copyActions.active?'place':tool, selected: slot.selection, active: slot.selection.at(-1) ?? null, space,
     pivot: pivot2.map(value => value / 2) as [number, number, number], localYaw: active?.orientation ?? 0,

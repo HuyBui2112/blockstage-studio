@@ -644,6 +644,29 @@ Clip/local và editor hide/isolate/Y filtering cập nhật cùng snapshot rende
 không đổi collision/document/history policy. Opt-in probe ghi counters chunk thay
 đổi, batch giữ lại và cell resolve; URL thường không serialize chúng ra DOM.
 
+Numeric modal preview giữ intent mới nhất đồng bộ. Từ 25.000 visible cells, gõ số,
+Backspace và thay axis khi có numeric text gộp đến frame sau idle deadline 75 ms
+hoặc maximum deadline 200 ms mỗi pending window; nhỏ hơn ngưỡng giữ delivery tức
+thì. RAF chỉ chạy khi có pending work; timeout fallback nếu môi trường thiếu RAF.
+Đây là thời hạn scheduling, không bảo đảm wall-clock khi main thread bận/tab ẩn.
+Pointer/gizmo không có numeric input vẫn theo đường hiện tại. Enter/click commit
+hủy pending preview rồi chuyển intent cuối cho session full validation hiện hành;
+không flush giá trị trung gian, không lấy preview cũ làm validation proof.
+
+Esc/tool transitions, dispose, scene/revision/resource changes và transform context
+(scope, view policy, catalog, auto connections, pivot mode/space) hủy pending work.
+Callback-only render không tự hủy gesture. Queue giữ tối đa một intent, clear mọi
+frame/timer trước callback để reentrant scheduling có window riêng. Invalid fractional/
+NaN numeric input vẫn đi qua domain và bị từ chối, không làm tròn âm thầm.
+Deferred delivery đi qua viewport bridge: `flushSync` publish React-owned ghost,
+retire redundant scheduled viewport RAF rồi render ngay trong numeric RAF hiện tại.
+Chỉ đường delivery deferred dùng bridge này, không dùng trong effect/start-modal,
+commit hoặc pointer/gizmo thông thường; disposed controller không vẽ. Render vẫn
+cập nhật animation/navigation và chỉ giữ frame kế nếu chúng đang cần. Đây là CPU
+submission, không bảo đảm GPU completion/presentation. Probe ghi numeric schedule,
+delivery, viewport props và whole-sequence counts ngoài final-key metric; mọi event
+phải thuộc cửa sổ action, không lấy viewport event của commit/Undo đến sau.
+
 ### 6.2 Kiểm kê Fabric chỉ đọc
 
 `pnpm check:fabric` tìm metadata versions ở vị trí `.minecraft` thông thường;

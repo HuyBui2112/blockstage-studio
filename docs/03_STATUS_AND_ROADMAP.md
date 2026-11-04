@@ -1166,6 +1166,64 @@ lượt modal preview lặp khi nhập số trước khi chọn P03 incremental 
 coalescing; giữ full trust-boundary validation và differential parity. Camera/GPU
 execution/FPS, memory retention dài hạn và human builder gate tiếp tục UNVERIFIED.
 
+**Cập nhật numeric preview — 04/11/2026:** modal giữ intent cuối đồng bộ, nhưng từ
+25.000 visible cells gộp numeric input/Backspace/axis thành một pending intent.
+Deadline idle 75 ms / maximum 200 ms, delivery ở RAF; scene nhỏ không thêm delay.
+Queue dừng mọi frame/timer sau delivery/cancel/dispose, không có idle loop. Enter/
+click hủy queue và commit intent cuối qua full validation hiện hành; Esc, tool,
+document/revision/selection/resources/policy/pivot/space changes không phát preview
+muộn. Callback-only render giữ gesture. Fractional/NaN input vẫn bị domain từ chối.
+Không triển khai incremental validation, cache proof hoặc nới trust boundary.
+
+Đường deferred dùng bridge publish React ghost rồi render trong frame đang sở hữu
+delivery; retire viewport RAF dư và kiểm tra disposed trước render. Gộp phím đơn
+thuần đã giảm số validation nhưng tăng final-key latency trong các thử nghiệm;
+không giữ nó như giải pháp độc lập. Reports attempts được giữ trong `artifacts/`
+để không giấu regression. Không kết luận browser timer hay React là nguyên nhân
+duy nhất từ các khoảng thời gian chưa instrument. Probe hiện có viewport-props,
+numeric schedule/delivery và whole-sequence counts, giới hạn đúng action window.
+Whole-sequence timestamp có CDP overhead, khác native final-key→CPU frame metric.
+
+Code gate đạt **582/582 tests, 51 file**, typecheck/lint/build. Regression gồm
+latest-value burst, 200 ms scheduling maximum, reentrant queue, Enter trước delivery,
+Esc/tool/context/dispose, callback-only renders, scene nhỏ tức thì và invalid input.
+Full native production browser regression đã đạt sau tích hợp: resource import/
+precedence/animation, editor keyboard/mouse/transforms, paired blocks, neighbor
+patches, copy/build/materials, visibility/Y, component reuse/R1 house, NBT/portable
+và Save/draft/fault/recovery. URL thường không có measurement getter/frame telemetry;
+không có runtime exceptions. Đã kiểm ảnh ghost/viewport sau chạy; UI không đổi.
+
+Đo cùng fixture dense seed 1, root Y+256, Intel UHD/D3D11/Edge 156, viewport
+1500×1000/DPR1, **30 mẫu/3 warmup**; resources/profile/fixture hashes khớp. Metric
+là native final-key→exact preview CPU frame submission, không phải GPU latency:
+
+| Cells | Preview p95 trước → sau (ms) | Whole G→Y→256 preview full validation calls sau |
+| --- | --- | --- |
+| 10.000 | 29,4 → 28,5 | 4 (giữ đường tức thì) |
+| 100.000 | 569,5 → 344,7 | 2 (zero-intent ban đầu + numeric cuối) |
+
+Mỗi final preview vẫn full-validate một lần; mỗi commit một lần. Native burst
+`256 Enter` trước delivery commit đúng intent cuối, một Undo khôi phục; `256 Esc`
+không mutation hoặc validation muộn sau 300 ms. Final public JSON và toàn bộ CPU
+instance-buffer/owner/state readback khớp fixture ở cả hai size; idle one-second
+bằng 0 frame. Reports local: `editor-numeric-before.json`, `editor-numeric-after.json`,
+`editor-numeric-comparison.json`. After report ghi target visible/focused và đưa lên
+foreground rõ ràng; baseline cũ chưa ghi visibility, không coi điều kiện tab là
+đối chứng được kiểm soát. Các runs tuần tự còn background/thermal/GC variation;
+không quy toàn bộ timing delta cho code hoặc suy SLO từ một máy. Whole-sequence
+p95 sau là 115,3/613,3 ms, có CDP overhead, chưa có baseline cùng contract này.
+Smoke chọn-all pairs/component **25k, 1 mẫu/0 warmup** đạt native immediate Enter,
+Esc không phát muộn, one-Undo và full document/instance readback:
+`editor-numeric-pairs-components-smoke.json`. Đây là correctness smoke, không chốt
+SLO: pair selection-all Undo quan sát 3,27 s ở mẫu này, cần profile riêng; không
+suy số đo dense root đơn sang transform toàn bộ scene có nhiều multi-block.
+
+P03 incremental validation vẫn chưa triển khai. **Đề xuất tiếp:** profile full
+schema/candidate allocation ở 100k và thiết kế proof cho changed roots + occupancy
+index, giữ import/load/full commit gate đến khi differential parity được chứng minh.
+Không mở rộng thành worker/full renderer rewrite chỉ vì còn độ trễ; 100k preview
+345 ms vẫn chưa là tương tác mượt hoặc R1 hardware/builder acceptance.
+
 **Q02:** audit chỉ đọc tìm bốn candidate version manifests, báo
 `INSTANCE_SELECTION_REQUIRED`. Một candidate `content 26.2` có embedded
 26.2/4903, Fabric Loader 0.19.5, Fabric API 0.161.0+26.2, 12 available root mod

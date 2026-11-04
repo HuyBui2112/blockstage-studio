@@ -228,6 +228,18 @@ layers and arbitrary clip planes remain unsupported; full K05 remains partial.
   alternatives. Minecraft Y is vertical even though Blender usually uses Z-up.
 - Route input by focus and interaction state. Do not intercept typing in fields.
   Camera/view state is independent of the document and asset selection.
+  Large-scene numeric modal previews (>=25k visible cells) coalesce latest intent
+  at the next frame after 75ms idle / 200ms max scheduling window; smaller scenes
+  stay immediate. RAF only runs while pending, with timeout fallback without RAF.
+  Intent updates synchronously. Enter/click cancels pending preview and commits
+  latest intent with fresh full validation; Esc/tool/context/dispose cancels timers
+  without flushing. Context includes revision, scope, resource/catalog, view policy,
+  connections, pivot and coordinate space. Callback-only renders keep the gesture.
+  No frames/timers outside pending numeric work; main-thread blocking or hidden
+  tabs can delay delivery. Cancel every scheduling handle before callbacks.
+  Deferred numeric delivery synchronizes the React ghost and renders in its owning
+  RAF via the viewport bridge; cancel the redundant viewport RAF first and respect
+  disposal. Never force this publication from an effect or normal modal start.
 - Select is the default on document/session/workspace boundaries. Q selects, E
   places the last palette; both cancel staged edits without committing. Normal
   edit drag selects through whole eligible owner bounds, Shift toggles, Ctrl/Meta+A

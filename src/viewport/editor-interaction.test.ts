@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import * as T from 'three'
 import { constrainedDelta, EditorInteraction, localDelta, rectanglesOverlap, type EditorViewportState } from './editor-interaction'
 import type { SceneBlock } from '../core/schema'
@@ -6,7 +6,7 @@ import { DEMO_MATERIALS } from '../core/catalog'
 import { newEditorDocument, type EditorObject } from '../editor/model'
 import { previewTransform, type TransformPreview } from '../editor/operations'
 
-function fixture() {
+function fixture(large=false) {
   const rectangle = { style: {}, setAttribute: vi.fn(), remove: vi.fn() }
   vi.stubGlobal('document', { createElement: () => rectangle })
   const canvas = Object.assign(new EventTarget(), { style: {}, dataset: {} as Record<string, string>, getBoundingClientRect: () => ({ left: 0, top: 0, width: 600, height: 400 }) }) as unknown as HTMLCanvasElement
@@ -19,6 +19,7 @@ function fixture() {
   const editor = new EditorInteraction({ canvas, host: { append: vi.fn(), getBoundingClientRect: () => ({ left: 0, top: 0 }) } as unknown as HTMLDivElement, scene: new T.Scene(), camera: () => camera, navigation, invalidate: vi.fn(), message: vi.fn(), renderBlock: () => ({ geometry, materials: [material] }) })
   const state: EditorViewportState = { tool: 'move', selected: ['a'], active: 'a', space: 'local', pivot: [.5, .5, .5], localYaw: 1, onSelect: vi.fn(), onPlace: vi.fn(), onTransform: vi.fn(), onCommand: vi.fn() }
   const blocks: SceneBlock[] = [{ owner: 'a', pos: [0, 0, 0], state: { name: 'minecraft:stone', properties: {} } }, { owner: 'b', pos: [4, 0, 0], state: { name: 'minecraft:stone', properties: {} } }]
+  if(large)for(let index=2;index<25000;index++)blocks.push({owner:'background',pos:[index,0,0],state:blocks[0].state})
   editor.update(state, blocks)
   editor.lastPointer = [300, 200]
   return { editor, state, blocks, navigation, geometry, material, texture, alphaMap, canvas }
@@ -27,9 +28,81 @@ function keyboard(code: string, key = '', extra = {}) {
   return { code, key, ctrlKey: false, altKey: false, shiftKey: false, metaKey: false, ...extra } as KeyboardEvent
 }
 
-afterEach(() => vi.unstubAllGlobals())
+beforeEach(()=>vi.useFakeTimers())
+afterEach(() => {vi.useRealTimers();vi.unstubAllGlobals()})
 
 describe('grid-safe editor viewport input', () => {
+  it('keeps small-scene numeric previews immediate without timers',()=>{
+    const {editor,state}=fixture()
+    editor.startModal('move');vi.mocked(state.onTransform).mockClear()
+    editor.keyDown(keyboard('','3'))
+    expect(state.onTransform).toHaveBeenCalledExactlyOnceWith({kind:'move',delta:[0,0,3]},'preview')
+    expect(vi.getTimerCount()).toBe(0)
+    editor.dispose()
+  })
+  it('coalesces numeric input to the latest preview and commits immediately before its timer',()=>{
+    const {editor,state}=fixture(true)
+    editor.startModal('move')
+    vi.mocked(state.onTransform).mockClear()
+    for(const char of '256')editor.keyDown(keyboard('',char))
+    expect(state.onTransform).not.toHaveBeenCalled()
+    expect(editor.bridge.canvas.dataset.transformIntent).toBe(JSON.stringify({kind:'move',delta:[0,0,256]}))
+    vi.advanceTimersByTime(75)
+    expect(state.onTransform).toHaveBeenCalledExactlyOnceWith({kind:'move',delta:[0,0,256]},'preview')
+    editor.keyDown(keyboard('Backspace'))
+    editor.keyDown(keyboard('Enter'))
+    expect(state.onTransform).toHaveBeenLastCalledWith({kind:'move',delta:[0,0,25]},'commit')
+    vi.advanceTimersByTime(300)
+    expect(state.onTransform).toHaveBeenCalledTimes(2)
+    editor.dispose()
+  })
+  it.each(['Escape','KeyQ','KeyE','KeyR'])('cancels pending numeric delivery on %s',code=>{
+    const {editor,state}=fixture(true)
+    editor.startModal('move');editor.keyDown(keyboard('','2'));editor.keyDown(keyboard(code))
+    const calls=vi.mocked(state.onTransform).mock.calls.length
+    vi.advanceTimersByTime(300)
+    expect(state.onTransform).toHaveBeenCalledTimes(calls)
+    expect(vi.mocked(state.onTransform).mock.calls.some(call=>call[1]==='commit')).toBe(false)
+    editor.dispose()
+  })
+  it.each(['revision','context','space','pivot','resource','selection','blocks','absent'])('drops pending preview when %s changes',change=>{
+    const {editor,state,blocks}=fixture(true)
+    editor.startModal('move');editor.keyDown(keyboard('','2'))
+    const next={...state}
+    if(change==='revision')next.revisionKey='other:1'
+    if(change==='context')next.transformContext={}
+    if(change==='space')next.space='global'
+    if(change==='pivot')next.pivot=[2,2,2]
+    if(change==='selection')next.selected=['b']
+    editor.update(change==='absent'?undefined:next,change==='blocks'?[...blocks]:blocks,change==='resource')
+    expect(editor.modal).toBeNull()
+    const calls=vi.mocked(state.onTransform).mock.calls.length
+    vi.advanceTimersByTime(300)
+    expect(state.onTransform).toHaveBeenCalledTimes(calls)
+    expect(vi.mocked(state.onTransform).mock.calls.some(call=>call[1]==='commit')).toBe(false)
+    editor.dispose()
+  })
+  it('keeps pending preview across callback-only renders and drops it at disposal',()=>{
+    const {editor,state,blocks}=fixture(true),latest=vi.fn()
+    editor.startModal('move');editor.keyDown(keyboard('','2'))
+    editor.update({...state,onTransform:latest},blocks)
+    vi.advanceTimersByTime(75)
+    expect(latest).toHaveBeenCalledExactlyOnceWith({kind:'move',delta:[0,0,2]},'preview')
+    editor.keyDown(keyboard('','5'));editor.dispose();vi.advanceTimersByTime(300)
+    expect(latest).toHaveBeenCalledTimes(1)
+  })
+  it('uses the presentation bridge only for delivered deferred input',()=>{
+    const {editor,state}=fixture(true),present=vi.fn((publish:()=>void)=>publish())
+    editor.bridge.publishDeferredPreview=present
+    editor.startModal('move')
+    expect(present).not.toHaveBeenCalled()
+    editor.keyDown(keyboard('','3'));vi.advanceTimersByTime(75)
+    expect(present).toHaveBeenCalledTimes(1)
+    expect(state.onTransform).toHaveBeenLastCalledWith({kind:'move',delta:[0,0,3]},'preview')
+    editor.keyDown(keyboard('','4'));editor.keyDown(keyboard('Escape'));vi.advanceTimersByTime(300)
+    expect(present).toHaveBeenCalledTimes(1)
+    editor.dispose()
+  })
   it('through box selection excludes locked roots and refreshes when policy changes',()=>{
     const {editor,state,blocks,geometry}=fixture()
     editor.update({...state,tool:'box',selected:[],active:null,selectableOwners:['b']},blocks)
@@ -134,6 +207,7 @@ describe('grid-safe editor viewport input', () => {
   it('emits one commit for a local numeric move and preserves committed blocks', () => {
     const { editor, state, blocks } = fixture(), before = JSON.stringify(blocks)
     editor.keyDown(keyboard('KeyG')); editor.keyDown(keyboard('KeyX')); editor.keyDown(keyboard('Digit3', '3'))
+    vi.advanceTimersByTime(75)
     expect(state.onTransform).toHaveBeenLastCalledWith({ kind: 'move', delta: [0, 0, 3] }, 'preview')
     editor.keyDown(keyboard('Enter'))
     expect(vi.mocked(state.onTransform).mock.calls.filter(call => call[1] === 'commit')).toEqual([[{ kind: 'move', delta: [0, 0, 3] }, 'commit']])
@@ -145,13 +219,14 @@ describe('grid-safe editor viewport input', () => {
     ['KeyR', '90', true], ['KeyG', '2', true],
     ['KeyR', '.', false], ['KeyG', '-', false],
   ])('routes %s typed %s to domain validation without silently rounding', (code, numeric, valid) => {
-    const { editor, state, blocks } = fixture()
+    const { editor, state, blocks } = fixture(true)
     const object: EditorObject = { id: 'a', name: 'Stone', kind: 'block', cells: [{ pos: [0, 0, 0], state: blocks[0].state }], children: [], pivot2: [1, 1, 1], orientation: 0 }
     const document = { ...newEditorDocument(), objects: [object] }, before = JSON.stringify(document)
     const results: TransformPreview[] = []
     state.onTransform = vi.fn(intent => { results.push(previewTransform(document, ['a'], intent, 'global', 'active', DEMO_MATERIALS)) })
     editor.keyDown(keyboard(code))
     for (const char of numeric) editor.keyDown(keyboard('', char))
+    vi.advanceTimersByTime(75)
     expect(results.at(-1)?.valid).toBe(valid)
     editor.keyDown(keyboard('Enter'))
     expect(results.at(-1)?.valid).toBe(valid)
@@ -163,6 +238,7 @@ describe('grid-safe editor viewport input', () => {
     const { editor, state } = fixture()
     editor.keyDown(keyboard('KeyR')); editor.keyDown(keyboard('KeyX'))
     for (const char of '90') editor.keyDown(keyboard(`Digit${char}`, char))
+    vi.advanceTimersByTime(75)
     expect(state.onTransform).toHaveBeenLastCalledWith({ kind: 'rotate', turns: 1 }, 'preview')
     editor.keyDown(keyboard('Escape'))
     editor.pointerUp({ button: 0 } as PointerEvent)

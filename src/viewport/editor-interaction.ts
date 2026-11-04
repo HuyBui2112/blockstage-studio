@@ -2,12 +2,16 @@ import * as T from 'three'
 import { TransformControls } from 'three/addons/controls/TransformControls.js'
 import type { SceneBlock, Vec3 } from '../core/schema'
 import type { PlacementHit } from '../editor/placement-plan'
+import { PreviewQueue } from './preview-queue'
+import { measurePhase } from '../core/measurement-phases'
 
 export type EditorTransformIntent = { kind: 'move'; delta: Vec3 } | { kind: 'rotate'; turns: number }
 export type EditorPlacementHit = PlacementHit
 export type EditorViewportState = {
   /** Measurement acknowledgement only; never a persistence or plan token. */
   revisionKey?: string
+  /** Session context identity; never a validation or persistence token. */
+  transformContext?: object
   tool: 'select' | 'place' | 'move' | 'rotate' | 'box'
   selected: string[]
   /** Visible, unlocked logical roots. Undefined preserves legacy editor behavior. */
@@ -46,6 +50,7 @@ type Bridge = {
   message: (text: string) => void
   renderBlock: (block: SceneBlock) => EditorBlockRender
   onGhostChange?: () => void
+  publishDeferredPreview?: (publish:()=>void)=>void
 }
 type Modal = {
   kind: 'move' | 'rotate'; origin: T.Vector3; startX: number; startY: number
@@ -100,6 +105,11 @@ export class EditorInteraction {
   pendingModal: {kind:Modal['kind'];from:EditorViewportState['tool'];blocks:SceneBlock[];selection:string} | null = null
   rectangle: HTMLDivElement
   bridge: Bridge
+  numericPreview = new PreviewQueue<EditorTransformIntent>(intent=>{
+    const publish=()=>measurePhase('interaction.numeric-delivery',()=>this.publishPreview(intent))
+    if(this.bridge.publishDeferredPreview)this.bridge.publishDeferredPreview(publish)
+    else publish()
+  })
   constructor(bridge: Bridge) {
     this.bridge = bridge
     this.transform = new TransformControls(bridge.camera(), bridge.canvas)
@@ -120,7 +130,8 @@ export class EditorInteraction {
   update(state: EditorViewportState | undefined, blocks: SceneBlock[], resourcesChanged = false) {
     if(state?.selectableOwners!==this.state?.selectableOwners)this.selectableOwners=state?.selectableOwners?new Set(state.selectableOwners):null
     const selectionKey = state?.selected.join('\u0000') ?? ''
-    if ((!state || selectionKey !== this.selectedKey || blocks !== this.blocks || state.tool !== this.state?.tool) && (this.modal || this.dragging || this.boxStart || this.boxArmed)) this.cancel()
+    const contextChanged=resourcesChanged || state?.revisionKey!==this.state?.revisionKey || state?.transformContext!==this.state?.transformContext || state?.space!==this.state?.space || state?.localYaw!==this.state?.localYaw || state?.pivot.some((value,index)=>value!==this.state?.pivot[index])
+    if ((!state || contextChanged || selectionKey !== this.selectedKey || blocks !== this.blocks || state.tool !== this.state?.tool) && (this.modal || this.dragging || this.boxStart || this.boxArmed)) this.cancel()
     const selectionChanged = this.blocks !== blocks || selectionKey !== this.selectedKey || this.active !== (state?.active ?? null)
     this.state = state; this.blocks = blocks; this.selectedKey = selectionKey
     this.active = state?.active ?? null
@@ -269,17 +280,26 @@ export class EditorInteraction {
   }
   dragEnd = () => {
     if (!this.dragging) return
+    this.numericPreview.cancel()
     this.dragging = false; this.bridge.navigation(true)
     if (!this.cancelled) this.state?.onTransform(this.dragIntent, 'commit')
     this.bridge.canvas.dataset.gizmoEvent = this.cancelled ? 'cancel' : 'commit'
     this.syncTransform()
   }
-  emit(intent: EditorTransformIntent) {
+  publishPreview(intent:EditorTransformIntent){
     const id = JSON.stringify(intent)
     if (id !== this.lastIntent) { this.lastIntent = id; this.state?.onTransform(intent, 'preview') }
+  }
+  emit(intent: EditorTransformIntent, deferred=false) {
+    // Small scenes already validate cheaply; avoid adding debounce latency to
+    // their normal typing. Large scenes coalesce expensive full-document passes.
+    if(deferred && this.blocks.length>=25000)measurePhase('interaction.numeric-schedule',()=>this.numericPreview.schedule(intent))
+    else{this.numericPreview.cancel();this.publishPreview(intent)}
+    const id = JSON.stringify(intent)
     this.bridge.canvas.dataset.transformIntent = id
   }
   cancel() {
+    this.numericPreview.cancel()
     const intent = this.modal?.intent ?? this.dragIntent
     this.cancelled = true
     if (this.dragging) { this.transform.reset(); this.transform.dragging = false }
@@ -294,6 +314,9 @@ export class EditorInteraction {
   }
   commitModal() {
     if (!this.modal) return
+    // Enter/click uses the latest intent directly. Never flush an obsolete
+    // preview before the session performs its fresh synchronous validation.
+    this.numericPreview.cancel()
     const intent = this.modal.intent
     this.modal = null; this.transform.enabled = true
     this.state?.onTransform(intent, 'commit')
@@ -334,7 +357,7 @@ export class EditorInteraction {
       const {kind} = this.pendingModal; this.pendingModal = null; this.startModal(kind)
     }
   }
-  updateModal(x = this.lastPointer[0], y = this.lastPointer[1]) {
+  updateModal(x = this.lastPointer[0], y = this.lastPointer[1], deferred=false) {
     const modal = this.modal, state = this.state
     if (!modal || !state) return
     const yaw = state.space === 'local' ? state.localYaw : 0
@@ -361,7 +384,7 @@ export class EditorInteraction {
       }
       modal.intent = { kind: 'move', delta }
     }
-    this.emit(modal.intent)
+    this.emit(modal.intent,deferred || !!modal.numeric)
   }
   pointerDown(e: PointerEvent) {
     this.lastPointer = [e.clientX, e.clientY]
@@ -482,8 +505,8 @@ export class EditorInteraction {
         if (this.modal.kind === 'rotate' && axis !== 1) { this.bridge.message('Whole block objects rotate only around Y.'); return true }
         this.modal.axis = axis as 0 | 1 | 2; this.modal.plane = this.modal.kind === 'move' && e.shiftKey; this.updateModal(); return true
       }
-      if (/^[0-9.-]$/.test(e.key)) { this.modal.numeric += e.key; this.updateModal(); return true }
-      if (e.code === 'Backspace') { this.modal.numeric = this.modal.numeric.slice(0, -1); this.updateModal(); return true }
+      if (/^[0-9.-]$/.test(e.key)) { this.modal.numeric += e.key; this.updateModal(undefined,undefined,true); return true }
+      if (e.code === 'Backspace') { this.modal.numeric = this.modal.numeric.slice(0, -1); this.updateModal(undefined,undefined,true); return true }
       // Navigation shortcuts remain available while a transform is staged.
       return !e.code.startsWith('Numpad') && !['Home', 'KeyF', 'Backquote'].includes(e.code)
     }
@@ -506,6 +529,7 @@ export class EditorInteraction {
     return false
   }
   dispose() {
+    this.numericPreview.dispose()
     this.transform.dispose()
     this.bridge.scene.remove(this.anchor, this.transform.getHelper(), this.outlines, this.ghost)
     for (const child of this.outlines.children) (child as T.Box3Helper).dispose()

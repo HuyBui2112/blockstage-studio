@@ -36,11 +36,12 @@ export async function runPerformanceScenarios({command,evaluate,until,click,aria
   const keyEvent=(code,keyValue=code,modifiers=0)=>key(code,keyValue,modifiers)
   async function frame(predicate){await until(`(()=>{const m=JSON.parse(document.querySelector('canvas').dataset.editorMeasurement??'null'),e=globalThis.__blockstageMeasurement.event;return m&&e&&m.frame>e.frame&&m.submittedAt>=e.at&&(${predicate})})()`);return evaluate(`(()=>{const m=JSON.parse(document.querySelector('canvas').dataset.editorMeasurement),e=globalThis.__blockstageMeasurement.event;return {latency:m.submittedAt-e.at,cpuSubmission:m.cpuSubmissionMs,startedAt:e.at,submittedAt:m.submittedAt,frame:m}})()`)}
   try{
+    await command('Page.bringToFront')
     await command('Emulation.setDeviceMetricsOverride',{width:1500,height:1000,deviceScaleFactor:1,mobile:false})
     await click(aria('Architecture workspace'));await until(`document.querySelector('.editor-workspace')?.dataset.editorReady==='true'&&document.querySelector('canvas')?.dataset.editorMeasurement`)
     if(!await evaluate(`!!document.querySelector('.editor-inspector')`))await click(aria('Toggle editor inspector'))
     await command('Browser.setDownloadBehavior',{behavior:'allow',downloadPath:directory})
-    report.environment=await evaluate(`(()=>{const canvas=document.querySelector('canvas'),gl=canvas.getContext('webgl2'),ext=gl.getExtension('WEBGL_debug_renderer_info');return {userAgent:navigator.userAgent,devicePixelRatio,viewport:[innerWidth,innerHeight],renderer:ext?gl.getParameter(ext.UNMASKED_RENDERER_WEBGL):null,vendor:ext?gl.getParameter(ext.UNMASKED_VENDOR_WEBGL):null}})()`)
+    report.environment=await evaluate(`(()=>{const canvas=document.querySelector('canvas'),gl=canvas.getContext('webgl2'),ext=gl.getExtension('WEBGL_debug_renderer_info');return {userAgent:navigator.userAgent,visibility:document.visibilityState,focused:document.hasFocus(),devicePixelRatio,viewport:[innerWidth,innerHeight],renderer:ext?gl.getParameter(ext.UNMASKED_RENDERER_WEBGL):null,vendor:ext?gl.getParameter(ext.UNMASKED_VENDOR_WEBGL):null}})()`)
     report.environment.host={platform:platform(),release:release(),cpu:cpus()[0]?.model??'unknown',threads:cpus().length,memoryBytes:totalmem()}
     const renderer=report.environment.renderer
     report.environment.rendererClass=!renderer?'unknown':/swiftshader|llvmpipe|software|basic render|\bwarp\b/i.test(renderer)?'software':'hardware-reported'
@@ -66,7 +67,7 @@ export async function runPerformanceScenarios({command,evaluate,until,click,aria
       const picked=highestCell(fixture.document),pick=await evaluate(`(()=>{const m=JSON.parse(document.querySelector('canvas').dataset.editorCamera).projection,p=${JSON.stringify(picked.pos.map(value=>value+.5))},q=[0,0,0,0];for(let r=0;r<4;r++)q[r]=m[r]*p[0]+m[4+r]*p[1]+m[8+r]*p[2]+m[12+r];const b=document.querySelector('canvas').getBoundingClientRect();return {x:b.x+(q[0]/q[3]+1)*b.width/2,y:b.y+(1-q[1]/q[3])*b.height/2}})()`)
       const initial=await cells(),move=fixture.meta.commands.moveRoot,chosen=options.selection==='all'?fixture.document.objects.map(object=>object.id):move.selection
       const originalByOwner=new Map(chosen.map(id=>[id,true])),moved=initial.map(cell=>originalByOwner.has(cell.owner)?{...cell,pos:cell.pos.map((value,axis)=>value+move.delta[axis])}:cell)
-      const samples={pick:[],preview:[],commit:[],undo:[],cpuSubmission:[]},resources=[],phaseSamples={pick:[],preview:[],commit:[],undo:[]},phaseCalls={pick:[],preview:[],commit:[],undo:[]}
+      const samples={pick:[],preview:[],commit:[],undo:[],cpuSubmission:[]},resources=[],phaseSamples={pick:[],preview:[],commit:[],undo:[]},phaseCalls={pick:[],preview:[],commit:[],undo:[]},numericSequence=[]
       result.samples=samples
       const previewPosition=moved.find(cell=>cell.owner===chosen[0])?.pos
       assert.ok(previewPosition,'The first selected owner must have a cell in the bounded fixture snapshot')
@@ -78,7 +79,9 @@ export async function runPerformanceScenarios({command,evaluate,until,click,aria
         const pickResult=await frame(`m.selected===1&&m.active===${JSON.stringify(picked.owner)}`)
         if(options.selection==='all')await keyEvent('KeyA','a',2)
         else await click(`.outliner-object > button[title=${JSON.stringify(chosen[0])}]`)
-        await focus();await keyEvent('KeyG','g');await keyEvent('KeyY','y')
+        await focus()
+        const sequenceStart=await evaluate(`({at:performance.now(),sequence:globalThis.__blockstagePhaseRead().events.at(-1)?.sequence??0})`)
+        await keyEvent('KeyG','g');await keyEvent('KeyY','y')
         for(const digit of String(move.delta[1]))await keyEvent(`Digit${digit}`,digit)
         const preview=await frame(`m.preview&&m.selected===${chosen.length}&&JSON.stringify(m.previewFirst)===${JSON.stringify(JSON.stringify(previewPosition))}`)
         assert.deepEqual(await cells(),initial,'Staged preview must not mutate committed cells')
@@ -100,6 +103,9 @@ export async function runPerformanceScenarios({command,evaluate,until,click,aria
         assert.ok(phaseEvents&&Array.isArray(phaseEvents.events),'Measured viewport must expose its phase collector')
         assert.deepEqual(await cells(),initial,'Undo returns the fixture cells exactly')
         if(round>=options.warmup){
+          const inPreview=event=>event.start>=preview.startedAt&&event.start+event.duration<=preview.submittedAt+.01
+          const scheduled=phaseEvents.events.findLast(event=>inPreview(event)&&event.name==='interaction.numeric-schedule'),delivered=phaseEvents.events.findLast(event=>inPreview(event)&&event.name==='interaction.numeric-delivery'),viewport=phaseEvents.events.findLast(event=>inPreview(event)&&event.name==='viewport.props')
+          numericSequence.push({harnessToPreviewMs:preview.submittedAt-sequenceStart.at,fullValidations:phaseEvents.events.filter(event=>event.sequence>sequenceStart.sequence&&event.name==='validation.total'&&event.start+event.duration<=preview.submittedAt+.01).length,...(scheduled&&delivered?{scheduledToDeliveryMs:delivered.start-scheduled.start,deliveryMs:delivered.duration,publishToFrameMs:preview.submittedAt-delivered.start-delivered.duration,...(viewport?{publishToViewportMs:viewport.start-delivered.start-delivered.duration,viewportMs:viewport.duration,viewportToFrameMs:preview.submittedAt-viewport.start-viewport.duration}:{})}:{})})
           samples.pick.push(pickResult.latency);samples.preview.push(preview.latency);samples.commit.push(commit.latency);samples.undo.push(undo.latency);samples.cpuSubmission.push(commit.cpuSubmission);resources.push(commit.frame)
           for(const [action,ack] of Object.entries({pick:pickResult,preview,commit,undo})){
             const totals={},calls={}
@@ -111,6 +117,31 @@ export async function runPerformanceScenarios({command,evaluate,until,click,aria
         }
       }
       const state=await evaluate(`({longTaskSupported:globalThis.__blockstageMeasurement.longTaskSupported,longTasks:globalThis.__blockstageMeasurement.longTasks.splice(0),heap:performance.memory?{used:performance.memory.usedJSHeapSize,total:performance.memory.totalJSHeapSize}:null})`)
+      if(count>=25000){
+        // Native events sent in protocol order without waiting for each digit's
+        // round trip: Enter/Esc may arrive before the deferred preview timer.
+        const burst=async last=>{
+          const events=[]
+          for(const [code,key] of [...String(move.delta[1]).split('').map(digit=>[`Digit${digit}`,digit]),[last,last]])for(const type of ['keyDown','keyUp'])events.push(command('Input.dispatchKeyEvent',{type,code,key,...(last==='Escape'&&code===last?{windowsVirtualKeyCode:27,nativeVirtualKeyCode:27}:{})}))
+          await Promise.all(events)
+        }
+        await focus();await keyEvent('KeyG','g');await keyEvent('KeyY','y')
+        const before=await revision(),sequence=await evaluate(`globalThis.__blockstagePhaseRead().events.at(-1)?.sequence??0`)
+        await burst('Enter')
+        await frame(`!m.preview&&m.revision.endsWith(':${before+1}')`)
+        assert.deepEqual(await cells(),moved,'Immediate Enter commits the final numeric value, not an intermediate digit')
+        const validations=await evaluate(`globalThis.__blockstagePhaseRead().events.filter(event=>event.sequence>${sequence}&&event.name==='validation.total').length`)
+        assert.equal(validations,1,'Immediate commit cancels pending preview and fully validates exactly once')
+        await keyEvent('KeyZ','z',2);await frame(`!m.preview&&m.revision.endsWith(':${before+2}')`)
+        assert.deepEqual(await cells(),initial)
+        await keyEvent('KeyG','g');await keyEvent('KeyY','y')
+        const cancelled=await revision(),cancelSequence=await evaluate(`globalThis.__blockstagePhaseRead().events.at(-1)?.sequence??0`)
+        await burst('Escape');await evaluate('new Promise(resolve=>setTimeout(resolve,300))')
+        assert.equal(await revision(),cancelled)
+        assert.deepEqual(await cells(),initial,'Esc preserves the document after pending timers would have fired')
+        assert.equal(await evaluate(`globalThis.__blockstagePhaseRead().events.filter(event=>event.sequence>${cancelSequence}&&event.name==='validation.total').length`),0,'Cancelled numeric preview never runs later')
+        result.numericPending={immediateEnterFinalValue:true,commitValidations:validations,oneUndoRestored:true,escapeNoLateValidation:true,limits:'Native burst correctness outside timed samples; wall-clock scheduling depends on the browser main thread'}
+      }
       result.phase='final-correctness';await save();await click(aria('Export editor document'))
       let downloaded
       for(let attempt=0;attempt<100;attempt++){try{downloaded=JSON.parse(await readFile(join(directory,`${fixture.document.name}.blockstage.json`),'utf8'));break}catch{await delay(100)}}
@@ -143,6 +174,7 @@ export async function runPerformanceScenarios({command,evaluate,until,click,aria
       await evaluate('new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)))')
       const idleStart=(await measure()).frame;await evaluate('new Promise(resolve=>setTimeout(resolve,1000))');const idleFrames=(await measure()).frame-idleStart
       result.status='measured';result.phase='complete';result.completedSamples=samples.commit.length;result.summary=Object.fromEntries(Object.entries(samples).map(([name,values])=>[name,summary(values)]));result.samples=samples;result.resources=resources;result.longTasks=state;result.idleFramesInOneSecond=idleFrames;result.correctness={sampledCells:initial.length,originalSnapshotSha256:hash(JSON.stringify(initial)),allRoundsPreservedSnapshot:true,fullFixtureSha256:fixture.meta.documentSha256,finalFullObjectsAndEntitiesMatch:true,limits:'Per-action comparisons use bounded editor diagnostics (first64cells); final downloaded JSON checks every object/cell/state/entity against the generator'}
+      result.numericSequence={samples:numericSequence,summary:summary(numericSequence.map(sample=>sample.harnessToPreviewMs)),limits:'Harness timestamp before G through exact final numeric preview, including CDP round trips and the initial zero-intent preview. Not the native final-key latency metric.'}
       result.phaseTiming={samples:phaseSamples,calls:phaseCalls,retention:await evaluate(`({limit:4096,dropped:globalThis.__blockstagePhaseRead?.().dropped??0})`),inclusive:true,limits:'Nested durations overlap. React reconciliation/passive effects and uninstrumented gaps are not attributed; absence is not zero work.',summary:Object.fromEntries(Object.entries(phaseSamples).map(([action,rounds])=>{const names=new Set(rounds.flatMap(round=>Object.keys(round)));return [action,Object.fromEntries([...names].map(name=>[name,summary(rounds.map(round=>round[name]??0))]))]}))}
       await screenshot(`performance-${kind}-${count}`);await save()
     }

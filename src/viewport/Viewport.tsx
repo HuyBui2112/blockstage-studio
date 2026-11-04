@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { flushSync } from 'react-dom'
 import * as T from 'three'
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
 import type { BlockState, SceneBlock, SceneEntity, Vec3 } from '../core/schema'
@@ -109,6 +110,16 @@ class ViewportController {
       navigation: enabled => { this.controls.enabled = enabled && !this.flying },
       invalidate: this.invalidate, message: message => this.props.onMessage(message),
       renderBlock: block => this.ghostRender(block), onGhostChange: () => this.refreshAnimations(),
+      publishDeferredPreview:publish=>{
+        // Already in a numeric-preview RAF. Synchronize React's ghost, then
+        // present it in this frame instead of waiting for another RAF after a
+        // long validation. Retire the redundant scheduled draw, not animations.
+        flushSync(publish)
+        if(this.disposed)return
+        if(this.frame)cancelAnimationFrame(this.frame)
+        this.frame=0
+        this.render(performance.now())
+      },
     })
     this.selection.visible = this.preview.visible = false
     this.scene.add(new T.HemisphereLight(0xe3f4ff, 0x535c54, 2.1))
@@ -606,6 +617,9 @@ class ViewportController {
   }
   wheel = (e: WheelEvent) => { if (this.flying) { e.preventDefault(); e.stopImmediatePropagation() } }
   update(props: Props) {
+    return measurePhase('viewport.props',()=>this.updateInner(props))
+  }
+  updateInner(props: Props) {
     const resourcesChanged=props.packs!==this.props.packs || props.profile!==this.props.profile || props.resolver!==this.props.resolver
     const catalogChanged=props.catalog!==this.props.catalog
     const rebuild = resourcesChanged || props.blocks !== this.props.blocks || props.entities!==this.props.entities || props.catalog!==this.props.catalog || props.clip !== this.props.clip || props.local !== this.props.local || props.local && props.selected !== this.props.selected
