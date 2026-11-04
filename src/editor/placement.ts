@@ -70,9 +70,20 @@ export function logicalCellGroups(cells: Block[]): Block[][] {
 
 /** Validate paired footprints in any leaf, including copied component cells. */
 export function validateLogicalObject(object: EditorObject, catalog: Material[]): void {
+  visitLogicalFootprints(object, cell => { blockSchema.parse(cell); validateState(cell.state, catalog) })
+}
+
+/** Internal document-validation composition: the complete document schema and
+ * every cell's registry state must already have passed in this same call.
+ * Standalone callers must use validateLogicalObject instead. */
+export function validateLogicalFootprints(object: EditorObject): void {
+  visitLogicalFootprints(object)
+}
+
+function visitLogicalFootprints(object: EditorObject, validateCell?: (cell: Block) => void): void {
   const occupied = new Map<string, Block>()
   for (const cell of object.cells) {
-    blockSchema.parse(cell); validateState(cell.state, catalog)
+    validateCell?.(cell)
     if (occupied.has(key(cell.pos))) throw new Error(`Duplicate logical cell at ${key(cell.pos)}`)
     occupied.set(key(cell.pos), cell)
   }
@@ -91,7 +102,7 @@ export function validateLogicalObject(object: EditorObject, catalog: Material[])
     for (const [property, v] of Object.entries(cell.state.properties)) if (sharedProperty(cell.state, adapter, property) && neighbor.state.properties[property] !== v) throw new Error(`Mismatched logical pair property: ${property}`)
   }
   if (object.kind === 'multiblock' && object.cells.length !== 2) throw new Error('Multiblock must contain exactly two cells')
-  for (const child of object.children) validateLogicalObject(child, catalog)
+  for (const child of object.children) visitLogicalFootprints(child, validateCell)
 }
 
 /** State changes are immutable and synchronized. Bed facing keeps the foot

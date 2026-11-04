@@ -28,7 +28,7 @@ export async function runPerformanceScenarios({command,evaluate,until,click,aria
   const measure=()=>evaluate(`JSON.parse(document.querySelector('canvas').dataset.editorMeasurement)`)
   const focus=()=>evaluate(`document.querySelector('canvas').focus()`)
   const keyEvent=(code,keyValue=code,modifiers=0)=>key(code,keyValue,modifiers)
-  async function frame(predicate){await until(`(()=>{const m=JSON.parse(document.querySelector('canvas').dataset.editorMeasurement??'null'),e=globalThis.__blockstageMeasurement.event;return m&&e&&m.frame>e.frame&&m.submittedAt>=e.at&&(${predicate})})()`);return evaluate(`(()=>{const m=JSON.parse(document.querySelector('canvas').dataset.editorMeasurement),e=globalThis.__blockstageMeasurement.event;return {latency:m.submittedAt-e.at,cpuSubmission:m.cpuSubmissionMs,frame:m}})()`)}
+  async function frame(predicate){await until(`(()=>{const m=JSON.parse(document.querySelector('canvas').dataset.editorMeasurement??'null'),e=globalThis.__blockstageMeasurement.event;return m&&e&&m.frame>e.frame&&m.submittedAt>=e.at&&(${predicate})})()`);return evaluate(`(()=>{const m=JSON.parse(document.querySelector('canvas').dataset.editorMeasurement),e=globalThis.__blockstageMeasurement.event;return {latency:m.submittedAt-e.at,cpuSubmission:m.cpuSubmissionMs,startedAt:e.at,submittedAt:m.submittedAt,frame:m}})()`)}
   try{
     await command('Emulation.setDeviceMetricsOverride',{width:1500,height:1000,deviceScaleFactor:1,mobile:false})
     await click(aria('Architecture workspace'));await until(`document.querySelector('.editor-workspace')?.dataset.editorReady==='true'&&document.querySelector('canvas')?.dataset.editorMeasurement`)
@@ -60,7 +60,7 @@ export async function runPerformanceScenarios({command,evaluate,until,click,aria
       const picked=highestCell(fixture.document),pick=await evaluate(`(()=>{const m=JSON.parse(document.querySelector('canvas').dataset.editorCamera).projection,p=${JSON.stringify(picked.pos.map(value=>value+.5))},q=[0,0,0,0];for(let r=0;r<4;r++)q[r]=m[r]*p[0]+m[4+r]*p[1]+m[8+r]*p[2]+m[12+r];const b=document.querySelector('canvas').getBoundingClientRect();return {x:b.x+(q[0]/q[3]+1)*b.width/2,y:b.y+(1-q[1]/q[3])*b.height/2}})()`)
       const initial=await cells(),move=fixture.meta.commands.moveRoot,chosen=options.selection==='all'?fixture.document.objects.map(object=>object.id):move.selection
       const originalByOwner=new Map(chosen.map(id=>[id,true])),moved=initial.map(cell=>originalByOwner.has(cell.owner)?{...cell,pos:cell.pos.map((value,axis)=>value+move.delta[axis])}:cell)
-      const samples={pick:[],preview:[],commit:[],undo:[],cpuSubmission:[]},resources=[]
+      const samples={pick:[],preview:[],commit:[],undo:[],cpuSubmission:[]},resources=[],phaseSamples={pick:[],preview:[],commit:[],undo:[]},phaseCalls={pick:[],preview:[],commit:[],undo:[]}
       result.samples=samples
       const previewPosition=moved.find(cell=>cell.owner===chosen[0])?.pos
       assert.ok(previewPosition,'The first selected owner must have a cell in the bounded fixture snapshot')
@@ -81,8 +81,19 @@ export async function runPerformanceScenarios({command,evaluate,until,click,aria
         assert.deepEqual(await cells(),moved,'Acknowledged commit must contain the intended moved cells')
         await keyEvent('KeyZ','z',2)
         const undo=await frame(`!m.preview&&m.revision.endsWith(':${before+2}')`)
+        const phaseEvents=await evaluate(`globalThis.__blockstagePhaseRead?.()??null`)
+        assert.ok(phaseEvents&&Array.isArray(phaseEvents.events),'Measured viewport must expose its phase collector')
         assert.deepEqual(await cells(),initial,'Undo returns the fixture cells exactly')
-        if(round>=options.warmup){samples.pick.push(pickResult.latency);samples.preview.push(preview.latency);samples.commit.push(commit.latency);samples.undo.push(undo.latency);samples.cpuSubmission.push(commit.cpuSubmission);resources.push(commit.frame);if(samples.commit.length%10===0){result.completedSamples=samples.commit.length;await save()}}
+        if(round>=options.warmup){
+          samples.pick.push(pickResult.latency);samples.preview.push(preview.latency);samples.commit.push(commit.latency);samples.undo.push(undo.latency);samples.cpuSubmission.push(commit.cpuSubmission);resources.push(commit.frame)
+          for(const [action,ack] of Object.entries({pick:pickResult,preview,commit,undo})){
+            const totals={},calls={}
+            for(const event of phaseEvents?.events??[])if(event.start>=ack.startedAt&&event.start+event.duration<=ack.submittedAt+.01){totals[event.name]=(totals[event.name]??0)+event.duration;calls[event.name]=(calls[event.name]??0)+1}
+            if(action==='commit')assert.ok(calls['validation.total']>=1,'Fresh transform commit must include full validation')
+            phaseSamples[action].push(totals);phaseCalls[action].push(calls)
+          }
+          if(samples.commit.length%10===0){result.completedSamples=samples.commit.length;await save()}
+        }
       }
       const state=await evaluate(`({longTaskSupported:globalThis.__blockstageMeasurement.longTaskSupported,longTasks:globalThis.__blockstageMeasurement.longTasks.splice(0),heap:performance.memory?{used:performance.memory.usedJSHeapSize,total:performance.memory.totalJSHeapSize}:null})`)
       result.phase='final-correctness';await save();await click(aria('Export editor document'))
@@ -96,6 +107,7 @@ export async function runPerformanceScenarios({command,evaluate,until,click,aria
       await evaluate('new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)))')
       const idleStart=(await measure()).frame;await evaluate('new Promise(resolve=>setTimeout(resolve,1000))');const idleFrames=(await measure()).frame-idleStart
       result.status='measured';result.phase='complete';result.completedSamples=samples.commit.length;result.summary=Object.fromEntries(Object.entries(samples).map(([name,values])=>[name,summary(values)]));result.samples=samples;result.resources=resources;result.longTasks=state;result.idleFramesInOneSecond=idleFrames;result.correctness={sampledCells:initial.length,originalSnapshotSha256:hash(JSON.stringify(initial)),allRoundsPreservedSnapshot:true,fullFixtureSha256:fixture.meta.documentSha256,finalFullObjectsAndEntitiesMatch:true,limits:'Per-action comparisons use bounded editor diagnostics (first64cells); final downloaded JSON checks every object/cell/state/entity against the generator'}
+      result.phaseTiming={samples:phaseSamples,calls:phaseCalls,retention:await evaluate(`({limit:4096,dropped:globalThis.__blockstagePhaseRead?.().dropped??0})`),inclusive:true,limits:'Nested durations overlap. React reconciliation/passive effects and uninstrumented gaps are not attributed; absence is not zero work.',summary:Object.fromEntries(Object.entries(phaseSamples).map(([action,rounds])=>{const names=new Set(rounds.flatMap(round=>Object.keys(round)));return [action,Object.fromEntries([...names].map(name=>[name,summary(rounds.map(round=>round[name]??0))]))]}))}
       await screenshot(`performance-${kind}-${count}`);await save()
     }
     report.status=cases.every(entry=>entry.status==='measured')?'measured':'partial';await save()

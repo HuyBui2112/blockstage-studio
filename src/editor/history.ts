@@ -1,4 +1,5 @@
 import type { EditorDocument, EditorObject } from './model'
+import { measurePhase } from '../core/measurement-phases'
 
 type ObjectEntry = { index: number; object: EditorObject }
 export type ObjectPatch = { id: string; before?: ObjectEntry; after?: ObjectEntry }
@@ -27,6 +28,9 @@ function metadata(document: EditorDocument): DocumentMetadata {
   return rest
 }
 export function executeHistory(history: EditorHistory, next: EditorDocument, label: string): EditorHistory {
+  return measurePhase('history.diff',()=>executeHistoryInner(history,next,label))
+}
+function executeHistoryInner(history:EditorHistory,next:EditorDocument,label:string):EditorHistory{
   const previous = history.document
   const before = new Map(previous.objects.map((object, index) => [object.id, { object, index }]))
   const after = new Map(next.objects.map((object, index) => [object.id, { object, index }]))
@@ -45,6 +49,9 @@ export function executeHistory(history: EditorHistory, next: EditorDocument, lab
   return { document: next, past: boundedPast([...history.past, command]), future: [] }
 }
 function apply(document: EditorDocument, command: HistoryCommand, direction: 'before' | 'after'): EditorDocument {
+  return measurePhase('history.apply',()=>applyInner(document,command,direction))
+}
+function applyInner(document:EditorDocument,command:HistoryCommand,direction:'before'|'after'):EditorDocument{
   const touched = new Set(command.patches.map(patch => patch.id))
   const objects = document.objects.filter(object => !touched.has(object.id))
   const entries = command.patches.flatMap(patch => patch[direction] ? [patch[direction]!] : []).sort((a, b) => a.index - b.index)

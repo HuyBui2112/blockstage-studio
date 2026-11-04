@@ -19,6 +19,7 @@ import { CellPicker } from './cell-picking'
 import { CONTEXT_CHAIN_IDS } from '../editor/placement-plan'
 import { bakeSpecialBlock, specialBlockAppearance } from '../render/special-blocks'
 import { PerformanceProbe } from './performance-probe'
+import { enableMeasurementPhases,measurePhase } from '../core/measurement-phases'
 
 export type { ViewCommand, ViewCommandKind } from './view-commands'
 export type { EditorViewportState, EditorTransformIntent, EditorPlacementHit } from './editor-interaction'
@@ -83,6 +84,7 @@ class ViewportController {
   placementRegion: { pointerId: number; start: EditorPlacementHit; axis: number; plane: T.Plane; session?: string } | null = null
   editorInteraction: EditorInteraction
   measurement:PerformanceProbe|null=null
+  releaseMeasurement:(()=>void)|null=null
   constructor(host: HTMLDivElement, props: Props) {
     this.host = host
     this.props = props
@@ -94,7 +96,7 @@ class ViewportController {
     this.renderer.domElement.tabIndex = 0
     this.renderer.domElement.setAttribute('aria-label', '3D preview. Middle mouse to orbit; Shift and middle mouse to pan; Home to frame all.')
     host.append(this.renderer.domElement)
-    if(new URL(globalThis.location.href).searchParams.get('measure')==='1')this.measurement=new PerformanceProbe(this.renderer.domElement)
+    if(new URL(globalThis.location.href).searchParams.get('measure')==='1'){this.measurement=new PerformanceProbe(this.renderer.domElement);this.releaseMeasurement=enableMeasurementPhases()}
     this.camera.position.set(14, 12, 17)
     this.controls = this.makeControls()
     this.controls.target.set(2, 2, 2); this.controls.update()
@@ -282,6 +284,9 @@ class ViewportController {
     }
   }
   rebuild(resourcesChanged=false) {
+    return measurePhase('viewport.rebuild',()=>this.rebuildInner(resourcesChanged))
+  }
+  rebuildInner(resourcesChanged:boolean){
     // Reuse geometry/material/texture objects for state, yaw and clip changes.
     // Keep browsing caches bounded; changing the asset stack always invalidates them.
     this.disposeMeshes(resourcesChanged || this.baked.size>256 || this.textureCache.size>512 || this.geometryCache.size>256)
@@ -637,6 +642,7 @@ class ViewportController {
     if (command) this.command(command.kind)
   }
   dispose() {
+    this.releaseMeasurement?.();this.releaseMeasurement=null
     this.disposed = true; cancelAnimationFrame(this.frame); this.observer.disconnect()
     if (this.flying) document.exitPointerLock()
     this.editorInteraction.dispose(); this.controls.dispose(); this.disposeMeshes()

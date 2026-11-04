@@ -176,6 +176,12 @@ layers and arbitrary clip planes remain unsupported; full K05 remains partial.
   actual preview first-cell position and committed revision, not preview presence.
   Record renderer identity; hardware request is not GPU execution/FPS proof.
   Compare full downloaded document after measured Undo; keep incomplete reports.
+  Phase spans are opt-in, bounded and inclusive; do not sum nested spans or call
+  unattributed React/effect work zero. Full document schema validation remains.
+  Registry/state deduplication is per synchronous validation call, never durable.
+  Fresh synchronous transform commits reuse their exact fully validated neighbor
+  candidate/notes once, retaining final view-policy guards; an old UI preview is
+  never validation proof. Standalone logical validation remains strict.
 - `check:fabric` is bounded read-only inventory. No launcher/world/account/options
   modifications or implicit EULA, downloads, installs or game launch. Metadata
   presence never closes Q02; selected Java/enabled mods and world readback remain

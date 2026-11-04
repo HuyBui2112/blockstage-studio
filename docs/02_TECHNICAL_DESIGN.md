@@ -608,6 +608,23 @@ phát hành. Move fixture Y+256 có thể đặt root khỏi camera, chỉ đo s
 state/CPU pipeline; không phải GPU draw latency của root luôn nhìn thấy. Không
 sửa gameplay, lịch sử hay user data để làm đẹp số liệu.
 
+Phase attribution opt-in ghi synchronous spans cho transform candidate/neighbors,
+full schema/state-pair validation, history diff/apply, session publish, flatten và
+viewport rebuild. Collector giữ tối đa 4.096 events, báo số bị loại; chỉ tồn tại
+khi measured viewport còn sống. Report có thời lượng và số lần gọi theo action.
+Các span **inclusive, lồng nhau**, không cộng chúng thành tổng latency. React
+reconciliation/passive effects và khoảng chưa instrument vẫn chưa được quy chiếu;
+không có span không có nghĩa là không tốn thời gian.
+
+Validation giữ full document schema tại mọi đường hiện hành. Mỗi lượt tạo registry
+index và deduplicate state hợp lệ theo nội dung, không cache qua các lượt/document.
+Sau schema và registry pass, footprint visitor vẫn kiểm complete pairs, shared
+properties và cấu trúc logical mà không parse từng cell lần hai. Public standalone
+logical validator vẫn strict. Transform commit tính candidate mới đồng bộ từ dữ
+liệu hiện tại, giữ nguyên neighbor notes và commit đúng candidate vừa full-validate
+một lần; không dùng preview UI cũ làm bằng chứng. Final view-policy guard và history
+atomic vẫn chạy; import/persistence không nhận đường bỏ validation.
+
 ### 6.2 Kiểm kê Fabric chỉ đọc
 
 `pnpm check:fabric` tìm metadata versions ở vị trí `.minecraft` thông thường;

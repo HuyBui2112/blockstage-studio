@@ -1,8 +1,9 @@
 import { z } from 'zod'
 import { blockSchema, entitySchema, projectSchema, type Block, type Project, type SceneBlock, type SceneEntity, type Vec3 } from '../core/schema'
 import { instantiate } from '../core/assembly'
-import { validateState, type Material } from '../core/catalog'
-import { logicalCellGroups, validateLogicalObject } from './placement'
+import { createStateValidator, type Material } from '../core/catalog'
+import { logicalCellGroups, validateLogicalFootprints } from './placement'
+import { measurePhase } from '../core/measurement-phases'
 
 export type QuarterTurn = 0 | 1 | 2 | 3
 export type PivotMode = 'active' | 'selection' | 'individual'
@@ -100,15 +101,23 @@ export function objectCells(object: EditorObject): Block[] {
   return [...object.cells, ...object.children.flatMap(objectCells)]
 }
 export function sceneBlocks(document: EditorDocument): SceneBlock[] {
-  return document.objects.flatMap(object => objectCells(object).map(cell => ({ ...cell, owner: object.id })))
+  return measurePhase('scene.flatten',()=>document.objects.flatMap(object => objectCells(object).map(cell => ({ ...cell, owner: object.id }))))
 }
 export function validateDocument(document: EditorDocument, catalog: Material[]): void {
-  const parsed = editorDocumentSchema.safeParse(document)
+  return measurePhase('validation.total',()=>validateDocumentInner(document,catalog))
+}
+function validateDocumentInner(document:EditorDocument,catalog:Material[]):void{
+  const parsed = measurePhase('validation.schema',()=>editorDocumentSchema.safeParse(document))
   if (!parsed.success) throw new Error(parsed.error.issues[0]?.message ?? 'Invalid editor document')
+  measurePhase('validation.states-and-pairs',()=>{
+  const validateState=createStateValidator(catalog)
   for (const object of document.objects) {
-    for (const cell of objectCells(object)) validateState(cell.state, catalog)
-    validateLogicalObject(object, catalog)
+    for (const cell of objectCells(object)) validateState(cell.state)
+    // The full document schema and this root's registry pass already checked
+    // cells. Keep pair semantics without parsing/validating each cell twice.
+    validateLogicalFootprints(object)
   }
+  })
 }
 
 /** Explicit conversion only. Legacy storage and the supplied project are never modified. */

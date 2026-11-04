@@ -6,6 +6,7 @@ import { isStructuralStateProperty, rewriteLogicalState } from './placement'
 import { sharedStateFields } from './state-edit'
 import type { NeighborRules } from '../core/profile'
 import { planNeighborConnections } from './neighbors'
+import { measurePhase } from '../core/measurement-phases'
 
 function selected(document: EditorDocument, ids: string[]): EditorObject[] {
   if (!ids.length) throw new Error('Select at least one object')
@@ -99,17 +100,21 @@ function rotateCandidate(document: EditorDocument, ids: string[], turns: number,
   return result
 }
 export type TransformIntent = { kind: 'move'; delta: Vec3 } | { kind: 'rotate'; turns: number }
-export type TransformPreview = { document: EditorDocument | null; blocks: SceneBlock[]; valid: boolean; error: string | null }
+export type TransformPreview = { document: EditorDocument | null; blocks: SceneBlock[]; valid: boolean; error: string | null; notes?:string[] }
 export function previewTransform(document: EditorDocument, ids: string[], intent: TransformIntent, space: CoordinateSpace, pivotMode: PivotMode, catalog: Material[], rules?: NeighborRules): TransformPreview {
+  return measurePhase('transform.preview',()=>previewTransformInner(document,ids,intent,space,pivotMode,catalog,rules))
+}
+function previewTransformInner(document:EditorDocument,ids:string[],intent:TransformIntent,space:CoordinateSpace,pivotMode:PivotMode,catalog:Material[],rules?:NeighborRules):TransformPreview{
   let candidate: EditorDocument
   let neighbors: SceneBlock[] = []
+  let notes:string[]=[]
   try {
-    candidate = intent.kind === 'move' ? moveCandidate(document, ids, intent.delta, space, catalog, false) : rotateCandidate(document, ids, intent.turns, pivotMode, catalog, false)
-    if(rules){const plan=planNeighborConnections(document,candidate,rules);candidate=plan.document;neighbors=plan.changed}
+    candidate = measurePhase('transform.candidate',()=>intent.kind === 'move' ? moveCandidate(document, ids, intent.delta, space, catalog, false) : rotateCandidate(document, ids, intent.turns, pivotMode, catalog, false))
+    if(rules){const plan=measurePhase('transform.neighbors',()=>planNeighborConnections(document,candidate,rules));candidate=plan.document;neighbors=plan.changed;notes=plan.notes}
   } catch (error) { return { document: null, blocks: [], valid: false, error: error instanceof Error ? error.message : 'Invalid transform' } }
   const chosen = new Set(ids)
   const blocks = [...candidate.objects.filter(object => chosen.has(object.id)).flatMap(object => objectCells(object).map(cell => ({ ...cell, owner: object.id }))),...neighbors.filter(block=>!chosen.has(block.owner))]
-  try { validateDocument(candidate, catalog); return { document: candidate, blocks, valid: true, error: null } }
+  try { validateDocument(candidate, catalog); return { document: candidate, blocks, valid: true, error: null, notes } }
   catch (error) { return { document: null, blocks, valid: false, error: error instanceof Error ? error.message : 'Invalid transform' } }
 }
 export function groupObjects(document: EditorDocument, ids: string[], name: string, catalog: Material[]): EditorDocument {

@@ -4,6 +4,8 @@ import type { Vec3 } from '../core/schema'
 import { newEditorDocument, sceneBlocks, type EditorObject } from './model'
 import { planNeighborConnections } from './neighbors'
 import { createHistory, executeHistory, undoHistory, redoHistory } from './history'
+import { DEMO_MATERIALS, type Material } from '../core/catalog'
+import { previewTransform } from './operations'
 
 const rule=(kind:NeighborRule['kind']='other',options:Partial<NeighborRule>={}):NeighborRule=>({kind,fence:kind==='fence',wooden:kind==='fence',wall:kind==='wall',forcePost:false,exception:false,properties:[],shapes:{'':[0,0]},...options})
 const rules:NeighborRules={
@@ -19,6 +21,20 @@ function object(id:string,name:string,pos:Vec3,properties:Record<string,string>=
 const doc=(...objects:EditorObject[])=>({...newEditorDocument(),objects})
 const props=(document:ReturnType<typeof doc>,id:string)=>sceneBlocks(document).find(b=>b.owner===id)!.state.properties
 describe('opt-in scene neighbor planning',()=>{
+  it('keeps finalized transform neighbor notes with its validated candidate and atomic history',()=>{
+    const fence:Material={id:'minecraft:oak_fence',label:'Fence',family:'fence',color:'#aaa',defaults:{north:'false',east:'false',south:'false',west:'false'},properties:{north:['false','true'],east:['false','true'],south:['false','true'],west:['false','true']}}
+    const dynamic:Material={id:'minecraft:moving_piston',label:'Dynamic',family:'dynamic',color:'#aaa',defaults:{},properties:{}}
+    const source=doc(object('a','oak_fence',[0,0,0],{north:'true'}),object('p','moving_piston',[1,0,1])),snapshot=structuredClone(source)
+    const result=previewTransform(source,['a'],{kind:'move',delta:[0,0,1]},'global','active',[...DEMO_MATERIALS,fence,dynamic],rules)
+    expect(result.valid).toBe(true)
+    expect(result.notes?.join(' ')).toMatch(/Dynamic.*explicit connections preserved/)
+    expect(result.document!.objects[0].cells[0].pos).toEqual([0,0,1])
+    expect(result.blocks.find(block=>block.owner==='a')!.state.properties.north).toBe('true')
+    expect(source).toEqual(snapshot)
+    const history=executeHistory(createHistory(source),result.document!,'Move finalized')
+    expect(undoHistory(history).document).toEqual(source)
+    expect(redoHistory(undoHistory(history)).document).toEqual(result.document)
+  })
   it('connects both sides and disconnects after delete in one atomic history patch',()=>{
     const before=doc(object('a','oak_fence',[0,0,0])), next={...before,objects:[...before.objects,object('b','birch_fence',[1,0,0])]}
     const plan=planNeighborConnections(before,next,rules)

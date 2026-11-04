@@ -19,6 +19,27 @@ export function validateState(s: BlockState, catalog: Material[]) {
   for (const [prop, values] of Object.entries(m.properties)) if (!values.includes(s.properties[prop])) throw new Error(`${s.name}: ${prop} không hợp lệ`)
   for (const prop of Object.keys(s.properties)) if (!m.properties[prop]) throw new Error(`${s.name}: không có thuộc tính ${prop}`)
 }
+/** One synchronous validation pass only. Recreate after any document/catalog
+ * change; successful checks are deduplicated by content, never object identity. */
+export function createStateValidator(catalog: Material[]): (state: BlockState) => void {
+  const materials = new Map<string, { material: Material; required: string[] }>()
+  for (const material of catalog) if (!materials.has(material.id)) materials.set(material.id, { material, required: Object.keys(material.properties) })
+  const validated = new Set<string>()
+  return state => {
+    const entry = materials.get(state.name)
+    if (!entry) throw new Error(`Chưa có registry cho ${state.name}`)
+    const { material, required } = entry
+    // The document schema supplies defaults in its parsed output only. Preserve
+    // the existing validator's behavior for an unnormalized original input.
+    if (state.properties === undefined || state.properties === null) { validateState(state, [material]); return }
+    // Required values use direct lookup in validateState, including inherited
+    // or non-enumerable properties that Object.entries alone would omit.
+    const signature = JSON.stringify([state.name, required.length ? required.map(property => state.properties[property]) : null, Object.entries(state.properties).sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0)])
+    if (validated.has(signature)) return
+    validateState(state, [material])
+    validated.add(signature)
+  }
+}
 export function family(id: string): string {
   return DEMO_MATERIALS.find(m => m.id === id)?.family ?? (/_log$|_wood$/.test(id) ? 'logs' : /_planks$/.test(id) ? 'planks' : /_slab$/.test(id) ? 'slabs' : /_stairs$/.test(id) ? 'stairs' : id)
 }

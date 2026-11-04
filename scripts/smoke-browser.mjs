@@ -24,6 +24,8 @@ const rendererMode=process.env.BLOCKSTAGE_RENDERER??'software'
 if(!['hardware','software'].includes(rendererMode))throw new Error('BLOCKSTAGE_RENDERER must be hardware or software')
 const child = spawn(browser, [
   '--headless=new', '--no-first-run', '--no-default-browser-check',
+  // Keep the isolated Edge process's DevTools stderr pipe across Windows startup.
+  ...(process.platform==='win32'&&/msedge\.exe$/i.test(browser)?['--edge-skip-compat-layer-relaunch']:[]),
   '--remote-debugging-port=0', '--remote-debugging-address=127.0.0.1',
   ...(rendererMode==='software'?['--enable-unsafe-swiftshader','--use-angle=swiftshader']:['--use-angle=d3d11']),
   `--user-data-dir=${directory}`, 'about:blank',
@@ -409,7 +411,10 @@ try {
   if (profilePath && process.env.BLOCKSTAGE_RESOURCE_PACK) {
     await runEditorScenarios({ command, evaluate, until, click, aria, input, upload, key, screenshot, directory, profilePath, closeManager, createPeer })
   }
-  if(new URL(process.env.BLOCKSTAGE_URL??'http://127.0.0.1:5173/').searchParams.get('measure')!=='1')assert.equal(await evaluate(`'editorMeasurement' in document.querySelector('canvas').dataset`),false,'Normal editor must not enable measurement telemetry')
+  if(new URL(process.env.BLOCKSTAGE_URL??'http://127.0.0.1:5173/').searchParams.get('measure')!=='1'){
+    assert.equal(await evaluate(`'editorMeasurement' in document.querySelector('canvas').dataset`),false,'Normal editor must not enable measurement telemetry')
+    assert.equal(await evaluate(`Object.hasOwn(globalThis,'__blockstagePhaseRead')`),false,'Normal editor must not expose phase collection')
+  }
   assert.deepEqual(errors, [], 'Browser must have no runtime exceptions')
   console.log(JSON.stringify({
     result: 'passed', resourcePack: basename(basePath), gameProfile: profilePath, repositoryChecks,

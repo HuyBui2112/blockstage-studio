@@ -20,6 +20,7 @@ import { createClipboard, type EditorClipboard } from './clipboard'
 import { applyCopyAction, type CopyActionPlan } from './copy-action'
 import { applyPrimitiveAction, type PrimitiveActionPlan } from './primitive-action'
 import { applyMaterialReplacement, type MaterialReplacementPlan } from './material-plan'
+import { measurePhase } from '../core/measurement-phases'
 
 export type EditorScope = 'architecture' | 'component'
 export type TransformIntent = { kind: 'move'; delta: Vec3 } | { kind: 'rotate'; turns: number }
@@ -66,6 +67,9 @@ export function useEditorSession(catalog: Material[], neighborRules?: NeighborRu
     return { ...list, records }
   }, [])
   function setSlots(update: (previous: Record<EditorScope, Slot>) => Record<EditorScope, Slot>, protectDraft = true) {
+    return measurePhase('session.publish',()=>setSlotsInner(update,protectDraft))
+  }
+  function setSlotsInner(update:(previous:Record<EditorScope,Slot>)=>Record<EditorScope,Slot>,protectDraft:boolean){
     const before = currentSlots.current
     let next = { ...update(before) }
     for (const scope of ['architecture', 'component'] as const) {
@@ -175,6 +179,9 @@ export function useEditorSession(catalog: Material[], neighborRules?: NeighborRu
   }, [refreshRecoveries])
 
   function commit(scope: EditorScope, next: EditorDocument, label: string, selection?: string[], finalized?: {notes:string[]}) {
+    return measurePhase('session.commit',()=>commitInner(scope,next,label,selection,finalized))
+  }
+  function commitInner(scope:EditorScope,next:EditorDocument,label:string,selection?:string[],finalized?:{notes:string[]}){
     if (lifecycle.current.has(scope)) throw new Error('A document operation is in progress')
     const before = slots[scope].history.document
     const plan=finalized ? {document:next,notes:finalized.notes} : autoConnections[scope] && neighborRules ? planNeighborConnections(before,next,neighborRules) : {document:next,notes:[]}
@@ -259,7 +266,10 @@ export function useEditorSession(catalog: Material[], neighborRules?: NeighborRu
     if (phase === 'preview') { setPreview({ scope, result }); return }
     setPreview(null)
     if (!result.valid || !result.document) { setError(result.error ?? 'Cannot commit this transform'); return }
-    try { commit(scope, result.document, intent.kind === 'move' ? 'Move objects' : 'Rotate objects') }
+    // This result was computed and fully validated synchronously above, against
+    // the current scene/rules. Commit its exact neighbor candidate once; never
+    // reuse an older UI preview as proof or drop the final view-policy guard.
+    try { commit(scope, result.document, intent.kind === 'move' ? 'Move objects' : 'Rotate objects',undefined,{notes:result.notes??[]}) }
     catch (error) { setError(messageOf(error)) }
   }
   function place(scope: EditorScope, state: BlockState, pos: Vec3, hit?: PlacementHit, options: PlacementOptions = { mode: 'design', turns: 0 }) {

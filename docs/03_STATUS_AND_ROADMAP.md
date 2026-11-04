@@ -1070,12 +1070,58 @@ cho mọi profile. Report: `editor-performance-hardware-matrix-smoke.json` và
 `editor-performance-hardware-selection-smoke.json`. Bộ đo mới ghi phase/progress
 và giữ incomplete report khi lỗi; long tasks reset theo từng case.
 
-**Quyết định tiếp theo:** P02 phase attribution cho validation/operation/history/
-React/scene rebuild trước khi chọn fast path P03 hoặc dirty chunks P04. Commit
-10k chưa đạt mục tiêu thử 100 ms, 100k chưa mượt; chưa biết cost nào trội trong
-các phase chưa đo. Không bỏ validation ở trust boundary hay đổi scene cap để
-che vấn đề. Driver đầy đủ/GPU execution, camera/save/history byte retention và
-human builder performance gate vẫn UNVERIFIED; P02/P07 tổng chưa đóng.
+**Cập nhật P02/P03 — 04/11/2026:** đã instrument synchronous phases cho candidate,
+neighbor planning, schema/state-pair validation, history, publish, flatten và scene
+rebuild. Collector opt-in tối đa 4.096 events, có call counts và báo truncation;
+normal URL không bật collector. Span inclusive/lồng nhau, không cộng thành tổng;
+React reconciliation/passive effects và khoảng chưa instrument vẫn chưa quy chiếu.
+
+Đã giảm công việc lặp trong validation: registry index và dedup state theo nội dung
+chỉ sống một lượt; giữ full document schema, footprint/pair rules và standalone
+strict validator. Fresh synchronous transform commit dùng đúng candidate/neighbor
+notes vừa full-validate, không chạy lại neighbor/validation; final view-policy guard
+và atomic history vẫn giữ. Không cache preview UI cũ hoặc nới schema/import budget.
+Differential tests so với composition cũ gồm lỗi/state mutation/catalogue ordering,
+schema defaults, complete/broken pairs, collisions, depth/cycles và aggregate cap.
+Code gate đạt **537/537 tests, 48 file**, typecheck/lint/build.
+Full native production browser regression đạt sau tích hợp: resources/animation,
+transforms/neighbors, copy/build/materials, visibility, component reuse, R1 house,
+NBT/portable và Save/draft/fault/recovery; normal URL xác nhận không có frame
+telemetry hoặc phase getter. Smoke hardware chọn-all pairs/component/mixed/entity
+1k, 3 mẫu/1 warmup cũng đạt, full JSON sau Undo khớp và free entities giữ nguyên;
+report `editor-phases-matrix-smoke.json`. Ba mẫu chỉ là regression evidence,
+không chốt hiệu năng các profile này. Đã xem ảnh R1 compact sau chạy; không đổi UI.
+
+Đo lại cùng Intel UHD/D3D11, Edge 156, viewport 1500×1000/DPR1, dense seed 1,
+root đầu tiên Y+256, **30 mẫu/3 warmup mỗi case**. Do số liệu giữa hai ngày dao
+động, dựng thêm control local trong cache: phục hồi composition validation cũ và
+commit không-finalized, giữ cùng probes; không thay source working tree. Hai build
+đo tuần tự trong cùng phiên, resource/profile và fixture hashes khớp:
+
+| Cells | Commit p95 control cũ → tối ưu (ms) | Validation p95 cũ → tối ưu (ms) | Full validation calls/commit |
+| --- | --- | --- | --- |
+| 10.000 | 280,4 → 148,2 | 156,7 → 53,7 | 2 → 1 |
+| 100.000 | 2.973,5 → 1.382,8 | 1.744,1 → 603,5 | 2 → 1 |
+
+Mọi round có đúng call count trên; final public JSON so toàn objects/cells/states/
+entities sau Undo khớp fixture ở cả hai build, fallback bằng 0. Reports local:
+`editor-phases-before.json` (ngày trước), `editor-phases-before-control.json`,
+`editor-phases-after.json`, `editor-phases-comparison.json`; công thức control
+ở `editor-phases-control-setup.json`, không chứa game assets. Đây là observed
+comparison, không randomized/thermal/background-load controlled: rebuild không
+đổi thuật toán vẫn dao động (100k p95 912,0 → 660,3 ms), không quy toàn bộ delta
+end-to-end cho tối ưu code. Không suy ra FPS, GPU completion hoặc SLO release.
+
+**Ưu tiên tiếp:** đo và thiết kế cập nhật scene theo owner/chunk thay vì rebuild
+toàn scene khi sửa một root (P04), giữ guards, negative coordinates, old/new cells,
+resource invalidation và mapping pick/instance đúng. Full schema vẫn là phần đáng
+kể; không bỏ nó khi chưa có differential proof cho incremental path. 10k commit
+p95 còn trên mục tiêu thử 100 ms, 100k còn hơn một giây: chưa tuyên bố mượt.
+
+P03 mới là subset loại bỏ validation trùng; chưa incremental occupancy/state index.
+Driver đầy đủ/GPU execution, camera/save/history byte retention và human builder
+performance gate vẫn UNVERIFIED; P02/P07 tổng chưa đóng. Không bỏ trust-boundary
+validation hay đổi scene cap để che độ trễ 100k.
 
 **Q02:** audit chỉ đọc tìm bốn candidate version manifests, báo
 `INSTANCE_SELECTION_REQUIRED`. Một candidate `content 26.2` có embedded
