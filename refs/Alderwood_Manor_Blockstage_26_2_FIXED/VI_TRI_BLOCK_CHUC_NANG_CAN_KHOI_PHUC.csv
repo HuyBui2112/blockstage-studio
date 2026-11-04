@@ -1,0 +1,87 @@
+﻿x,y,z,old_name,old_properties,preview_name,preview_properties,reason
+104,2,19,minecraft:enchanting_table,{},minecraft:crying_obsidian,{},Crying obsidian đánh dấu bàn enchant; không enchant
+79,2,21,minecraft:barrel,"{""facing"": ""up"", ""open"": ""false""}",minecraft:composter,"{""level"": ""0""}",Thùng gỗ trang trí thay barrel (không chứa được đồ)
+63,8,23,minecraft:chest,"{""facing"": ""south"", ""type"": ""single"", ""waterlogged"": ""false""}",minecraft:composter,"{""level"": ""0""}",Thùng gỗ trang trí thay chest (không chứa được đồ)
+66,8,23,minecraft:barrel,"{""facing"": ""up"", ""open"": ""false""}",minecraft:composter,"{""level"": ""0""}",Thùng gỗ trang trí thay barrel (không chứa được đồ)
+79,2,24,minecraft:chest,"{""facing"": ""south"", ""type"": ""single"", ""waterlogged"": ""false""}",minecraft:composter,"{""level"": ""0""}",Thùng gỗ trang trí thay chest (không chứa được đồ)
+109,2,24,minecraft:lectern,"{""facing"": ""south"", ""has_book"": ""false"", ""powered"": ""false""}",minecraft:cartography_table,{},Cartography table thay lectern; không đặt sách
+100,2,26,minecraft:chiseled_bookshelf,"{""facing"": ""south"", ""slot_0_occupied"": ""false"", ""slot_1_occupied"": ""false"", ""slot_2_occupied"": ""false"", ""slot_3_occupied"": ""false"", ""slot_4_occupied"": ""false"", ""slot_5_occupied"": ""false""}",minecraft:bookshelf,{},Bookshelf thường thay chiseled bookshelf; không tương tác khe sách
+27,2,41,minecraft:barrel,"{""facing"": ""up"", ""open"": ""false""}",minecraft:composter,"{""level"": ""0""}",Thùng gỗ trang trí thay barrel (không chứa được đồ)
+96,2,41,minecraft:barrel,"{""facing"": ""up"", ""open"": ""false""}",minecraft:composter,"{""level"": ""0""}",Thùng gỗ trang trí thay barrel (không chứa được đồ)
+99,2,41,minecraft:barrel,"{""facing"": ""up"", ""open"": ""false""}",minecraft:composter,"{""level"": ""0""}",Thùng gỗ trang trí thay barrel (không chứa được đồ)
+102,2,41,minecraft:barrel,"{""facing"": ""up"", ""open"": ""false""}",minecraft:composter,"{""level"": ""0""}",Thùng gỗ trang trí thay barrel (không chứa được đồ)
+105,2,41,minecraft:barrel,"{""facing"": ""up"", ""open"": ""false""}",minecraft:composter,"{""level"": ""0""}",Thùng gỗ trang trí thay barrel (không chứa được đồ)
+108,2,41,minecraft:barrel,"{""facing"": ""up"", ""open"": ""false""}",minecraft:composter,"{""level"": ""0""}",Thùng gỗ trang trí thay barrel (không chứa được đồ)
+111,2,41,minecraft:barrel,"{""facing"": ""up"", ""open"": ""false""}",minecraft:composter,"{""level"": ""0""}",Thùng gỗ trang trí thay barrel (không chứa được đồ)
+15,3,41,minecraft:furnace,"{""facing"": ""east"", ""lit"": ""false""}",minecraft:stonecutter,"{""facing"": ""east""}",Stonecutter thay furnace để mô phỏng quầy xưởng; không nung
+16,3,41,minecraft:smoker,"{""facing"": ""east"", ""lit"": ""false""}",minecraft:stonecutter,"{""facing"": ""east""}",Stonecutter thay smoker; không nấu
+96,3,41,minecraft:barrel,"{""facing"": ""north"", ""open"": ""false""}",minecraft:composter,"{""level"": ""0""}",Thùng gỗ trang trí thay barrel (không chứa được đồ)
+99,3,41,minecraft:barrel,"{""facing"": ""north"", ""open"": ""false""}",minecraft:composter,"{""level"": ""0""}",Thùng gỗ trang trí thay barrel (không chứa được đồ)
+102,3,41,minecraft:barrel,"{""facing"": ""north"", ""open"": ""false""}",minecraft:composter,"{""level"": ""0""}",Thùng gỗ trang trí thay barrel (không chứa được đồ)
+105,3,41,minecraft:barrel,"{""facing"": ""north"", ""open"": ""false""}",minecraft:composter,"{""level"": ""0""}",Thùng gỗ trang trí thay barrel (không chứa được đồ)
+108,3,41,minecraft:barrel,"{""facing"": ""north"", ""open"": ""false""}",minecraft:composter,"{""level"": ""0""}",Thùng gỗ trang trí thay barrel (không chứa được đồ)
+111,3,41,minecraft:barrel,"{""facing"": ""north"", ""open"": ""false""}",minecraft:composter,"{""level"": ""0""}",Thùng gỗ trang trí thay barrel (không chứa được đồ)
+15,3,42,minecraft:furnace,"{""facing"": ""east"", ""lit"": ""false""}",minecraft:stonecutter,"{""facing"": ""east""}",Stonecutter thay furnace để mô phỏng quầy xưởng; không nung
+16,3,42,minecraft:smoker,"{""facing"": ""east"", ""lit"": ""false""}",minecraft:stonecutter,"{""facing"": ""east""}",Stonecutter thay smoker; không nấu
+15,3,43,minecraft:furnace,"{""facing"": ""east"", ""lit"": ""false""}",minecraft:stonecutter,"{""facing"": ""east""}",Stonecutter thay furnace để mô phỏng quầy xưởng; không nung
+16,3,43,minecraft:smoker,"{""facing"": ""east"", ""lit"": ""false""}",minecraft:stonecutter,"{""facing"": ""east""}",Stonecutter thay smoker; không nấu
+27,2,44,minecraft:barrel,"{""facing"": ""up"", ""open"": ""false""}",minecraft:composter,"{""level"": ""0""}",Thùng gỗ trang trí thay barrel (không chứa được đồ)
+96,2,44,minecraft:barrel,"{""facing"": ""up"", ""open"": ""false""}",minecraft:composter,"{""level"": ""0""}",Thùng gỗ trang trí thay barrel (không chứa được đồ)
+99,2,44,minecraft:barrel,"{""facing"": ""up"", ""open"": ""false""}",minecraft:composter,"{""level"": ""0""}",Thùng gỗ trang trí thay barrel (không chứa được đồ)
+102,2,44,minecraft:barrel,"{""facing"": ""up"", ""open"": ""false""}",minecraft:composter,"{""level"": ""0""}",Thùng gỗ trang trí thay barrel (không chứa được đồ)
+105,2,44,minecraft:barrel,"{""facing"": ""up"", ""open"": ""false""}",minecraft:composter,"{""level"": ""0""}",Thùng gỗ trang trí thay barrel (không chứa được đồ)
+108,2,44,minecraft:barrel,"{""facing"": ""up"", ""open"": ""false""}",minecraft:composter,"{""level"": ""0""}",Thùng gỗ trang trí thay barrel (không chứa được đồ)
+111,2,44,minecraft:barrel,"{""facing"": ""up"", ""open"": ""false""}",minecraft:composter,"{""level"": ""0""}",Thùng gỗ trang trí thay barrel (không chứa được đồ)
+15,3,44,minecraft:furnace,"{""facing"": ""east"", ""lit"": ""false""}",minecraft:stonecutter,"{""facing"": ""east""}",Stonecutter thay furnace để mô phỏng quầy xưởng; không nung
+16,3,44,minecraft:smoker,"{""facing"": ""east"", ""lit"": ""false""}",minecraft:stonecutter,"{""facing"": ""east""}",Stonecutter thay smoker; không nấu
+96,3,44,minecraft:barrel,"{""facing"": ""north"", ""open"": ""false""}",minecraft:composter,"{""level"": ""0""}",Thùng gỗ trang trí thay barrel (không chứa được đồ)
+99,3,44,minecraft:barrel,"{""facing"": ""north"", ""open"": ""false""}",minecraft:composter,"{""level"": ""0""}",Thùng gỗ trang trí thay barrel (không chứa được đồ)
+102,3,44,minecraft:barrel,"{""facing"": ""north"", ""open"": ""false""}",minecraft:composter,"{""level"": ""0""}",Thùng gỗ trang trí thay barrel (không chứa được đồ)
+105,3,44,minecraft:barrel,"{""facing"": ""north"", ""open"": ""false""}",minecraft:composter,"{""level"": ""0""}",Thùng gỗ trang trí thay barrel (không chứa được đồ)
+108,3,44,minecraft:barrel,"{""facing"": ""north"", ""open"": ""false""}",minecraft:composter,"{""level"": ""0""}",Thùng gỗ trang trí thay barrel (không chứa được đồ)
+111,3,44,minecraft:barrel,"{""facing"": ""north"", ""open"": ""false""}",minecraft:composter,"{""level"": ""0""}",Thùng gỗ trang trí thay barrel (không chứa được đồ)
+97,2,47,minecraft:chest,"{""facing"": ""south"", ""type"": ""single"", ""waterlogged"": ""false""}",minecraft:composter,"{""level"": ""0""}",Thùng gỗ trang trí thay chest (không chứa được đồ)
+102,2,47,minecraft:chest,"{""facing"": ""south"", ""type"": ""single"", ""waterlogged"": ""false""}",minecraft:composter,"{""level"": ""0""}",Thùng gỗ trang trí thay chest (không chứa được đồ)
+108,2,47,minecraft:chest,"{""facing"": ""south"", ""type"": ""single"", ""waterlogged"": ""false""}",minecraft:composter,"{""level"": ""0""}",Thùng gỗ trang trí thay chest (không chứa được đồ)
+113,2,47,minecraft:chest,"{""facing"": ""south"", ""type"": ""single"", ""waterlogged"": ""false""}",minecraft:composter,"{""level"": ""0""}",Thùng gỗ trang trí thay chest (không chứa được đồ)
+96,2,50,minecraft:barrel,"{""facing"": ""up"", ""open"": ""false""}",minecraft:composter,"{""level"": ""0""}",Thùng gỗ trang trí thay barrel (không chứa được đồ)
+99,2,50,minecraft:barrel,"{""facing"": ""up"", ""open"": ""false""}",minecraft:composter,"{""level"": ""0""}",Thùng gỗ trang trí thay barrel (không chứa được đồ)
+102,2,50,minecraft:barrel,"{""facing"": ""up"", ""open"": ""false""}",minecraft:composter,"{""level"": ""0""}",Thùng gỗ trang trí thay barrel (không chứa được đồ)
+105,2,50,minecraft:barrel,"{""facing"": ""up"", ""open"": ""false""}",minecraft:composter,"{""level"": ""0""}",Thùng gỗ trang trí thay barrel (không chứa được đồ)
+108,2,50,minecraft:barrel,"{""facing"": ""up"", ""open"": ""false""}",minecraft:composter,"{""level"": ""0""}",Thùng gỗ trang trí thay barrel (không chứa được đồ)
+111,2,50,minecraft:barrel,"{""facing"": ""up"", ""open"": ""false""}",minecraft:composter,"{""level"": ""0""}",Thùng gỗ trang trí thay barrel (không chứa được đồ)
+96,3,50,minecraft:barrel,"{""facing"": ""north"", ""open"": ""false""}",minecraft:composter,"{""level"": ""0""}",Thùng gỗ trang trí thay barrel (không chứa được đồ)
+99,3,50,minecraft:barrel,"{""facing"": ""north"", ""open"": ""false""}",minecraft:composter,"{""level"": ""0""}",Thùng gỗ trang trí thay barrel (không chứa được đồ)
+102,3,50,minecraft:barrel,"{""facing"": ""north"", ""open"": ""false""}",minecraft:composter,"{""level"": ""0""}",Thùng gỗ trang trí thay barrel (không chứa được đồ)
+105,3,50,minecraft:barrel,"{""facing"": ""north"", ""open"": ""false""}",minecraft:composter,"{""level"": ""0""}",Thùng gỗ trang trí thay barrel (không chứa được đồ)
+108,3,50,minecraft:barrel,"{""facing"": ""north"", ""open"": ""false""}",minecraft:composter,"{""level"": ""0""}",Thùng gỗ trang trí thay barrel (không chứa được đồ)
+111,3,50,minecraft:barrel,"{""facing"": ""north"", ""open"": ""false""}",minecraft:composter,"{""level"": ""0""}",Thùng gỗ trang trí thay barrel (không chứa được đồ)
+96,2,53,minecraft:barrel,"{""facing"": ""up"", ""open"": ""false""}",minecraft:composter,"{""level"": ""0""}",Thùng gỗ trang trí thay barrel (không chứa được đồ)
+99,2,53,minecraft:barrel,"{""facing"": ""up"", ""open"": ""false""}",minecraft:composter,"{""level"": ""0""}",Thùng gỗ trang trí thay barrel (không chứa được đồ)
+102,2,53,minecraft:barrel,"{""facing"": ""up"", ""open"": ""false""}",minecraft:composter,"{""level"": ""0""}",Thùng gỗ trang trí thay barrel (không chứa được đồ)
+105,2,53,minecraft:barrel,"{""facing"": ""up"", ""open"": ""false""}",minecraft:composter,"{""level"": ""0""}",Thùng gỗ trang trí thay barrel (không chứa được đồ)
+108,2,53,minecraft:barrel,"{""facing"": ""up"", ""open"": ""false""}",minecraft:composter,"{""level"": ""0""}",Thùng gỗ trang trí thay barrel (không chứa được đồ)
+111,2,53,minecraft:barrel,"{""facing"": ""up"", ""open"": ""false""}",minecraft:composter,"{""level"": ""0""}",Thùng gỗ trang trí thay barrel (không chứa được đồ)
+96,3,53,minecraft:barrel,"{""facing"": ""north"", ""open"": ""false""}",minecraft:composter,"{""level"": ""0""}",Thùng gỗ trang trí thay barrel (không chứa được đồ)
+99,3,53,minecraft:barrel,"{""facing"": ""north"", ""open"": ""false""}",minecraft:composter,"{""level"": ""0""}",Thùng gỗ trang trí thay barrel (không chứa được đồ)
+102,3,53,minecraft:barrel,"{""facing"": ""north"", ""open"": ""false""}",minecraft:composter,"{""level"": ""0""}",Thùng gỗ trang trí thay barrel (không chứa được đồ)
+105,3,53,minecraft:barrel,"{""facing"": ""north"", ""open"": ""false""}",minecraft:composter,"{""level"": ""0""}",Thùng gỗ trang trí thay barrel (không chứa được đồ)
+108,3,53,minecraft:barrel,"{""facing"": ""north"", ""open"": ""false""}",minecraft:composter,"{""level"": ""0""}",Thùng gỗ trang trí thay barrel (không chứa được đồ)
+111,3,53,minecraft:barrel,"{""facing"": ""north"", ""open"": ""false""}",minecraft:composter,"{""level"": ""0""}",Thùng gỗ trang trí thay barrel (không chứa được đồ)
+99,3,63,minecraft:brewing_stand,"{""has_bottle_0"": ""false"", ""has_bottle_1"": ""false"", ""has_bottle_2"": ""false""}",minecraft:cauldron,{},Cauldron thay brewing stand; không pha thuốc
+102,3,63,minecraft:brewing_stand,"{""has_bottle_0"": ""false"", ""has_bottle_1"": ""false"", ""has_bottle_2"": ""false""}",minecraft:cauldron,{},Cauldron thay brewing stand; không pha thuốc
+105,3,63,minecraft:brewing_stand,"{""has_bottle_0"": ""false"", ""has_bottle_1"": ""false"", ""has_bottle_2"": ""false""}",minecraft:cauldron,{},Cauldron thay brewing stand; không pha thuốc
+108,3,63,minecraft:brewing_stand,"{""has_bottle_0"": ""false"", ""has_bottle_1"": ""false"", ""has_bottle_2"": ""false""}",minecraft:cauldron,{},Cauldron thay brewing stand; không pha thuốc
+14,2,66,minecraft:blast_furnace,"{""facing"": ""south"", ""lit"": ""false""}",minecraft:stonecutter,"{""facing"": ""south""}",Stonecutter thay blast furnace; không luyện
+17,2,66,minecraft:blast_furnace,"{""facing"": ""south"", ""lit"": ""false""}",minecraft:stonecutter,"{""facing"": ""south""}",Stonecutter thay blast furnace; không luyện
+20,2,66,minecraft:blast_furnace,"{""facing"": ""south"", ""lit"": ""false""}",minecraft:stonecutter,"{""facing"": ""south""}",Stonecutter thay blast furnace; không luyện
+23,2,66,minecraft:blast_furnace,"{""facing"": ""south"", ""lit"": ""false""}",minecraft:stonecutter,"{""facing"": ""south""}",Stonecutter thay blast furnace; không luyện
+14,2,68,minecraft:furnace,"{""facing"": ""south"", ""lit"": ""false""}",minecraft:stonecutter,"{""facing"": ""south""}",Stonecutter thay furnace để mô phỏng quầy xưởng; không nung
+17,2,68,minecraft:furnace,"{""facing"": ""south"", ""lit"": ""false""}",minecraft:stonecutter,"{""facing"": ""south""}",Stonecutter thay furnace để mô phỏng quầy xưởng; không nung
+20,2,68,minecraft:furnace,"{""facing"": ""south"", ""lit"": ""false""}",minecraft:stonecutter,"{""facing"": ""south""}",Stonecutter thay furnace để mô phỏng quầy xưởng; không nung
+23,2,68,minecraft:furnace,"{""facing"": ""south"", ""lit"": ""false""}",minecraft:stonecutter,"{""facing"": ""south""}",Stonecutter thay furnace để mô phỏng quầy xưởng; không nung
+110,2,70,minecraft:barrel,"{""facing"": ""up"", ""open"": ""false""}",minecraft:composter,"{""level"": ""0""}",Thùng gỗ trang trí thay barrel (không chứa được đồ)
+110,2,73,minecraft:barrel,"{""facing"": ""up"", ""open"": ""false""}",minecraft:composter,"{""level"": ""0""}",Thùng gỗ trang trí thay barrel (không chứa được đồ)
+101,2,99,minecraft:barrel,"{""facing"": ""up"", ""open"": ""false""}",minecraft:composter,"{""level"": ""0""}",Thùng gỗ trang trí thay barrel (không chứa được đồ)
+104,2,99,minecraft:barrel,"{""facing"": ""up"", ""open"": ""false""}",minecraft:composter,"{""level"": ""0""}",Thùng gỗ trang trí thay barrel (không chứa được đồ)
+108,2,99,minecraft:barrel,"{""facing"": ""up"", ""open"": ""false""}",minecraft:composter,"{""level"": ""0""}",Thùng gỗ trang trí thay barrel (không chứa được đồ)
