@@ -8,6 +8,13 @@ import {createPerformanceFixture} from './performance-fixtures.mjs'
 
 const summary=values=>{const ordered=[...values].sort((a,b)=>a-b);return {samples:values.length,p50:ordered[Math.ceil(ordered.length*.5)-1]??null,p95:ordered[Math.ceil(ordered.length*.95)-1]??null,max:ordered.at(-1)??null}}
 const hash=bytes=>createHash('sha256').update(bytes).digest('hex')
+function validationCoverage(events,afterSequence,submittedAt){
+  const window=events.filter(event=>event.sequence>afterSequence&&event.start+event.duration<=submittedAt+.01)
+  const subsets=window.filter(event=>event.name==='transform.validation-subset')
+  const validations=window.filter(event=>event.name==='validation.total')
+  const changedRootValidations=validations.filter(event=>subsets.some(parent=>event.start>=parent.start&&event.start+event.duration<=parent.start+parent.duration+.01)).length
+  return {fullValidations:validations.length-changedRootValidations,changedRootValidations}
+}
 function highestCell(document){
   let best
   const walk=(object,owner)=>{for(const cell of object.cells)if(!best||cell.pos[1]>best.pos[1])best={...cell,owner};for(const child of object.children)walk(child,owner)}
@@ -105,7 +112,7 @@ export async function runPerformanceScenarios({command,evaluate,until,click,aria
         if(round>=options.warmup){
           const inPreview=event=>event.start>=preview.startedAt&&event.start+event.duration<=preview.submittedAt+.01
           const scheduled=phaseEvents.events.findLast(event=>inPreview(event)&&event.name==='interaction.numeric-schedule'),delivered=phaseEvents.events.findLast(event=>inPreview(event)&&event.name==='interaction.numeric-delivery'),viewport=phaseEvents.events.findLast(event=>inPreview(event)&&event.name==='viewport.props')
-          numericSequence.push({harnessToPreviewMs:preview.submittedAt-sequenceStart.at,fullValidations:phaseEvents.events.filter(event=>event.sequence>sequenceStart.sequence&&event.name==='validation.total'&&event.start+event.duration<=preview.submittedAt+.01).length,...(scheduled&&delivered?{scheduledToDeliveryMs:delivered.start-scheduled.start,deliveryMs:delivered.duration,publishToFrameMs:preview.submittedAt-delivered.start-delivered.duration,...(viewport?{publishToViewportMs:viewport.start-delivered.start-delivered.duration,viewportMs:viewport.duration,viewportToFrameMs:preview.submittedAt-viewport.start-viewport.duration}:{})}:{})})
+          numericSequence.push({harnessToPreviewMs:preview.submittedAt-sequenceStart.at,...validationCoverage(phaseEvents.events,sequenceStart.sequence,preview.submittedAt),...(scheduled&&delivered?{scheduledToDeliveryMs:delivered.start-scheduled.start,deliveryMs:delivered.duration,publishToFrameMs:preview.submittedAt-delivered.start-delivered.duration,...(viewport?{publishToViewportMs:viewport.start-delivered.start-delivered.duration,viewportMs:viewport.duration,viewportToFrameMs:preview.submittedAt-viewport.start-viewport.duration}:{})}:{})})
           samples.pick.push(pickResult.latency);samples.preview.push(preview.latency);samples.commit.push(commit.latency);samples.undo.push(undo.latency);samples.cpuSubmission.push(commit.cpuSubmission);resources.push(commit.frame)
           for(const [action,ack] of Object.entries({pick:pickResult,preview,commit,undo})){
             const totals={},calls={}

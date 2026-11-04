@@ -1218,11 +1218,69 @@ Esc không phát muộn, one-Undo và full document/instance readback:
 SLO: pair selection-all Undo quan sát 3,27 s ở mẫu này, cần profile riêng; không
 suy số đo dense root đơn sang transform toàn bộ scene có nhiều multi-block.
 
-P03 incremental validation vẫn chưa triển khai. **Đề xuất tiếp:** profile full
-schema/candidate allocation ở 100k và thiết kế proof cho changed roots + occupancy
-index, giữ import/load/full commit gate đến khi differential parity được chứng minh.
+Riêng slice numeric không thay validation; subset P03 tiếp sau được ghi bên dưới.
+Định hướng đã chọn là profile full schema/candidate allocation ở 100k và proof cho
+changed roots + occupancy index, giữ import/load/full commit gate.
 Không mở rộng thành worker/full renderer rewrite chỉ vì còn độ trễ; 100k preview
 345 ms vẫn chưa là tương tác mượt hoặc R1 hardware/builder acceptance.
+
+**Cập nhật P03 preview validation — 04/11/2026:** đã có subset theo một live
+gesture immutable khi auto connections tắt. Full-validate base một lần + occupancy
+index toàn document, rồi whole changed-root schema/state/pair validation và kiểm
+occupied cells với untouched roots. Private adapters giữ topology/IDs/counts và
+metadata/entities; không xuất API nhận arbitrary candidate để bỏ validation.
+Subset/collision failure chạy full fallback để giữ đúng cả chấp nhận/từ chối và
+ưu tiên lỗi của public validator. Zero intent dùng base đã kiểm. Auto connections
+giữ đường full, kể cả khi rules chưa có; commit luôn bỏ proof và full-validate
+candidate mới. Import/load/persistence/public `previewTransform` giữ hợp đồng cũ.
+
+Controller chỉ giữ một context: document reference, scope/epoch/revision, selection
+và order, catalog, view, space/pivot, connection policy. Cancel, commit, selection/
+document publishing, lifecycle, workspace boundary và unmount loại index/proof.
+Base/catalog nested values phải immutable; không cache theo identity cho mutation
+tại chỗ, không proof/token lưu trữ. Base/index và candidate/root-list scans còn O(n);
+all-selected vẫn kiểm toàn nội dung đổi. Không đóng toàn bộ P03/occupancy indexing.
+
+Code gate **609/609 tests, 53 file**, typecheck/lint/build. Differential matrix 75
+case dùng cùng session cho group/component, bed/door/log và free entity; root/state/
+collision/bounds/pivot/selection/error parity khớp public full path. Controller tests
+kiểm từng context invalidation, bounded one-context retention, neighbor full path,
+invalid-base fallback và selection copy. Không coi test count là world/runtime gate.
+Full native production regression đã đạt sau tích hợp hook/lifecycle: resources/
+animation, transforms/neighbor patches, visibility/Y, component/R1 house, NBT/portable,
+Save/draft/fault/recovery và workspace isolation. Normal URL không bật probe; không
+có runtime exceptions. Đã xem screenshot compact; không thay giao diện hoặc schema.
+
+Đo dense seed 1/root Y+256, Intel UHD/D3D11/Edge 156, 1500×1000/DPR1,
+**30 mẫu/3 warmup**. Fixture/resource/profile/browser/renderer khớp trước/sau:
+
+| Cells | Native final-key preview p50 trước → sau (ms) | p95 trước → sau (ms) |
+| --- | --- | --- |
+| 10.000 | 25,2 → 3,6 | 27,5 → 6,1 |
+| 100.000 | 315,6 → 90,3 | 336,5 → 287,1 |
+
+Valid final preview root đơn ở 100k: changed-root validation p95 0,3 ms, pure
+transform.preview p95 12,9 ms (nested spans, không cộng); numeric scheduling/UI/frame
+chờ vẫn nằm trong end-to-end. Max 100k tăng 348,9 → 638,2 ms trong các runs này;
+tail còn dao động và có khoảng post-publish/frame chưa quy chiếu hết. Không tuyên
+bố mọi preview mượt hoặc quy mọi delta cho code; runs tuần tự chưa kiểm soát
+thermal/background load/GC. Commit không dùng fast path: 60 measured commits đều
+full-validate một lần; final JSON + CPU instance-buffer readback khớp sau Undo,
+idle một giây bằng 0 frame. Native 100k Enter/Esc pending checks đạt.
+
+Reports local `editor-validation-before.json`, `editor-validation-after.json`,
+`editor-validation-comparison.json`; probe phân biệt full-scene và changed-root
+subdocument calls. 10k G/Y/256 có 2 full calls (base + collision fallback ở một
+giá trị trung gian) và 3 subset calls; 100k coalesced có 1 base full + 1 subset.
+Full schema không bị loại, chỉ tránh kiểm lại untouched content trong preview.
+Smoke chọn-all pairs/component 25k (1 mẫu/0 warmup) cũng đạt full JSON và instance
+readback, immediate Enter/Esc và one-Undo: `editor-validation-multiselect-smoke.json`.
+Không suy SLO từ một mẫu; pair select-all Undo vẫn quan sát 3,05 s, chưa giải quyết
+bằng fast path preview này. Commit/history/rendering toàn scene cần profile riêng.
+
+**Đề xuất tiếp:** quy chiếu tail post-publish/frame và profile chọn nhiều/all roots
+trước khi tối ưu commit/history hoặc mở rộng proof sang neighbor rules. Không suy
+root đơn dense sang mọi scene/group, không nới cap hoặc giảm correctness gates.
 
 **Q02:** audit chỉ đọc tìm bốn candidate version manifests, báo
 `INSTANCE_SELECTION_REQUIRED`. Một candidate `content 26.2` có embedded

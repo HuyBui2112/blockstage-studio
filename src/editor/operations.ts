@@ -104,7 +104,7 @@ export type TransformPreview = { document: EditorDocument | null; blocks: SceneB
 export function previewTransform(document: EditorDocument, ids: string[], intent: TransformIntent, space: CoordinateSpace, pivotMode: PivotMode, catalog: Material[], rules?: NeighborRules): TransformPreview {
   return measurePhase('transform.preview',()=>previewTransformInner(document,ids,intent,space,pivotMode,catalog,rules))
 }
-function previewTransformInner(document:EditorDocument,ids:string[],intent:TransformIntent,space:CoordinateSpace,pivotMode:PivotMode,catalog:Material[],rules?:NeighborRules):TransformPreview{
+function previewTransformInner(document:EditorDocument,ids:string[],intent:TransformIntent,space:CoordinateSpace,pivotMode:PivotMode,catalog:Material[],rules?:NeighborRules,validateCandidate:(candidate:EditorDocument)=>void=candidate=>validateDocument(candidate,catalog)):TransformPreview{
   let candidate: EditorDocument
   let neighbors: SceneBlock[] = []
   let notes:string[]=[]
@@ -114,8 +114,47 @@ function previewTransformInner(document:EditorDocument,ids:string[],intent:Trans
   } catch (error) { return { document: null, blocks: [], valid: false, error: error instanceof Error ? error.message : 'Invalid transform' } }
   const chosen = new Set(ids)
   const blocks = [...candidate.objects.filter(object => chosen.has(object.id)).flatMap(object => objectCells(object).map(cell => ({ ...cell, owner: object.id }))),...neighbors.filter(block=>!chosen.has(block.owner))]
-  try { validateDocument(candidate, catalog); return { document: candidate, blocks, valid: true, error: null, notes } }
+  try { validateCandidate(candidate); return { document: candidate, blocks, valid: true, error: null, notes } }
   catch (error) { return { document: null, blocks, valid: false, error: error instanceof Error ? error.message : 'Invalid transform' } }
+}
+/** Preview-only proof scoped to one short gesture. Base and catalog (including
+ * nested values) must remain immutable for its entire lifetime. Recreate on any
+ * document/catalog change; this is never validation proof for a commit.
+ * Only the private topology-preserving move/rotation adapters create candidates.
+ */
+export function createTransformPreviewSession(base: EditorDocument, catalog: Material[]): {
+  preview(ids: string[], intent: TransformIntent, space: CoordinateSpace, pivotMode: PivotMode): TransformPreview
+} {
+  measurePhase('transform.validation-base', () => validateDocument(base, catalog))
+  const occupancy = measurePhase('transform.base-index', () => {
+    const index = new Map<string, string>()
+    for (const root of base.objects) for (const cell of objectCells(root)) index.set(cell.pos.join(','), root.id)
+    return index
+  })
+  const validateCandidate = (candidate: EditorDocument) => {
+    if (candidate === base) return
+    const changedRoots = candidate.objects.filter((root, index) => root !== base.objects[index])
+    const changedIds = new Set(changedRoots.map(root => root.id))
+    // Topology, IDs, global budgets, metadata and entities are unchanged by the
+    // private adapters. Whole-root validation retains nested schemas, states,
+    // logical pairs and collisions within/between all changed roots.
+    try {
+      measurePhase('transform.validation-subset', () => validateDocument({ ...candidate, objects: changedRoots, entities: [] }, catalog))
+      for (const root of changedRoots) for (const cell of objectCells(root)) {
+        const key = cell.pos.join(',')
+        const owner = occupancy.get(key)
+        if (owner !== undefined && !changedIds.has(owner)) throw new Error(`Cell collision at ${key}`)
+      }
+    } catch {
+      // Invalid previews retain the full validator's diagnostic ordering. The
+      // full result also wins over any unforeseen conservative subset failure.
+      measurePhase('transform.validation-fallback', () => validateDocument(candidate, catalog))
+    }
+  }
+  return {
+    preview: (ids, intent, space, pivotMode) => measurePhase('transform.preview', () =>
+      previewTransformInner(base, ids, intent, space, pivotMode, catalog, undefined, validateCandidate)),
+  }
 }
 export function groupObjects(document: EditorDocument, ids: string[], name: string, catalog: Material[]): EditorDocument {
   const objects = selected(document, ids), chosen = new Set(ids)

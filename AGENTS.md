@@ -182,6 +182,17 @@ layers and arbitrary clip planes remain unsupported; full K05 remains partial.
   Fresh synchronous transform commits reuse their exact fully validated neighbor
   candidate/notes once, retaining final view-policy guards; an old UI preview is
   never validation proof. Standalone logical validation remains strict.
+  Transform preview may use one immutable gesture-scoped base proof/occupancy index
+  with auto connections OFF: validate base fully once, schema/state/pair-check whole
+  changed roots together and check them against untouched occupied cells. Only the
+  private topology-preserving adapters create candidates. Invalid subset results
+  fall back to full validation, preserving public diagnostics. Auto connections,
+  commit/import/load/public preview keep full validation. Never reuse this proof
+  for commit or mutable inputs. Reset on document/epoch/revision/scope/selection,
+  catalog/view/space/pivot/policy changes, cancel, lifecycle and workspace/unmount.
+  Keep one context only; no persistent/global cache. Base/index and root scans are
+  still O(n); all-selected previews still validate all changed content. Measurement
+  must distinguish changed-root subdocument validation from full-scene validation.
   Block rendering reuses unchanged 16³ chunk instance batches and picking snapshots.
   Immutable input diff still scans visible cells; owner/state/position/order changes
   invalidate affected chunks, including both old/new negative chunk coordinates.

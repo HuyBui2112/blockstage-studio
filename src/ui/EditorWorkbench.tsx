@@ -1,6 +1,6 @@
 import { ViewControls } from './ViewControls'
 import { createRootViewResolver, editableRootIds, assertViewEdit, toggleRootHidden, toggleRootLocked, type EditorViewState } from '../editor/view-state'
-import { Suspense, lazy, useMemo, useState, type KeyboardEvent } from 'react'
+import { Suspense, lazy, useEffect, useMemo, useState, type KeyboardEvent } from 'react'
 import { defaultState, validateState } from '../core/catalog'
 import { bounds } from '../core/assembly'
 import { resourceName } from '../core/labels'
@@ -110,6 +110,8 @@ export function EditorWorkbench({ resources, session, workspace, onWorkspace, on
   const [libraryOpen, setLibraryOpen] = useState(() => matchMedia('(min-width: 761px)').matches)
   const [inspectorOpen, setInspectorOpen] = useState(() => matchMedia('(min-width: 1000px)').matches)
   const interactionKey=`${scope}:${document.id}:${slot.epoch}:${readOnly}`
+  const cancelTransformPreview=session.cancelPreview
+  useEffect(()=>{cancelTransformPreview();return cancelTransformPreview},[interactionKey,cancelTransformPreview])
   const [interactionOwner,setInteractionOwner]=useState(interactionKey)
   if(interactionOwner!==interactionKey){setInteractionOwner(interactionKey);setTool('select');setPlacementHit(null);setRegionPlacement(false);setRegionDragging(false)}
   const viewState = session.views[scope]

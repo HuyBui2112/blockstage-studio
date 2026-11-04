@@ -616,7 +616,7 @@ Các span **inclusive, lồng nhau**, không cộng chúng thành tổng latency
 reconciliation/passive effects và khoảng chưa instrument vẫn chưa được quy chiếu;
 không có span không có nghĩa là không tốn thời gian.
 
-Validation giữ full document schema tại mọi đường hiện hành. Mỗi lượt tạo registry
+Import/load/commit và public `previewTransform` giữ full document schema. Mỗi lượt tạo registry
 index và deduplicate state hợp lệ theo nội dung, không cache qua các lượt/document.
 Sau schema và registry pass, footprint visitor vẫn kiểm complete pairs, shared
 properties và cấu trúc logical mà không parse từng cell lần hai. Public standalone
@@ -624,6 +624,29 @@ logical validator vẫn strict. Transform commit tính candidate mới đồng b
 liệu hiện tại, giữ nguyên neighbor notes và commit đúng candidate vừa full-validate
 một lần; không dùng preview UI cũ làm bằng chứng. Final view-policy guard và history
 atomic vẫn chạy; import/persistence không nhận đường bỏ validation.
+
+Preview Move/Rotate khi auto connections tắt có một session chỉ sống trong gesture:
+full-validate immutable base/catalog một lần rồi dựng occupancy index theo root owner
+(kể cả explicit air và các root không hiển thị). Candidate chỉ do các adapter private
+giữ nguyên topology tạo ra: IDs, counts, metadata/entities và cây không đổi. Mỗi
+preview kiểm whole changed roots bằng schema/registry/pair validator một batch, rồi
+đối chiếu occupied cells mới với untouched roots; changed-selected collisions nằm
+trong batch đó. Zero intent tái dùng base đã kiểm. Nếu subset/collision check thất
+bại, chạy full validation để giữ đúng kết quả và ưu tiên lỗi của đường public cũ.
+
+Controller chỉ giữ một context theo document reference, scope/epoch/revision,
+selection/order, catalog reference, view policy, space/pivot và connection policy.
+Nested base/catalog phải immutable; đây không phải cache cho dữ liệu mutable hoặc
+validation token có thể lưu/nhập. Cancel/commit/publish document/selection/lifecycle,
+workspace boundary/unmount loại proof/index. Auto connections dùng full preview path
+kể cả khi chưa có neighbor rules. Commit luôn bỏ proof, tính candidate mới và full
+validate; không thể dùng session này để bỏ validation tại trust boundary.
+Base validation/index vẫn O(n), candidate/root diff còn quét danh sách roots; selection
+toàn scene vẫn kiểm toàn nội dung đổi. Không tuyên bố mọi thao tác thành O(delta).
+Probe tách `transform.validation-base`, `transform.base-index`,
+`transform.validation-subset` và `transform.validation-fallback`; `validation.total`
+luôn kiểm đầy đủ document argument, có thể là changed-root subdocument. Whole-sequence
+report phân biệt full-scene với subset calls, không đếm subset như full-scene proof.
 
 Block scene giữ snapshot theo chunk 16³, so owner/position/state để nhận thay đổi
 trên immutable scene input. Mỗi lần update vẫn quét toàn visible cell list; chỉ

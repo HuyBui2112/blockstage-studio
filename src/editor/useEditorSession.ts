@@ -21,6 +21,7 @@ import { applyCopyAction, type CopyActionPlan } from './copy-action'
 import { applyPrimitiveAction, type PrimitiveActionPlan } from './primitive-action'
 import { applyMaterialReplacement, type MaterialReplacementPlan } from './material-plan'
 import { measurePhase } from '../core/measurement-phases'
+import { createTransformPreviewController } from './transform-preview-controller'
 
 export type EditorScope = 'architecture' | 'component'
 export type TransformIntent = { kind: 'move'; delta: Vec3 } | { kind: 'rotate'; turns: number }
@@ -43,6 +44,10 @@ export function useEditorSession(catalog: Material[], neighborRules?: NeighborRu
   const [ready, setReady] = useState(false)
   const [error, setError] = useState('')
   const [preview, setPreview] = useState<Preview | null>(null)
+  const transformPreviews=useRef<ReturnType<typeof createTransformPreviewController>|null>(null)
+  if(!transformPreviews.current)transformPreviews.current=createTransformPreviewController()
+  const cancelPreview=useCallback(()=>{transformPreviews.current?.reset();setPreview(null)},[])
+  useEffect(()=>{const owned=transformPreviews.current;return()=>owned?.reset()},[])
   const [clipboard, setClipboard] = useState<EditorClipboard | null>(null)
   const currentSlots = useRef({ ...slots })
   const saving = useRef(new Set<EditorScope>())
@@ -56,7 +61,7 @@ export function useEditorSession(catalog: Material[], neighborRules?: NeighborRu
     viewRef.current = { ...viewRef.current, [scope]: next }; setViews(viewRef.current)
     const allowed = new Set(editableRootIds(slot.history.document, next))
     setSlots(previous => ({ ...previous, [scope]: { ...slot, selection: slot.selection.filter(id => allowed.has(id)) } }), false)
-    setPreview(null)
+    cancelPreview()
   }
   const refreshRecoveries = useCallback(async () => {
     const list = await draftRepository.list()
@@ -70,6 +75,7 @@ export function useEditorSession(catalog: Material[], neighborRules?: NeighborRu
     return measurePhase('session.publish',()=>setSlotsInner(update,protectDraft))
   }
   function setSlotsInner(update:(previous:Record<EditorScope,Slot>)=>Record<EditorScope,Slot>,protectDraft:boolean){
+    transformPreviews.current?.reset()
     const before = currentSlots.current
     let next = { ...update(before) }
     for (const scope of ['architecture', 'component'] as const) {
@@ -99,7 +105,7 @@ export function useEditorSession(catalog: Material[], neighborRules?: NeighborRu
     if (lifecycle.current.has(scope) || saving.current.has(scope)) { setError('An operation is in progress. Retry when it finishes.'); return false }
     lifecycle.current.add(scope)
     setBusy(previous => ({ ...previous, [scope]: true }))
-    setPreview(null)
+    cancelPreview()
     try { await controllers.current[scope]?.pause(); await work(); setError(''); void refreshRecoveries().catch(() => {}); return true }
     catch (error) { setError(messageOf(error)); return false }
     finally { lifecycle.current.delete(scope); controllers.current[scope]?.resume(); setBusy(previous => ({ ...previous, [scope]: false })) }
@@ -196,7 +202,7 @@ export function useEditorSession(catalog: Material[], neighborRules?: NeighborRu
       const history = executeHistory(slot.history, next, label)
       return { ...previous, [scope]: { ...slot, history, pristine: slot.pristine && history === slot.history, selection: (selection ?? slot.selection).filter(id => available.has(id)) } }
     })
-    setPreview(null)
+    cancelPreview()
     setError('')
   }
   function perform(scope: EditorScope, label: string, operation: (document: EditorDocument) => EditorDocument, selection?: string[]) {
@@ -206,7 +212,7 @@ export function useEditorSession(catalog: Material[], neighborRules?: NeighborRu
   function select(scope: EditorScope, ids: string[], toggle: boolean) {
     // Copy previews are session-only; selection changes never publish them.
     if (lifecycle.current.has(scope)) return
-    setPreview(null)
+    cancelPreview()
     setSlots(previous => {
       const slot = previous[scope], available = new Set(editableRootIds(slot.history.document, viewRef.current[scope]))
       const selection = toggle ? new Set(slot.selection) : new Set<string>()
@@ -250,7 +256,7 @@ export function useEditorSession(catalog: Material[], neighborRules?: NeighborRu
   }
   function history(scope: EditorScope, redo: boolean) {
     if (lifecycle.current.has(scope)) return
-    setPreview(null)
+    cancelPreview()
     setError('')
     setSlots(previous => {
       const slot = previous[scope], next = redo ? redoHistory(slot.history) : undoHistory(slot.history)
@@ -259,12 +265,15 @@ export function useEditorSession(catalog: Material[], neighborRules?: NeighborRu
   }
   function transform(scope: EditorScope, intent: TransformIntent, phase: 'preview' | 'commit' | 'cancel', space: CoordinateSpace, pivot: PivotMode) {
     if (lifecycle.current.has(scope)) return
-    if (phase === 'cancel') { setPreview(null); setError(''); return }
+    if (phase === 'cancel') { cancelPreview(); setError(''); return }
     const slot = slots[scope]
-    const result = previewTransform(slot.history.document, slot.selection, intent, space, pivot, catalog, autoConnections[scope]?neighborRules:undefined)
+    if(phase==='commit')transformPreviews.current?.reset()
+    const result = phase==='preview'
+      ? transformPreviews.current!.preview({document:slot.history.document,catalog,scope,epoch:slot.epoch,revision:slot.revision,selection:slot.selection,space,pivot,view:viewRef.current[scope],autoConnections:autoConnections[scope],rules:autoConnections[scope]?neighborRules:undefined},intent)
+      : previewTransform(slot.history.document, slot.selection, intent, space, pivot, catalog, autoConnections[scope]?neighborRules:undefined)
     if (result.valid && result.document) { try { assertViewEdit(slot.history.document, result.document, viewRef.current[scope]) } catch (error) { result.valid = false; result.error = messageOf(error); result.document = null } }
     if (phase === 'preview') { setPreview({ scope, result }); return }
-    setPreview(null)
+    cancelPreview()
     if (!result.valid || !result.document) { setError(result.error ?? 'Cannot commit this transform'); return }
     // This result was computed and fully validated synchronously above, against
     // the current scene/rules. Commit its exact neighbor candidate once; never
@@ -478,8 +487,8 @@ export function useEditorSession(catalog: Material[], neighborRules?: NeighborRu
       setComponents(previous => previous.filter(asset => asset.id !== id))
     } catch (error) { setError(messageOf(error)) }
   }
-  function configureConnections(scope:EditorScope,enabled:boolean){setPreview(null);setConnectionNotes(null);setAutoConnections(previous=>({...previous,[scope]:enabled}))}
-  return { views, changeView, clipboard, copySelection, commitCopy, commitPrimitive, commitMaterial, importStructure, restorePortable, draftStatus, recoveryCount, refreshRecoveries, restoreRecovery, discardRecovery, recoveryDocument, retryDraft, busy, refreshDocuments, renameSaved, deleteDocument, discardChanges, autoConnections, connectionNotes, configureConnections, slots, components, ready, error, setError, preview, cancelPreview: () => setPreview(null), select, history, transform, place, group, ungroup, remove, updateState, setPivot, move, rotate, rename, save, newDocument, open, importDocument, saveComponent, editComponent, placeComponent, importComponent, removeComponent }
+  function configureConnections(scope:EditorScope,enabled:boolean){cancelPreview();setConnectionNotes(null);setAutoConnections(previous=>({...previous,[scope]:enabled}))}
+  return { views, changeView, clipboard, copySelection, commitCopy, commitPrimitive, commitMaterial, importStructure, restorePortable, draftStatus, recoveryCount, refreshRecoveries, restoreRecovery, discardRecovery, recoveryDocument, retryDraft, busy, refreshDocuments, renameSaved, deleteDocument, discardChanges, autoConnections, connectionNotes, configureConnections, slots, components, ready, error, setError, preview, cancelPreview, select, history, transform, place, group, ungroup, remove, updateState, setPivot, move, rotate, rename, save, newDocument, open, importDocument, saveComponent, editComponent, placeComponent, importComponent, removeComponent }
 }
 
 export type EditorSession = ReturnType<typeof useEditorSession>
