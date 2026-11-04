@@ -2,11 +2,33 @@ import { describe, expect, it } from 'vitest'
 import { Ray, Vector3 } from 'three'
 import type { SceneBlock, Vec3 } from '../core/schema'
 import { CellPicker } from './cell-picking'
+import { SceneChunks } from './scene-chunks'
 
 const block = (pos: Vec3, name = 'minecraft:iron_chain', owner = pos.join(',')): SceneBlock => ({ pos, owner, state: { name, properties: {} } })
 const ray = (origin: Vec3, direction: Vec3) => new Ray(new Vector3(...origin), new Vector3(...direction).normalize())
 
 describe('editor cell picking', () => {
+  it('matches fresh picking after incremental move/state/rebind/removal/Undo and preserves placement filters',()=>{
+    const chunks=new SceneChunks(),picker=new CellPicker([])
+    const a=block([-1,0,0],'minecraft:iron_chain','a'),b=block([16,0,0],'minecraft:stone','b')
+    const scenes=[[a,b],[{...a,pos:[-17,0,0] as Vec3},b],[{...a,owner:'replacement',state:{name:'minecraft:stone',properties:{}}},b],[b],[a,b],[]]
+    const rays=[ray([-30,.5,.5],[1,0,0]),ray([30,.5,.5],[-1,0,0]),ray([-.5,4,.5],[0,-1,0])]
+    for(const scene of scenes){
+      picker.updateChunks(chunks.update(scene).chunks)
+      const fresh=new CellPicker(scene)
+      for(const sight of rays)for(const eligible of [undefined,(value:SceneBlock)=>value.owner==='b',(value:SceneBlock)=>value.state.name==='minecraft:iron_chain']){
+        expect(picker.hit(sight,eligible)).toEqual(fresh.hit(sight,eligible))
+      }
+    }
+  })
+  it('follows new chunk order for exact edge ties, including clone-equal chunks',()=>{
+    const a=block([15,0,0],'minecraft:stone','a'),b=block([16,0,0],'minecraft:stone','b')
+    const chunks=new SceneChunks(),picker=new CellPicker([]),sight=ray([16,.5,-4],[0,0,1])
+    picker.updateChunks(chunks.update([a,b]).chunks)
+    expect(picker.hit(sight)?.block.owner).toBe('a')
+    picker.updateChunks(chunks.update([b,a]).chunks)
+    expect(picker.hit(sight)?.block.owner).toBe('b')
+  })
   it('skips locked owners for selection while retaining their placement surfaces',()=>{
     const locked=block([0,0,0],'minecraft:iron_chain','locked'),editable=block([0,0,2],'minecraft:stone','editable')
     const picker=new CellPicker([locked,editable]),selectable=new Set(['editable'])

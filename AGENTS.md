@@ -182,6 +182,15 @@ layers and arbitrary clip planes remain unsupported; full K05 remains partial.
   Fresh synchronous transform commits reuse their exact fully validated neighbor
   candidate/notes once, retaining final view-policy guards; an old UI preview is
   never validation proof. Standalone logical validation remains strict.
+  Block rendering reuses unchanged 16³ chunk instance batches and picking snapshots.
+  Immutable input diff still scans visible cells; owner/state/position/order changes
+  invalidate affected chunks, including both old/new negative chunk coordinates.
+  Resolve position-dependent model variants again on changed cells/chunks. Resource
+  stack/profile/resolver/catalog changes and cache eviction clear all dependent
+  batches/ghost clones before shared resources. Chunk disposal owns instance buffers
+  only; never dispose shared geometry/maps/materials. Refresh active animations.
+  CPU instance-buffer readback is not GPU completion/pixel proof. Entities/occupancy/
+  flatten remain on their existing full-update paths; do not claim O(delta) globally.
 - `check:fabric` is bounded read-only inventory. No launcher/world/account/options
   modifications or implicit EULA, downloads, installs or game launch. Metadata
   presence never closes Q02; selected Java/enabled mods and world readback remain

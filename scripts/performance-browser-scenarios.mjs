@@ -14,6 +14,12 @@ function highestCell(document){
   for(const object of document.objects)walk(object,object.id)
   return best
 }
+function expectedRenderHash(document){
+  const records=[]
+  const walk=(object,owner)=>{for(const cell of object.cells)if(!['minecraft:air','minecraft:cave_air','minecraft:void_air'].includes(cell.state.name))records.push(JSON.stringify([owner,cell.pos.map(value=>value+.5),cell.state.name,Object.entries(cell.state.properties).sort(([a],[b])=>a<b?-1:a>b?1:0)]));for(const child of object.children)walk(child,owner)}
+  for(const object of document.objects)walk(object,object.id)
+  return {cells:records.length,sha256:hash(JSON.stringify(records.sort()))}
+}
 
 /** Disposable origin and native events; no direct document/history mutation. */
 export async function runPerformanceScenarios({command,evaluate,until,click,aria,upload,key,screenshot,directory}){
@@ -81,6 +87,15 @@ export async function runPerformanceScenarios({command,evaluate,until,click,aria
         assert.deepEqual(await cells(),moved,'Acknowledged commit must contain the intended moved cells')
         await keyEvent('KeyZ','z',2)
         const undo=await frame(`!m.preview&&m.revision.endsWith(':${before+2}')`)
+        for(const ack of [commit,undo]){
+          const work=ack.frame.sceneUpdate
+          assert.ok(work,'Measured scene must acknowledge its chunk update')
+          if(kind==='dense'&&options.selection==='root'&&count>=10000){
+            assert.ok(work.changedChunks+work.removedChunks<=2,'Single-cell move only invalidates old/new chunks')
+            assert.ok(work.retainedBatches>0,'Unchanged chunks retain their instance batches')
+            assert.ok(work.resolvedCells<count,'Do not resolve every block for a one-root edit')
+          }
+        }
         const phaseEvents=await evaluate(`globalThis.__blockstagePhaseRead?.()??null`)
         assert.ok(phaseEvents&&Array.isArray(phaseEvents.events),'Measured viewport must expose its phase collector')
         assert.deepEqual(await cells(),initial,'Undo returns the fixture cells exactly')
@@ -102,6 +117,27 @@ export async function runPerformanceScenarios({command,evaluate,until,click,aria
       assert.ok(downloaded,'Complete editor JSON must download after the measurement')
       assert.deepEqual(downloaded.objects,fixture.document.objects,'Every object/cell/state is restored after the final Undo')
       assert.deepEqual(downloaded.entities,fixture.document.entities,'Block transforms leave free entities unchanged')
+      // Read actual submitted instance buffers, outside timed samples. Public JSON
+      // alone cannot prove that reused batches contain the restored cell matrices.
+      const renderReadback=await evaluate(`(async()=>{
+        const host=document.querySelector('.viewport');let fiber=host[Object.keys(host).find(name=>name.startsWith('__reactFiber'))],controller;
+        for(;fiber&&!controller;fiber=fiber.return)for(let hook=fiber.memoizedState;hook;hook=hook.next){const value=hook.memoizedState?.current;if(value?.renderer&&value?.blockScene){controller=value;break}}
+        if(!controller)throw new Error('Expected the active block scene controller');
+        const records=[];
+        if(controller.group.children.filter(mesh=>mesh.isInstancedMesh).length!==controller.batches.length)throw new Error('Orphaned or missing scene batch');
+        for(const mesh of controller.batches){
+          const blocks=mesh.userData.blocks,a=mesh.instanceMatrix.array;
+          if(mesh.parent!==controller.group||!mesh.visible||mesh.count!==blocks.length)throw new Error('Inactive or stale instance batch');
+          for(let i=0;i<blocks.length;i++){
+            if(records.length>=100000)throw new Error('Render readback budget exceeded');
+            const block=blocks[i];records.push(JSON.stringify([block.owner,[a[i*16+12],a[i*16+13],a[i*16+14]],block.state.name,Object.entries(block.state.properties).sort(([a],[b])=>a<b?-1:a>b?1:0)]));
+          }
+        }
+        const bytes=new TextEncoder().encode(JSON.stringify(records.sort())),digest=await crypto.subtle.digest('SHA-256',bytes);
+        return {cells:records.length,sha256:[...new Uint8Array(digest)].map(value=>value.toString(16).padStart(2,'0')).join('')};
+      })()`)
+      assert.deepEqual(renderReadback,expectedRenderHash(fixture.document),'Every visible instance matrix/owner/state must match the independent fixture after Undo')
+      result.renderReadback={...renderReadback,limits:'CPU instance buffer and draw-group readback after timed samples; not GPU execution or pixel parity'}
       await focus();await keyEvent('KeyQ','q')
       await until(`document.querySelector('[aria-label="Draft protection"]')?.dataset.phase==='protected'`)
       await evaluate('new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)))')

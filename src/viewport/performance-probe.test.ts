@@ -13,8 +13,9 @@ describe('opt-in CPU frame submission acknowledgement',()=>{
     const probe=new PerformanceProbe(canvas)
     probe.frame(renderer,105,'architecture:doc:epoch:8',true,1,'owner',[1,256,3])
     expect(JSON.parse(canvas.dataset.editorMeasurement!)).toMatchObject({frame:1,submittedAt:110,cpuSubmissionMs:5,revision:'architecture:doc:epoch:8',preview:true,previewFirst:[1,256,3],active:'owner',drawCalls:7,geometries:3,textures:4})
-    probe.frame(renderer,108,'architecture:doc:epoch:9',false,1,'owner',null)
-    expect(JSON.parse(canvas.dataset.editorMeasurement!)).toMatchObject({frame:2,revision:'architecture:doc:epoch:9',preview:false,previewFirst:null})
+    const sceneUpdate={chunks:30,changedChunks:2,removedChunks:0,createdBatches:2,retainedBatches:28,resolvedCells:1024}
+    probe.frame(renderer,108,'architecture:doc:epoch:9',false,1,'owner',null,sceneUpdate)
+    expect(JSON.parse(canvas.dataset.editorMeasurement!)).toMatchObject({frame:2,revision:'architecture:doc:epoch:9',preview:false,previewFirst:null,sceneUpdate})
     expect(info).toEqual(before)
   })
 })

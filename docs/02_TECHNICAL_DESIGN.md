@@ -625,6 +625,25 @@ liệu hiện tại, giữ nguyên neighbor notes và commit đúng candidate v�
 một lần; không dùng preview UI cũ làm bằng chứng. Final view-policy guard và history
 atomic vẫn chạy; import/persistence không nhận đường bỏ validation.
 
+Block scene giữ snapshot theo chunk 16³, so owner/position/state để nhận thay đổi
+trên immutable scene input. Mỗi lần update vẫn quét toàn visible cell list; chỉ
+chunk thay đổi hoặc bị xóa mới tháo/tạo instance batches. Chunk không đổi giữ
+`InstancedMesh`, instance buffer, shared geometry/material và snapshot picking.
+Thứ tự cell trong chunk và thứ tự chunk hiện hành được giữ để ray ties ổn định;
+owner-only replacement cũng phải refresh `userData.blocks`. Di chuyển resolve
+model lại tại vị trí mới, kể cả trong cùng chunk, vì weighted variants phụ thuộc
+tọa độ. Không suy geometry/model size thành occupied footprint.
+
+Pack/profile/resolver/catalog thay đổi hoặc cache vượt ngưỡng cũ sẽ clear toàn
+scene cache; ghost instance/material clones được tháo trước shared resources.
+Chunk removal chỉ dispose instance-owned resources, không dispose shared maps/
+geometry/material. Animations được tính lại từ committed meshes, entities và ghost
+đang dùng. Entity meshes vẫn rebuild theo đường hiện tại; occupancy Set/flatten và
+snapshot diff vẫn có chi phí O(n), chưa là incremental document index hoặc DDA.
+Clip/local và editor hide/isolate/Y filtering cập nhật cùng snapshot render/picking;
+không đổi collision/document/history policy. Opt-in probe ghi counters chunk thay
+đổi, batch giữ lại và cell resolve; URL thường không serialize chúng ra DOM.
+
 ### 6.2 Kiểm kê Fabric chỉ đọc
 
 `pnpm check:fabric` tìm metadata versions ở vị trí `.minecraft` thông thường;

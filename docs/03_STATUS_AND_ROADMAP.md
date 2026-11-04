@@ -1123,6 +1123,49 @@ Driver đầy đủ/GPU execution, camera/save/history byte retention và human 
 performance gate vẫn UNVERIFIED; P02/P07 tổng chưa đóng. Không bỏ trust-boundary
 validation hay đổi scene cap để che độ trễ 100k.
 
+**Cập nhật P04 dirty chunks — 04/11/2026:** block renderer/picking dùng chung
+immutable chunk snapshots 16³; chỉ dựng lại batch trong chunk đổi owner, position,
+state hoặc thứ tự cell, tháo chunk bị xóa. Chunk khác giữ instance buffer và GPU
+object. Moves cập nhật cả chunk cũ/mới, resolve weighted model ở vị trí mới;
+Undo/Redo, visibility và resource invalidation dùng cùng đường update. Chunk chỉ
+dispose instance resources; shared geometry/material/texture vẫn thuộc cache.
+Ghost và active animation ownership giữ riêng. Không đổi document/domain rules.
+Code gate đạt **556/556 tests, 50 file**, typecheck/lint/build. Tests kiểm instance-object
+identity/disposal bằng Three.js CPU objects, so snapshot/matrices với full rebuild,
+owner-only rebind, negative chunks và weighted appearance khi move trong cùng chunk.
+Full native production regression cũng đạt: resource precedence/toggle/removal,
+animation, thin-cell picking, neighbor patches, state/transform/group, visibility/Y,
+component/R1 house, import/export và Save/draft/fault/recovery. Normal URL vẫn không
+bật telemetry. Đã xem ảnh nội thất sau chạy; không thay đổi UI hoặc dữ liệu schema.
+
+Đối chiếu cùng phiên, Intel UHD/D3D11/Edge 156, dense seed 1, root đầu tiên Y+256,
+30 mẫu sau 3 warmup, hashes fixture/resource/profile và renderer khớp:
+
+| Cells | Commit p95 trước → sau (ms) | Undo p95 trước → sau (ms) | Viewport rebuild p95 trước → sau (ms) |
+| --- | --- | --- | --- |
+| 10.000 | 84,0 → 64,4 | 45,3 → 29,8 | 35,0 → 13,1 |
+| 100.000 | 686,4 → 432,4 | 413,1 → 166,6 | 303,5 → 51,6 |
+
+Mỗi commit trong 60 samples đổi đúng 2 chunk, resolve 2.160 cells thay vì toàn
+scene; giữ lần lượt 28/140 batches. Every-round preview/commit/Undo và final full
+public JSON khớp fixture. Reports `editor-chunks-before.json`,
+`editor-chunks-after.json`, `editor-chunks-comparison.json`. Lượt readback riêng
+1k/10k/100k (3 mẫu/1 warmup) đọc mọi CPU instance matrix/owner/state và draw-group
+membership sau Undo, hash khớp độc lập với fixture: `editor-chunks-readback-smoke.json`.
+Readback ngoài timed samples; không là GPU completion/pixel parity hoặc SLO.
+Runs tuần tự, không kiểm soát thermal/background load; không quy mọi delta cho code.
+Smoke chọn-all sparse/mixed/transparent/pairs/component/entity ở 1k (3 mẫu/1 warmup)
+cũng đạt full document và render-buffer readback: `editor-chunks-matrix-smoke.json`.
+Không dùng ba mẫu để chốt SLO hoặc suy hiệu suất 100k cho những scene này.
+
+P04 hoàn tất subset dirty block chunks; không triển khai DDA hoặc incremental
+entities. Visible-cell diff, occupancy Set, flatten, document validation và entity
+mesh path vẫn có full-scan/update cost. 100k commit còn 432 ms và numeric preview
+p95 khoảng 802 ms, chưa mượt. **Đề xuất tiếp:** quy chiếu full validation và các
+lượt modal preview lặp khi nhập số trước khi chọn P03 incremental validation hoặc
+coalescing; giữ full trust-boundary validation và differential parity. Camera/GPU
+execution/FPS, memory retention dài hạn và human builder gate tiếp tục UNVERIFIED.
+
 **Q02:** audit chỉ đọc tìm bốn candidate version manifests, báo
 `INSTANCE_SELECTION_REQUIRED`. Một candidate `content 26.2` có embedded
 26.2/4903, Fabric Loader 0.19.5, Fabric API 0.161.0+26.2, 12 available root mod

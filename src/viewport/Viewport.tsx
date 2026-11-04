@@ -20,6 +20,7 @@ import { CONTEXT_CHAIN_IDS } from '../editor/placement-plan'
 import { bakeSpecialBlock, specialBlockAppearance } from '../render/special-blocks'
 import { PerformanceProbe } from './performance-probe'
 import { enableMeasurementPhases,measurePhase } from '../core/measurement-phases'
+import { BlockScene, type BlockAppearance, type SceneUpdate } from './block-scene'
 
 export type { ViewCommand, ViewCommandKind } from './view-commands'
 export type { EditorViewportState, EditorTransformIntent, EditorPlacementHit } from './editor-interaction'
@@ -53,7 +54,9 @@ class ViewportController {
   grid = new T.GridHelper(256, 256, 0x494842, 0x302f2c)
   ray = new T.Raycaster()
   pointer = new T.Vector2()
-  batches: Batch[] = []
+  blockScene = new BlockScene(this.group)
+  sceneUpdate:SceneUpdate|undefined
+  get batches(){return this.blockScene.batches}
   textures: T.Texture[] = []
   textureCache = new Map<string, T.Texture>()
   materialCache = new Map<string, (T.MeshLambertMaterial|T.MeshBasicMaterial)[]>()
@@ -174,7 +177,7 @@ class ViewportController {
       if (this.renderer.domElement.dataset.editorCamera !== cameraData) this.renderer.domElement.dataset.editorCamera = cameraData
     }
     this.editorInteraction.publishHandles()
-    this.measurement?.frame(this.renderer,measureStarted,this.props.editor?.revisionKey,!!this.props.editor?.ghost,this.props.editor?.selected.length??0,this.props.editor?.active??null,this.props.editor?.ghost?.blocks[0]?.pos??null)
+    this.measurement?.frame(this.renderer,measureStarted,this.props.editor?.revisionKey,!!this.props.editor?.ghost,this.props.editor?.selected.length??0,this.props.editor?.active??null,this.props.editor?.ghost?.blocks[0]?.pos??null,this.sceneUpdate)
     if (this.props.onMetrics) {
       const { render, memory }=this.renderer.info
       const metrics: RenderMetrics={drawCalls:render.calls,triangles:render.triangles,geometries:memory.geometries,textures:memory.textures}
@@ -183,8 +186,8 @@ class ViewportController {
     }
   }
   disposeMeshes(clearCaches=true) {
-    for (const b of this.batches) b.dispose()
-    this.batches = []; this.entityMeshes=[]; this.group.clear(); this.animations=[]
+    this.blockScene.clear()
+    this.entityMeshes=[]; this.group.clear(); this.animations=[]
     if (!clearCaches) return
     this.editorInteraction.clearGhostMaterials()
     this.textureImages.clear()
@@ -283,72 +286,60 @@ class ViewportController {
       if (animation) this.animations.push(animation)
     }
   }
+  blockAppearance(b:SceneBlock,catalog:Map<string,Material>,packsEnabled:boolean):BlockAppearance {
+    let mesh:BakedMesh|null=null,renderKey=stateKey(b.state),fallback=false
+    const issues:string[]=[]
+    if(packsEnabled){
+      try{
+        const appearance=specialBlockAppearance(b.state)
+        const special=blockEntityAppearance(b.state.name,b.state.properties)
+        if(appearance){
+          renderKey='special:'+stateKey(b.state)
+          mesh=this.baked.get(renderKey)??bakeSpecialBlock(b.state,this.props.profile,this.resolver)!
+          this.baked.set(renderKey,mesh);issues.push(`${b.state.name}: ${appearance.note}`)
+        }else if(special&&this.props.profile?.entityModels[special.layer]&&this.resolver.files.has(special.texture)){
+          mesh=this.baked.get(renderKey)??bakeEntity(this.props.profile.entityModels[special.layer],special.texture,'block')
+          if(!this.baked.has(renderKey)){
+            mesh.geometry.rotateY(-(['south','west','north','east'].indexOf(b.state.properties.facing))*Math.PI/2)
+            this.baked.set(renderKey,mesh)
+          }
+        }else{
+          // Weighted models depend on the exact world cell, including moves
+          // inside a chunk; resolve every cell in each changed chunk again.
+          const resolved=this.resolver.resolve(b.state,b.pos)
+          renderKey=b.state.name+resolved.key
+          const material=catalog.get(b.state.name)
+          mesh=this.baked.get(renderKey)??bakeBlock(resolved,this.resolver,material?.source==='game-profile'&&!material.hasBlockEntity)
+          this.baked.set(renderKey,mesh)
+        }
+      }catch(error){fallback=true;issues.push(`${b.state.name}: ${error instanceof Error?error.message:String(error)}`)}
+    }else{fallback=true;issues.push('No resource pack is enabled. Showing a placeholder outline.')}
+    const cacheKey=stateKey(b.state)
+    let geometry=mesh?.geometry??this.geometryCache.get(cacheKey)
+    if(!geometry){geometry=blockGeometry(b.state);this.geometryCache.set(cacheKey,geometry)}
+    const materials=mesh?this.modelMaterials(mesh.surfaces,b.state):this.materials(b.state)
+    if(fallback)for(const material of materials){material.color.set('#d673c4');material.wireframe=true}
+    return {key:(fallback?'fallback:':'model:')+renderKey,geometry,materials,fallback,issues}
+  }
   rebuild(resourcesChanged=false) {
     return measurePhase('viewport.rebuild',()=>this.rebuildInner(resourcesChanged))
   }
   rebuildInner(resourcesChanged:boolean){
     // Reuse geometry/material/texture objects for state, yaw and clip changes.
     // Keep browsing caches bounded; changing the asset stack always invalidates them.
-    this.disposeMeshes(resourcesChanged || this.baked.size>256 || this.textureCache.size>512 || this.geometryCache.size>256)
+    const clearCaches=resourcesChanged || this.baked.size>256 || this.textureCache.size>512 || this.geometryCache.size>256
+    if(clearCaches)this.disposeMeshes(true)
+    else{for(const mesh of this.entityMeshes)this.group.remove(mesh);this.entityMeshes=[]}
     if (resourcesChanged) this.resolver=this.props.resolver ?? new ModelResolver(this.props.packs)
     this.occupied = new Set(this.props.blocks.map(b => key(b.pos)))
-    const groups = new Map<string, {blocks:SceneBlock[];mesh:BakedMesh|null;fallback:boolean}>()
-    const diagnostics: RenderDiagnostics={modeledBlocks:0,fallbackBlocks:0,entities:0,issues:[]}
-    const issues=new Set<string>()
     const catalog=new Map(this.props.catalog.map(m=>[m.id,m]))
     const visible = this.props.blocks.filter(b => (this.props.clip === null || b.pos[1] <= this.props.clip) && (!this.props.local || !this.props.selected || b.owner === this.props.selected))
-    this.cellPicker = new CellPicker(visible)
-    for (const b of visible) {
-      if(['minecraft:air','minecraft:cave_air','minecraft:void_air'].includes(b.state.name))continue
-      const chunk = b.pos.map(v => Math.floor(v / 16)).join(',')
-      let mesh:BakedMesh|null=null,renderKey=stateKey(b.state),fallback=false
-      if (this.props.packs.some(p=>p.enabled)) {
-        try {
-          const appearance=specialBlockAppearance(b.state)
-          const special=blockEntityAppearance(b.state.name,b.state.properties)
-          if(appearance){
-            renderKey='special:'+stateKey(b.state)
-            mesh=this.baked.get(renderKey)??bakeSpecialBlock(b.state,this.props.profile,this.resolver)!
-            this.baked.set(renderKey,mesh);issues.add(`${b.state.name}: ${appearance.note}`)
-          } else if (special && this.props.profile?.entityModels[special.layer] && this.resolver.files.has(special.texture)) {
-            renderKey=stateKey(b.state)
-            mesh=this.baked.get(renderKey)??bakeEntity(this.props.profile.entityModels[special.layer],special.texture,'block')
-            if (!this.baked.has(renderKey)) {
-              const angle=-(['south','west','north','east'].indexOf(b.state.properties.facing))*Math.PI/2
-              mesh.geometry.rotateY(angle);this.baked.set(renderKey,mesh)
-            }
-          } else {
-            const resolved=this.resolver.resolve(b.state,b.pos)
-            renderKey=b.state.name+resolved.key
-            const material=catalog.get(b.state.name)
-            mesh=this.baked.get(renderKey)??bakeBlock(resolved,this.resolver,material?.source==='game-profile'&&!material.hasBlockEntity)
-            this.baked.set(renderKey,mesh)
-          }
-          diagnostics.modeledBlocks++
-        } catch (error) {
-          fallback=true;diagnostics.fallbackBlocks++
-          issues.add(`${b.state.name}: ${error instanceof Error?error.message:String(error)}`)
-        }
-      } else {
-        fallback=true; diagnostics.fallbackBlocks++
-        issues.add('No resource pack is enabled. Showing a placeholder outline.')
-      }
-      const k=chunk+'|'+renderKey
-      const group=groups.get(k)??{blocks:[],mesh,fallback};group.blocks.push(b);groups.set(k,group)
-    }
-    const matrix = new T.Matrix4()
-    for (const {blocks,mesh:baked,fallback} of groups.values()) {
-      const state = blocks[0].state, cacheKey = stateKey(state)
-      let geometry = this.geometryCache.get(cacheKey)
-      if (baked) geometry=baked.geometry
-      else if (!geometry) { geometry = blockGeometry(state); this.geometryCache.set(cacheKey, geometry) }
-      const materials=baked?this.modelMaterials(baked.surfaces,state):this.materials(state)
-      if (fallback) for (const material of materials) { material.color.set('#d673c4'); material.wireframe=true }
-      const mesh = new T.InstancedMesh(geometry, materials, blocks.length)
-      mesh.userData = { blocks }
-      blocks.forEach((b, n) => mesh.setMatrixAt(n, matrix.makeTranslation(b.pos[0] + .5, b.pos[1] + .5, b.pos[2] + .5)))
-      mesh.computeBoundingBox(); mesh.computeBoundingSphere(); this.group.add(mesh); this.batches.push(mesh)
-    }
+    const packsEnabled=this.props.packs.some(pack=>pack.enabled)
+    const result=measurePhase('viewport.chunks',()=>this.blockScene.update(visible,block=>this.blockAppearance(block,catalog,packsEnabled)))
+    this.sceneUpdate=result.work
+    this.cellPicker.updateChunks(result.chunks)
+    const diagnostics:RenderDiagnostics={...result.diagnostics,entities:0}
+    const issues=new Set(diagnostics.issues)
     for (const entity of this.props.entities) {
       if ((this.props.clip!==null&&entity.position[1]>this.props.clip)||(this.props.local&&this.props.selected&&this.props.selected!==`entity:${entity.id}`)) continue
       try {
@@ -376,7 +367,7 @@ class ViewportController {
     const diagnosticsKey=JSON.stringify(diagnostics)
     if (diagnosticsKey!==this.diagnosticsKey) { this.diagnosticsKey=diagnosticsKey; this.props.onDiagnostics(diagnostics) }
     this.grid.position.y = this.props.layer - .005
-    this.highlight(); this.editorInteraction.update(this.props.previewMode ? undefined : this.props.editor, this.props.blocks, true); this.invalidate()
+    this.highlight(); this.editorInteraction.update(this.props.previewMode ? undefined : this.props.editor, this.props.blocks, clearCaches); this.refreshAnimations(); this.invalidate()
   }
   highlight() {
     if (this.props.previewMode || this.props.editor) { this.selection.visible=false; return }
@@ -616,6 +607,7 @@ class ViewportController {
   wheel = (e: WheelEvent) => { if (this.flying) { e.preventDefault(); e.stopImmediatePropagation() } }
   update(props: Props) {
     const resourcesChanged=props.packs!==this.props.packs || props.profile!==this.props.profile || props.resolver!==this.props.resolver
+    const catalogChanged=props.catalog!==this.props.catalog
     const rebuild = resourcesChanged || props.blocks !== this.props.blocks || props.entities!==this.props.entities || props.catalog!==this.props.catalog || props.clip !== this.props.clip || props.local !== this.props.local || props.local && props.selected !== this.props.selected
     const editorToolChanged=props.editor?.tool!==this.props.editor?.tool
     const placementSessionChanged=props.editor?.placementSession!==this.props.editor?.placementSession
@@ -631,7 +623,7 @@ class ViewportController {
     }
     if(placementSessionChanged)this.placementPointer=null
     if (editorToolChanged || rebuild || layer) { this.placementHoverKey = ''; this.placementCameraKey = '' }
-    if (rebuild) this.rebuild(resourcesChanged)
+    if (rebuild) this.rebuild(resourcesChanged || catalogChanged)
     else {
       if (layer) { this.grid.position.y=props.layer-.005; this.invalidate() }
       if (hidePreview) { this.preview.visible=false; this.invalidate() }
