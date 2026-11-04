@@ -1,18 +1,92 @@
-.object-view-menu { position: relative; }
-.object-view-menu > summary { cursor: pointer; padding: 6px 10px; }
-.object-view-menu > div { position: absolute; right: 0; top: 100%; z-index: 30; display: grid; width: 220px; max-width: calc(100vw - 24px); max-height: min(620px, calc(100dvh - 140px)); overflow-y: auto; padding: 6px; background: #20252d; border: 1px solid #454b56; border-radius: 6px; }
-.object-view-menu > div > button { text-align: left; padding: 7px 10px; }
-.view-range-indicator { margin-left: 7px; color: #b9ccef; white-space: nowrap; }
-.view-y-range { min-width: 0; margin: 6px 0; padding: 8px; border: 1px solid #454b56; border-radius: 4px; }
-.view-y-range legend { padding: 0 4px; font-size: 12px; }
-.view-y-fields, .view-y-actions { display: flex; gap: 8px; margin-bottom: 8px; }
-.view-y-fields label { display: grid; gap: 4px; min-width: 0; flex: 1; font-size: 11px; }
-.view-y-fields input { width: 100%; min-width: 0; box-sizing: border-box; }
-.view-y-actions button { flex: 1; }
-.view-y-range > button { width: 100%; }
-.view-range-error, .view-range-help { display: block; margin-top: 7px; font-size: 11px; line-height: 1.4; }
-.view-range-error { color: #ffb4b4; }
-.view-range-help { color: #b0bac9; }
-.root-view-actions { display: flex; justify-content: flex-end; gap: 4px; }
-.root-view-actions > button { font-size: 11px; padding: 3px 6px; }
-.root-view-actions > button[aria-pressed="true"] { color: #9ebcfc; background: #303c51; }
+.object-view-menu {
+  position: relative;
+}
+.object-view-menu > summary {
+  cursor: pointer;
+  padding: 6px 10px;
+}
+.object-view-menu > div {
+  position: absolute;
+  right: 0;
+  top: 100%;
+  z-index: 30;
+  display: grid;
+  width: 220px;
+  max-width: calc(100vw - 24px);
+  max-height: min(620px, calc(100dvh - 140px));
+  overflow-y: auto;
+  padding: 6px;
+  background: #20252d;
+  border: 1px solid #454b56;
+  border-radius: 6px;
+}
+.object-view-menu > div > button {
+  text-align: left;
+  padding: 7px 10px;
+}
+.view-range-indicator {
+  margin-left: 7px;
+  color: #b9ccef;
+  white-space: nowrap;
+}
+.view-y-range {
+  min-width: 0;
+  margin: 6px 0;
+  padding: 8px;
+  border: 1px solid #454b56;
+  border-radius: 4px;
+}
+.view-y-range legend {
+  padding: 0 4px;
+  font-size: 12px;
+}
+.view-y-fields,
+.view-y-actions {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.view-y-fields label {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  flex: 1;
+  font-size: 11px;
+}
+.view-y-fields input {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+.view-y-actions button {
+  flex: 1;
+}
+.view-y-range > button {
+  width: 100%;
+}
+.view-range-error,
+.view-range-help {
+  display: block;
+  margin-top: 7px;
+  font-size: 11px;
+  line-height: 1.4;
+}
+.view-range-error {
+  color: #ffb4b4;
+}
+.view-range-help {
+  color: #b0bac9;
+}
+.root-view-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 4px;
+}
+.root-view-actions > button {
+  font-size: 11px;
+  padding: 3px 6px;
+}
+.root-view-actions > button[aria-pressed="true"] {
+  color: #9ebcfc;
+  background: #303c51;
+}

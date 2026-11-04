@@ -218,6 +218,9 @@ layers and arbitrary clip planes remain unsupported; full K05 remains partial.
   successfully before publishing changes, and recover from storage/import failures.
 - Reuse GPU objects across unchanged content; dispose textures, geometry, materials,
   URLs, listeners, workers, and animation frames at their ownership boundary.
+- Undo/Redo batch selection membership uses a local root-ID Set and preserves input
+  selection order/duplicates; empty/single selection needs no index allocation.
+  Keep downstream view pruning, revision/draft handling and patch history unchanged.
 - Render on demand; continuous frames are justified by navigation/animation only.
   Avoid React updates and scene rebuilds for unchanged hover/diagnostic values.
 - Measure before adding complexity or dependencies. CPU flatten time and software

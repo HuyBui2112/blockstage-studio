@@ -74,7 +74,7 @@ export async function runPerformanceScenarios({command,evaluate,until,click,aria
       const picked=highestCell(fixture.document),pick=await evaluate(`(()=>{const m=JSON.parse(document.querySelector('canvas').dataset.editorCamera).projection,p=${JSON.stringify(picked.pos.map(value=>value+.5))},q=[0,0,0,0];for(let r=0;r<4;r++)q[r]=m[r]*p[0]+m[4+r]*p[1]+m[8+r]*p[2]+m[12+r];const b=document.querySelector('canvas').getBoundingClientRect();return {x:b.x+(q[0]/q[3]+1)*b.width/2,y:b.y+(1-q[1]/q[3])*b.height/2}})()`)
       const initial=await cells(),move=fixture.meta.commands.moveRoot,chosen=options.selection==='all'?fixture.document.objects.map(object=>object.id):move.selection
       const originalByOwner=new Map(chosen.map(id=>[id,true])),moved=initial.map(cell=>originalByOwner.has(cell.owner)?{...cell,pos:cell.pos.map((value,axis)=>value+move.delta[axis])}:cell)
-      const samples={pick:[],preview:[],commit:[],undo:[],cpuSubmission:[]},resources=[],phaseSamples={pick:[],preview:[],commit:[],undo:[]},phaseCalls={pick:[],preview:[],commit:[],undo:[]},numericSequence=[]
+      const samples={pick:[],preview:[],commit:[],undo:[],cpuSubmission:[],undoCpuSubmission:[]},resources=[],phaseSamples={pick:[],preview:[],commit:[],undo:[]},phaseCalls={pick:[],preview:[],commit:[],undo:[]},numericSequence=[],undoResources=[]
       result.samples=samples
       const previewPosition=moved.find(cell=>cell.owner===chosen[0])?.pos
       assert.ok(previewPosition,'The first selected owner must have a cell in the bounded fixture snapshot')
@@ -109,11 +109,13 @@ export async function runPerformanceScenarios({command,evaluate,until,click,aria
         const phaseEvents=await evaluate(`globalThis.__blockstagePhaseRead?.()??null`)
         assert.ok(phaseEvents&&Array.isArray(phaseEvents.events),'Measured viewport must expose its phase collector')
         assert.deepEqual(await cells(),initial,'Undo returns the fixture cells exactly')
+        assert.deepEqual(await evaluate(`JSON.parse(document.querySelector('.editor-diagnostics').dataset.selection)`),chosen,'Undo preserves the complete ordered surviving root selection')
         if(round>=options.warmup){
           const inPreview=event=>event.start>=preview.startedAt&&event.start+event.duration<=preview.submittedAt+.01
           const scheduled=phaseEvents.events.findLast(event=>inPreview(event)&&event.name==='interaction.numeric-schedule'),delivered=phaseEvents.events.findLast(event=>inPreview(event)&&event.name==='interaction.numeric-delivery'),viewport=phaseEvents.events.findLast(event=>inPreview(event)&&event.name==='viewport.props')
           numericSequence.push({harnessToPreviewMs:preview.submittedAt-sequenceStart.at,...validationCoverage(phaseEvents.events,sequenceStart.sequence,preview.submittedAt),...(scheduled&&delivered?{scheduledToDeliveryMs:delivered.start-scheduled.start,deliveryMs:delivered.duration,publishToFrameMs:preview.submittedAt-delivered.start-delivered.duration,...(viewport?{publishToViewportMs:viewport.start-delivered.start-delivered.duration,viewportMs:viewport.duration,viewportToFrameMs:preview.submittedAt-viewport.start-viewport.duration}:{})}:{})})
           samples.pick.push(pickResult.latency);samples.preview.push(preview.latency);samples.commit.push(commit.latency);samples.undo.push(undo.latency);samples.cpuSubmission.push(commit.cpuSubmission);resources.push(commit.frame)
+          samples.undoCpuSubmission.push(undo.cpuSubmission);undoResources.push(undo.frame)
           for(const [action,ack] of Object.entries({pick:pickResult,preview,commit,undo})){
             const totals={},calls={}
             for(const event of phaseEvents?.events??[])if(event.start>=ack.startedAt&&event.start+event.duration<=ack.submittedAt+.01){totals[event.name]=(totals[event.name]??0)+event.duration;calls[event.name]=(calls[event.name]??0)+1}
@@ -124,6 +126,18 @@ export async function runPerformanceScenarios({command,evaluate,until,click,aria
         }
       }
       const state=await evaluate(`({longTaskSupported:globalThis.__blockstageMeasurement.longTaskSupported,longTasks:globalThis.__blockstageMeasurement.longTasks.splice(0),heap:performance.memory?{used:performance.memory.usedJSHeapSize,total:performance.memory.totalJSHeapSize}:null})`)
+      if(options.selection==='all'){
+        await focus()
+        const before=await revision()
+        await keyEvent('KeyZ','Z',10)
+        await frame(`!m.preview&&m.revision.endsWith(':${before+1}')`)
+        assert.deepEqual(await cells(),moved,'Redo restores the intended complete selected move')
+        assert.deepEqual(await evaluate(`JSON.parse(document.querySelector('.editor-diagnostics').dataset.selection)`),chosen,'Redo preserves the complete ordered root selection')
+        await keyEvent('KeyZ','z',2)
+        await frame(`!m.preview&&m.revision.endsWith(':${before+2}')`)
+        assert.deepEqual(await cells(),initial,'One Undo restores every sampled selected cell after Redo')
+        result.redoCorrectness={orderedSelectionPreserved:true,oneUndoRestored:true,limits:'Native Redo/Undo outside timed samples; final public JSON and instance readback below compare all cells'}
+      }
       if(count>=25000){
         // Native events sent in protocol order without waiting for each digit's
         // round trip: Enter/Esc may arrive before the deferred preview timer.
@@ -182,6 +196,7 @@ export async function runPerformanceScenarios({command,evaluate,until,click,aria
       const idleStart=(await measure()).frame;await evaluate('new Promise(resolve=>setTimeout(resolve,1000))');const idleFrames=(await measure()).frame-idleStart
       result.status='measured';result.phase='complete';result.completedSamples=samples.commit.length;result.summary=Object.fromEntries(Object.entries(samples).map(([name,values])=>[name,summary(values)]));result.samples=samples;result.resources=resources;result.longTasks=state;result.idleFramesInOneSecond=idleFrames;result.correctness={sampledCells:initial.length,originalSnapshotSha256:hash(JSON.stringify(initial)),allRoundsPreservedSnapshot:true,fullFixtureSha256:fixture.meta.documentSha256,finalFullObjectsAndEntitiesMatch:true,limits:'Per-action comparisons use bounded editor diagnostics (first64cells); final downloaded JSON checks every object/cell/state/entity against the generator'}
       result.numericSequence={samples:numericSequence,summary:summary(numericSequence.map(sample=>sample.harnessToPreviewMs)),limits:'Harness timestamp before G through exact final numeric preview, including CDP round trips and the initial zero-intent preview. Not the native final-key latency metric.'}
+      result.undoResources=undoResources
       result.phaseTiming={samples:phaseSamples,calls:phaseCalls,retention:await evaluate(`({limit:4096,dropped:globalThis.__blockstagePhaseRead?.().dropped??0})`),inclusive:true,limits:'Nested durations overlap. React reconciliation/passive effects and uninstrumented gaps are not attributed; absence is not zero work.',summary:Object.fromEntries(Object.entries(phaseSamples).map(([action,rounds])=>{const names=new Set(rounds.flatMap(round=>Object.keys(round)));return [action,Object.fromEntries([...names].map(name=>[name,summary(rounds.map(round=>round[name]??0))]))]}))}
       await screenshot(`performance-${kind}-${count}`);await save()
     }

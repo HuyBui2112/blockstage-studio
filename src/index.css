@@ -1,5 +1,5 @@
 :root {
-  font-family: "Segoe UI",system-ui,sans-serif;
+  font-family: "Segoe UI", system-ui, sans-serif;
   color: #e9e5de;
   background: #1b1d20;
   font-synthesis: none;
@@ -17,24 +17,28 @@
   --accent: #c99d79;
   --accent-bright: #e7c5a4;
   --green: #9bb29c;
-  --mono: Consolas,monospace;
-  color-scheme: dark
+  --mono: Consolas, monospace;
+  color-scheme: dark;
 }
 
 * {
-  box-sizing: border-box
+  box-sizing: border-box;
 }
 
 body {
   margin: 0;
-  min-width: 360px
+  min-width: 360px;
 }
 
-button,input,select,textarea {
-  font: inherit
+button,
+input,
+select,
+textarea {
+  font: inherit;
 }
 
-button,.button {
+button,
+.button {
   border: 1px solid #424448;
   background: #2c2e31;
   color: var(--text);
@@ -47,62 +51,73 @@ button,.button {
   justify-content: center;
   gap: 7px;
   line-height: 1.3;
-  transition: background .12s,border-color .12s,color .12s
+  transition:
+    background 0.12s,
+    border-color 0.12s,
+    color 0.12s;
 }
 
-button:hover,.button:hover {
+button:hover,
+.button:hover {
   background: #393b3e;
-  border-color: #535457
+  border-color: #535457;
 }
 
 button:disabled {
-  opacity: .38;
-  cursor: default
+  opacity: 0.38;
+  cursor: default;
 }
 
-button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible,a:focus-visible {
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+a:focus-visible {
   outline: 2px solid var(--accent);
-  outline-offset: 3px
+  outline-offset: 3px;
 }
 
-input,select,textarea {
+input,
+select,
+textarea {
   min-width: 0;
   border: 1px solid #3b3d40;
   background: var(--input);
   color: var(--text);
   border-radius: 4px;
   padding: 8px;
-  line-height: 1.3
+  line-height: 1.3;
 }
 
 input::placeholder {
-  color: #858a8f
+  color: #858a8f;
 }
 
-input[type=checkbox] {
-  accent-color: var(--accent)
+input[type="checkbox"] {
+  accent-color: var(--accent);
 }
 
-input[type=number] {
-  width: 70px
+input[type="number"] {
+  width: 70px;
 }
 
-select option,select optgroup {
+select option,
+select optgroup {
   background: #242629;
-  color: var(--text)
+  color: var(--text);
 }
 
 svg {
   flex-shrink: 0;
-  vertical-align: middle
+  vertical-align: middle;
 }
 
 small {
-  font-size: 10px
+  font-size: 10px;
 }
 
 strong {
-  font-weight: 550
+  font-weight: 550;
 }
 
 kbd {
@@ -113,53 +128,53 @@ kbd {
   border-radius: 3px;
   padding: 2px 5px;
   color: #c8cacb;
-  white-space: nowrap
+  white-space: nowrap;
 }
 
 .muted {
-  color: var(--muted)
+  color: var(--muted);
 }
 
 .tiny {
   font-size: 10px;
-  line-height: 1.7
+  line-height: 1.7;
 }
 
 .primary {
   color: #241e19;
   background: var(--accent);
   border-color: #d4ac8b;
-  font-weight: 600
+  font-weight: 600;
 }
 
 .primary:hover {
   background: #dcb593;
   border-color: #e5c6a7;
-  color: #241e19
+  color: #241e19;
 }
 
 .wide {
   width: 100%;
-  margin-top: 8px
+  margin-top: 8px;
 }
 
 .subtle {
   border-color: transparent;
   background: transparent;
-  color: var(--muted)
+  color: var(--muted);
 }
 
 .dashed {
   border-style: dashed;
-  background: transparent
+  background: transparent;
 }
 
 .danger {
-  color: #e5a194
+  color: #e5a194;
 }
 
 .accent {
-  color: var(--accent-bright)
+  color: var(--accent-bright);
 }
 
 .status-dot {
@@ -168,7 +183,7 @@ kbd {
   border-radius: 50%;
   background: var(--green);
   display: inline-block;
-  flex-shrink: 0
+  flex-shrink: 0;
 }
 
 .icon-button {
@@ -183,24 +198,25 @@ kbd {
   border: 1px solid transparent;
   border-radius: 4px;
   background: transparent;
-  color: var(--muted)
+  color: var(--muted);
 }
 
 .icon-button:hover {
   background: var(--hover);
   border-color: transparent;
-  color: var(--text)
+  color: var(--text);
 }
 
-.icon-button.active,.icon-button[aria-pressed=true] {
+.icon-button.active,
+.icon-button[aria-pressed="true"] {
   background: #3c322a;
   border-color: #66503f;
-  color: var(--accent-bright)
+  color: var(--accent-bright);
 }
 
 .icon-button.danger:hover {
   background: #53332e;
-  color: #efb4a7
+  color: #efb4a7;
 }
 
 .sr-only {
@@ -210,26 +226,26 @@ kbd {
   padding: 0;
   margin: -1px;
   overflow: hidden;
-  clip: rect(0,0,0,0);
+  clip: rect(0, 0, 0, 0);
   white-space: nowrap;
-  border: 0
+  border: 0;
 }
 
 ::-webkit-scrollbar {
   width: 5px;
-  height: 5px
+  height: 5px;
 }
 
 ::-webkit-scrollbar-thumb {
   background: #4d4f52;
-  border-radius: 5px
+  border-radius: 5px;
 }
 
 ::-webkit-scrollbar-track {
-  background: transparent
+  background: transparent;
 }
 
 ::selection {
   background: #775b45;
-  color: #fff0df
+  color: #fff0df;
 }

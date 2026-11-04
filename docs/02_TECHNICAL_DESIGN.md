@@ -616,6 +616,15 @@ Các span **inclusive, lồng nhau**, không cộng chúng thành tổng latency
 reconciliation/passive effects và khoảng chưa instrument vẫn chưa được quy chiếu;
 không có span không có nghĩa là không tốn thời gian.
 
+Undo/Redo lọc selection theo các root còn tồn tại bằng một `Set` ID cục bộ cho batch,
+giữ thứ tự và các ID lặp của selection đầu vào; không giữ child-only/vanished IDs.
+Empty/single selection giữ direct lookup để không tạo index toàn document không cần
+thiết. `history.selection` đo cả index construction và filtering, nằm trong span
+`session.publish`; không cộng các span lồng nhau. View-policy pruning/isolate
+reconciliation, revision, draft protection và patch history/retention giữ nguyên.
+Index không cache qua Undo/Redo. `viewport.selection-outlines` đo riêng dựng viền;
+loại membership scan không đồng nghĩa mọi bước Undo/render đều tuyến tính hoặc mượt.
+
 Import/load/commit và public `previewTransform` giữ full document schema. Mỗi lượt tạo registry
 index và deduplicate state hợp lệ theo nội dung, không cache qua các lượt/document.
 Sau schema và registry pass, footprint visitor vẫn kiểm complete pairs, shared

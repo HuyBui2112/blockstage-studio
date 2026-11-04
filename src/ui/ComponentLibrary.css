@@ -1,7 +1,29 @@
-.component-catalogue-tools { flex-shrink: 0; }
-.component-sort { display: flex; align-items: center; gap: 10px; color: var(--muted); font-size: 10px; }
-.component-sort select { min-width: 0; flex: 1; }
-.component-catalogue-count { padding: 0 14px 8px; color: var(--muted); font-size: 10px; flex-shrink: 0; }
-.component-asset-main > span { min-width: 0; }
-.component-asset-main strong { overflow-wrap: anywhere; }
-.component-show-more { width: 100%; }
+.component-catalogue-tools {
+  flex-shrink: 0;
+}
+.component-sort {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--muted);
+  font-size: 10px;
+}
+.component-sort select {
+  min-width: 0;
+  flex: 1;
+}
+.component-catalogue-count {
+  padding: 0 14px 8px;
+  color: var(--muted);
+  font-size: 10px;
+  flex-shrink: 0;
+}
+.component-asset-main > span {
+  min-width: 0;
+}
+.component-asset-main strong {
+  overflow-wrap: anywhere;
+}
+.component-show-more {
+  width: 100%;
+}
