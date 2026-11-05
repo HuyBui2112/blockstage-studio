@@ -79,6 +79,13 @@ import {
 } from "./material-plan";
 import { measurePhase } from "../core/measurement-phases";
 import { createTransformPreviewController } from "./transform-preview-controller";
+import {
+  applyEntityAction,
+  editableEntityIds,
+  planEntityAction,
+  type EntityActionIntent,
+  type EntityActionPlan,
+} from "./entity-action";
 
 export type EditorScope = "architecture" | "component";
 export type TransformIntent =
@@ -87,6 +94,7 @@ export type TransformIntent =
 type Slot = {
   history: EditorHistory;
   selection: string[];
+  entitySelection: string[];
   saved: EditorDocument | null;
   editingAssetId: string | null;
   epoch: string;
@@ -105,6 +113,7 @@ const messageOf = (error: unknown) =>
 const makeSlot = (scope: EditorScope): Slot => ({
   history: createHistory(newEditorDocument(scope)),
   selection: [],
+  entitySelection: [],
   saved: null,
   editingAssetId: null,
   epoch: crypto.randomUUID(),
@@ -166,6 +175,11 @@ export function useEditorSession(
   const [ready, setReady] = useState(false);
   const [error, setError] = useState("");
   const [preview, setPreview] = useState<Preview | null>(null);
+  const [entityPreview, setEntityPreview] = useState<{
+    scope: EditorScope;
+    plan: EntityActionPlan;
+  } | null>(null);
+  const entityPreviewRef = useRef<typeof entityPreview>(null);
   const transformPreviews = useRef<ReturnType<
     typeof createTransformPreviewController
   > | null>(null);
@@ -174,10 +188,15 @@ export function useEditorSession(
   const cancelPreview = useCallback(() => {
     transformPreviews.current?.reset();
     setPreview(null);
+    entityPreviewRef.current = null;
+    setEntityPreview(null);
   }, []);
   useEffect(() => {
     const owned = transformPreviews.current;
-    return () => owned?.reset();
+    return () => {
+      owned?.reset();
+      entityPreviewRef.current = null;
+    };
   }, []);
   const [clipboard, setClipboard] = useState<EditorClipboard | null>(null);
   const currentSlots = useRef({ ...slots });
@@ -240,6 +259,8 @@ export function useEditorSession(
     protectDraft: boolean,
   ) {
     transformPreviews.current?.reset();
+    entityPreviewRef.current = null;
+    setEntityPreview(null);
     const before = currentSlots.current;
     let next = { ...update(before) };
     for (const scope of ["architecture", "component"] as const) {
@@ -274,6 +295,12 @@ export function useEditorSession(
       const selection = slot.selection.filter((id) => allowed.has(id));
       if (selection.length !== slot.selection.length)
         next = { ...next, [scope]: { ...slot, selection } };
+      const entityIds = new Set(editableEntityIds(slot.history.document, view));
+      const entitySelection = boundary
+        ? []
+        : slot.entitySelection.filter((id) => entityIds.has(id));
+      if (entitySelection.length !== slot.entitySelection.length)
+        next = { ...next, [scope]: { ...next[scope], entitySelection } };
       if (
         slot.epoch === before[scope].epoch &&
         slot.history.document !== before[scope].history.document
@@ -443,6 +470,7 @@ export function useEditorSession(
               next[scope] = {
                 history,
                 selection: [],
+                entitySelection: [],
                 saved: history.document,
                 editingAssetId:
                   scope === "component" &&
@@ -552,8 +580,95 @@ export function useEditorSession(
           if (toggle && selection.has(id)) selection.delete(id);
           else selection.add(id);
         }
-      return { ...previous, [scope]: { ...slot, selection: [...selection] } };
+      return {
+        ...previous,
+        [scope]: { ...slot, selection: [...selection], entitySelection: [] },
+      };
     });
+  }
+  function selectEntity(scope: EditorScope, id: string, toggle: boolean) {
+    if (lifecycle.current.has(scope)) return;
+    cancelPreview();
+    setSlots((previous) => {
+      const slot = previous[scope];
+      const view = viewRef.current[scope];
+      if (!editableEntityIds(slot.history.document, view).includes(id))
+        return previous;
+      const selected = new Set(toggle ? slot.entitySelection : []);
+      if (toggle && selected.has(id)) selected.delete(id);
+      else selected.add(id);
+      return {
+        ...previous,
+        [scope]: { ...slot, selection: [], entitySelection: [...selected] },
+      };
+    }, false);
+  }
+  function previewEntity(scope: EditorScope, intent: EntityActionIntent) {
+    cancelPreview();
+    if (lifecycle.current.has(scope)) return false;
+    try {
+      const slot = currentSlots.current[scope];
+      const plan = planEntityAction(
+        slot.history.document,
+        slot.entitySelection,
+        intent,
+        catalog,
+        {
+          base: {
+            documentId: slot.history.document.id,
+            sessionEpoch: slot.epoch,
+            revision: slot.revision,
+          },
+          view: viewRef.current[scope],
+        },
+      );
+      entityPreviewRef.current = { scope, plan };
+      setEntityPreview(entityPreviewRef.current);
+      setError("");
+      return true;
+    } catch (error) {
+      setError(messageOf(error));
+      return false;
+    }
+  }
+  function commitEntity(scope: EditorScope) {
+    const pending = entityPreviewRef.current;
+    if (lifecycle.current.has(scope) || pending?.scope !== scope) return false;
+    try {
+      const slot = currentSlots.current[scope];
+      const next = applyEntityAction(
+        pending.plan,
+        slot.history.document,
+        {
+          documentId: slot.history.document.id,
+          sessionEpoch: slot.epoch,
+          revision: slot.revision,
+        },
+        catalog,
+        viewRef.current[scope],
+      );
+      setSlots((previous) => {
+        if (previous[scope] !== slot) return previous;
+        const history = executeHistory(slot.history, next, pending.plan.label);
+        return {
+          ...previous,
+          [scope]: {
+            ...slot,
+            history,
+            selection: [],
+            entitySelection: pending.plan.selection,
+            pristine: slot.pristine && history === slot.history,
+          },
+        };
+      });
+      cancelPreview();
+      setError("");
+      return true;
+    } catch (error) {
+      cancelPreview();
+      setError(messageOf(error));
+      return false;
+    }
   }
   function copySelection(scope: EditorScope) {
     if (lifecycle.current.has(scope)) return false;
@@ -954,6 +1069,7 @@ export function useEditorSession(
           [scope]: {
             history,
             selection: [],
+            entitySelection: [],
             saved: history.document,
             token: record.token,
             epoch: crypto.randomUUID(),
@@ -993,6 +1109,7 @@ export function useEditorSession(
         [scope]: {
           history: createHistory(imported),
           selection: [],
+          entitySelection: [],
           saved: null,
           editingAssetId: null,
           token: null,
@@ -1009,6 +1126,10 @@ export function useEditorSession(
     return exclusive(scope, async () => {
       const slot = currentSlots.current[scope],
         doc = slot.history.document;
+      if (!selectionOnly && doc.entities.length)
+        throw new Error(
+          "Component library assets contain blocks only. Save this document or select block objects to publish.",
+        );
       const ids = selectionOnly
         ? slot.selection
         : doc.objects.map((object) => object.id);
@@ -1127,6 +1248,7 @@ export function useEditorSession(
             history,
             saved: history.document,
             selection: [],
+            entitySelection: [],
             epoch: crypto.randomUUID(),
             revision: 0,
             savedRevision: 0,
@@ -1152,6 +1274,7 @@ export function useEditorSession(
         saved: recovered.saved?.document ?? null,
         token: recovered.saved?.token ?? null,
         selection: [],
+        entitySelection: [],
         pristine: false,
         editingAssetId: recovered.head.componentAssetId ?? null,
         epoch: recovered.head.epoch,
@@ -1196,6 +1319,7 @@ export function useEditorSession(
           saved: history.document,
           token: restored.token,
           selection: [],
+          entitySelection: [],
           pristine: false,
           editingAssetId: null,
           epoch: crypto.randomUUID(),
@@ -1231,6 +1355,7 @@ export function useEditorSession(
           saved: history.document,
           token: record.token,
           selection: [],
+          entitySelection: [],
           pristine: false,
           editingAssetId: null,
           epoch: crypto.randomUUID(),
@@ -1255,6 +1380,7 @@ export function useEditorSession(
         component: {
           history: createHistory(document),
           selection: [],
+          entitySelection: [],
           saved: null,
           editingAssetId: asset.id,
           token: null,
@@ -1316,6 +1442,10 @@ export function useEditorSession(
     setAutoConnections((previous) => ({ ...previous, [scope]: enabled }));
   }
   return {
+    entityPreview,
+    selectEntity,
+    previewEntity,
+    commitEntity,
     views,
     changeView,
     clipboard,

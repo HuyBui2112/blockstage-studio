@@ -1,0 +1,98 @@
+.entity-panel {
+  border-top: 1px solid var(--line);
+  font-size: 11px;
+  padding: 0 16px;
+}
+.entity-panel > summary {
+  cursor: pointer;
+  padding: 10px 0;
+  font-weight: 600;
+}
+.entity-panel > summary span {
+  margin-left: 7px;
+  color: var(--soft);
+  font-weight: 400;
+}
+.entity-panel-body {
+  display: grid;
+  gap: 10px;
+  padding-bottom: 12px;
+}
+.entity-panel-list {
+  display: grid;
+  gap: 4px;
+  max-height: 190px;
+  overflow: auto;
+}
+.entity-panel-list button {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  text-align: left;
+  padding: 6px 8px;
+}
+.entity-panel-list button span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.entity-panel-list small {
+  color: var(--soft);
+  font-size: 10px;
+}
+.entity-panel-list button[aria-pressed="true"] {
+  border-color: var(--accent, #c4a477);
+  background: #39342e;
+}
+.entity-panel fieldset {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  min-width: 0;
+  display: grid;
+  gap: 8px;
+}
+.entity-panel-action {
+  display: grid;
+  gap: 5px;
+}
+.entity-panel-vector {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 7px;
+}
+.entity-panel-vector label {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+.entity-panel input,
+.entity-panel select {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  border: 1px solid #484b4e;
+  border-radius: 3px;
+  padding: 5px 6px;
+  background: #1c1e20;
+  color: var(--text);
+  font: 11px var(--mono, monospace);
+}
+.entity-panel-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.entity-panel-muted {
+  color: var(--soft);
+  margin: 0;
+  font-size: 10px;
+}
+.entity-panel-error {
+  color: #f2aa9d;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.entity-panel :is(button, input, select, summary):focus-visible {
+  outline: 2px solid var(--accent, #c4a477);
+  outline-offset: 2px;
+}

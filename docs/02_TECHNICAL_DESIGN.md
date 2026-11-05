@@ -29,6 +29,7 @@ Java không bắt buộc để mở UI khi đã có profile; cần JDK cho các 
 | `src/editor/model.ts` | Document v2, object tree, component asset và validation |
 | `src/editor/placement.ts`, `placement-plan.ts`, `support.ts` | Pair adapters, Design/Context, component yaw và support warnings thuần dữ liệu |
 | `src/editor/operations.ts`, `history.ts` | Transform/group/component operations, preview và Undo/Redo atomic |
+| `src/editor/entity-operations.ts`, `entity-action.ts` | Pig operations và exact-candidate plans; session/EntityPanel nhập số |
 | `src/editor/neighbors.ts` | Opt-in scene connections cho fence/wall/gate, source index + sparse overlay, patch neighbors atomic |
 | `src/editor/useEditorSession.ts` | Workspace session, command commit, document/component persistence |
 | `src/io` | Archive worker, external input, IndexedDB, shared scene NBT/datapack writer |
@@ -133,6 +134,29 @@ live khi sửa nguồn. Không nhầm cơ chế này với template references c
 Schema strict kiểm cycle, depth, ID trùng, occupancy và giới hạn công việc. Document
 hiện tối đa 100.000 objects/cells, depth 16, entities 1.000; không phải cam kết FPS.
 Unknown properties/NBT bị từ chối rõ ràng khi chưa có schema/adapter, không bỏ ngầm.
+
+**Entity domain N04 — subset hiện hành:** `entity-operations.ts` cung cấp
+`addEntity`, `moveEntities`, `setEntityYaw`, `duplicateEntities`, `removeEntities`.
+API nhận document/catalog và entity IDs riêng, không trộn với object selection.
+`entityEditCapability` chỉ cấp phép pig; render/export/registry support không tự
+mở quyền edit loại khác. Đã nối session/EntityPanel theo numeric-first subset N05.
+Vị trí là tọa độ thực trong bounds schema, delta World không snap; yaw finite được
+normalize modulo 360 khi thêm/đặt yaw. Duplicate giữ nguyên yaw nguồn và nhận một
+ID mới cho mỗi entity theo thứ tự chọn; ID mới không trùng entity hoặc nested
+object hiện hữu. Legacy cross-kind IDs vẫn đọc được và chỉ target entity list;
+UI tương lai phải phân biệt namespace identity, không dùng bare ID chung.
+Unsupported/missing/duplicate selection hoặc một kết quả vượt bounds chặn cả
+batch. Entity có thể trùng vị trí nhau hoặc block; đây không phải simulation.
+Full-validate base và candidate; cap 1.000 trước add/duplicate expansion, không
+mutate input hoặc block objects. No-op giữ document reference để không xóa Redo.
+Candidate ghi qua history metadata hiện có thành một Undo/Redo; không tạo writer
+lưu trữ riêng. Action plan giữ exact candidate, source/epoch/revision/catalog/view
+guards; session giữ entity selection riêng và hủy preview khi đổi context.
+EntityPanel có Preview/Confirm/Cancel/Esc; viewport chỉ thay entity list để xem
+candidate, Save/draft giữ committed data. Y-range kiểm anchor thực; block isolation
+chặn edit entity, hidden/locked IDs vẫn chỉ thuộc block roots. Publish cả component
+có entity bị chặn vì library schema chỉ có blocks. Ray selection/gizmo, entity
+visibility riêng và coverage ngoài pig còn thiếu; chưa là world proof.
 
 ### 4.2 Lưu trữ và lifecycle
 

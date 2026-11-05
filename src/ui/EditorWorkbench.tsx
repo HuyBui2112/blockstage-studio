@@ -61,6 +61,8 @@ import type {
 import { Icon, type IconName } from "./Icon";
 import { ResourceBrowser } from "./ResourceBrowser";
 import { ComponentLibrary } from "./ComponentLibrary";
+import { EntityPanel } from "./EntityPanel";
+import { editableEntityIds } from "../editor/entity-action";
 import "./editor.css";
 
 const Viewport = lazy(() =>
@@ -530,6 +532,15 @@ export function EditorWorkbench({
     cancelTransformPreview();
     return cancelTransformPreview;
   }, [interactionKey, cancelTransformPreview]);
+  useEffect(() => {
+    cancelTransformPreview();
+  }, [
+    resources.resolver,
+    resources.profile,
+    resources.packs,
+    resources.catalog,
+    cancelTransformPreview,
+  ]);
   const [interactionOwner, setInteractionOwner] = useState(interactionKey);
   if (interactionOwner !== interactionKey) {
     setInteractionOwner(interactionKey);
@@ -539,6 +550,18 @@ export function EditorWorkbench({
     setRegionDragging(false);
   }
   const viewState = session.views[scope];
+  const selectableEntities = useMemo(
+    () => new Set(editableEntityIds(document, viewState)),
+    [document, viewState],
+  );
+  const stagedEntity =
+    !readOnly &&
+    session.entityPreview?.scope === scope &&
+    session.entityPreview.plan.source === document &&
+    session.entityPreview.plan.catalog === resources.catalog &&
+    session.entityPreview.plan.view === viewState
+      ? session.entityPreview.plan
+      : null;
   const selectableOwners = useMemo(
     () => editableRootIds(document, viewState),
     [document, viewState],
@@ -879,7 +902,10 @@ export function EditorWorkbench({
   const protection = session.draftStatus[scope];
   const view = (kind: ViewCommandKind) =>
     setCommand((previous) => ({ id: (previous?.id ?? 0) + 1, kind }));
-  const changeTool = (next: EditorViewportState["tool"]) => {
+  const changeTool = (
+    next: EditorViewportState["tool"],
+    focusViewport = true,
+  ) => {
     materialActions.cancel();
     setMaterialsOpen(false);
     primitiveActions.cancel();
@@ -890,7 +916,7 @@ export function EditorWorkbench({
     setRegionDragging(false);
     setPlacementHit(null);
     setTool(next);
-    focusCopyCanvas();
+    if (focusViewport) focusCopyCanvas();
   };
   const changeView = (next: EditorViewState) => {
     changeTool("select");
@@ -1002,7 +1028,7 @@ export function EditorWorkbench({
     else if (name === "deselect") session.select(scope, [], false);
   }
   const editor: EditorViewportState | undefined =
-    readOnly || !loaded
+    readOnly || !loaded || !!stagedEntity
       ? undefined
       : {
           revisionKey: `${scope}:${document.id}:${slot.epoch}:${slot.revision}`,
@@ -1090,6 +1116,16 @@ export function EditorWorkbench({
         };
   function saveShortcut(event: KeyboardEvent) {
     if (exportSnapshot || documentsOpen || structureImportOpen) return;
+    if (
+      stagedEntity &&
+      event.key === "Escape" &&
+      !event.nativeEvent.isComposing
+    ) {
+      event.preventDefault();
+      event.stopPropagation();
+      session.cancelPreview();
+      return;
+    }
     if (event.ctrlKey && event.code === "KeyS") {
       event.preventDefault();
       if (loaded && !readOnly) void session.save(scope);
@@ -1623,7 +1659,7 @@ export function EditorWorkbench({
             >
               <Viewport
                 blocks={visibleBlocks}
-                entities={document.entities}
+                entities={stagedEntity?.document.entities ?? document.entities}
                 packs={resources.packs}
                 resolver={resources.resolver}
                 catalog={resources.catalog}
@@ -1653,7 +1689,9 @@ export function EditorWorkbench({
               <small>
                 {readOnly
                   ? "Read-only view"
-                  : `${document.objects.length} objects · ${blocks.length} cells`}
+                  : stagedEntity
+                    ? "Entity preview · Confirm / Cancel"
+                    : `${document.objects.length} objects · ${blocks.length} cells`}
               </small>
             </div>
             <div
@@ -1778,7 +1816,11 @@ export function EditorWorkbench({
           </div>
           <footer className="editor-stage-footer">
             <span>
-              {readOnly ? "Read-only" : `${slot.selection.length} selected`}
+              {readOnly
+                ? "Read-only"
+                : slot.entitySelection.length
+                  ? `${slot.entitySelection.length} entities selected`
+                  : `${slot.selection.length} selected`}
               <span className="footer-separator">·</span>1 unit = 1 block
             </span>
             {!readOnly && (
@@ -1998,13 +2040,38 @@ export function EditorWorkbench({
               ) : (
                 <div className="selection-empty">
                   <Icon name="select" size={24} />
-                  <span>Select an object in the viewport</span>
+                  <span>
+                    {slot.entitySelection.length
+                      ? `${slot.entitySelection.length} entities selected`
+                      : "Select an object in the viewport"}
+                  </span>
                   <small>
                     Drag selects a region · Shift toggles · Ctrl A selects all
                   </small>
                 </div>
               )}
               <SupportDetails issues={supportIssues} />
+              {!readOnly && (
+                <EntityPanel
+                  key={`${scope}:${slot.epoch}`}
+                  entities={document.entities}
+                  selection={slot.entitySelection}
+                  selectableIds={selectableEntities}
+                  previewing={!!stagedEntity}
+                  error={session.error}
+                  disabled={!loaded || viewState.isolated !== null}
+                  onSelect={(id, toggle) => {
+                    changeTool("select", false);
+                    session.selectEntity(scope, id, toggle);
+                  }}
+                  onPreview={(intent) => {
+                    changeTool("select", false);
+                    session.previewEntity(scope, intent);
+                  }}
+                  onConfirm={() => session.commitEntity(scope)}
+                  onCancel={session.cancelPreview}
+                />
+              )}
               <section className="editor-section outliner-section">
                 <div className="section-title">
                   <h2>Objects</h2>
@@ -2173,6 +2240,11 @@ export function EditorWorkbench({
         data-objects={document.objects.length}
         data-blocks={blocks.length}
         data-selection={JSON.stringify(slot.selection)}
+        data-entity-selection={JSON.stringify(slot.entitySelection)}
+        data-entities={JSON.stringify(document.entities)}
+        data-entity-preview={
+          stagedEntity ? JSON.stringify(stagedEntity.document.entities) : ""
+        }
         data-snapshot={diagnosticSnapshot}
         data-revision={slot.revision}
         data-saved-revision={slot.savedRevision ?? ""}

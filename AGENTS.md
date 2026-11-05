@@ -19,6 +19,14 @@
 
 ## Current milestone and product direction
 
+Current priority (user direction, 05/11/2026): complete the finite R1 core
+functionality before further standalone performance optimization. Continue entity
+domain/UI (N04/N05), typed payload/chest (K06/N01–N03/N06), shared capabilities
+and blocking game-rule/resource gaps in dependency order. P-lane optimization is
+deferred, not deleted or marked complete; retain its evidence and release gates.
+Correctness, ownership, bounded work and regression checks still apply to every
+feature. R2 linked/kits/generators and extension formats are separate milestones.
+
 Blockstage is a local-first, block-native architectural CAD tool for Minecraft Java.
 The implemented foundation includes resources, Architecture/Component editors,
 read-only Preview, logical multi-block objects, grid-safe transforms, groups,

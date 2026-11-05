@@ -21,6 +21,29 @@ Lượt rà soát lộ trình đọc source/evidence và nguồn chính thức; 
 code gate, browser hoặc game oracle**. Kết quả bên dưới là bằng chứng của mốc
 triển khai, không phải kết quả chạy mới trong lượt nghiên cứu tài liệu.
 
+## Ưu tiên thực hiện hiện hành — 05/11/2026
+
+Theo yêu cầu mới của chủ dự án, **hoàn thiện chức năng cốt lõi R1 trước các đợt
+tối ưu hiệu suất riêng**. Các đề xuất tiếp theo ở báo cáo P phía dưới là lịch sử
+đo và backlog hoãn lại, không còn là task kế tiếp. Giữ các tối ưu đã kiểm chứng;
+không gỡ validation hoặc bỏ regression để làm nhanh tính năng.
+
+| Thứ tự | Công việc cốt lõi | Điều kiện hoàn thành phần code |
+| --- | --- | --- |
+| 1 | Entity cơ bản N04 → N05, bắt đầu pig theo R1 candidate | Pure thao tác vị trí thực/yaw/identity, rồi palette/đặt/chọn/Inspector/viewport; preview/cancel, view policy, Save và một Undo/Redo đúng. Preview Assets không thay entity editor. |
+| 2 | Typed payload K06/N01 → N02 → N03 → N06 | Typed NBT/JSON an toàn, ownership và reject policy trước chest adapter/UI; Save/backup/copy/import/export không mất kiểu hoặc fields. Không mở arbitrary payload. |
+| 3 | G01/G07 và các luật đặt còn chặn palette R1 | Tập capabilities rõ theo action; ưu tiên slab merge/stair neighbors/door hinge khi fixture xác nhận. Game-facing semantics cần oracle phù hợp, không đoán từ texture/tags. |
+| 4 | Appearance và resource lifecycle R01/R02/R05/R06 | Sửa case tái hiện trong palette, thiếu resource có đường phục hồi, context loss/disposal không mất công trình; giữ unsupported reasons. |
+| 5 | Khép workflow R1 | Library UX còn thiếu trong phạm vi đã chọn, entity/chest cùng nhà nhiều tầng, lưu/phục hồi/chuyển máy/import/export qua UI; kiểm negative/fault/focus và dữ liệu cuối. |
+| 6 | Đo và tối ưu P, nghiệm thu runtime/builder/release | Quay lại commit đa chọn và latency đã ghi; gate Fabric/world, người dùng thật và phần cứng vẫn độc lập, không tuyên bố READY chỉ vì code xong. |
+
+Mỗi bước giao theo slice có dependency, kiểm thử và cập nhật trạng thái, không
+triển khai cả bảng trong một lần. N04 có thể song song thiết kế typed payload;
+N05 không đợi chest. Code checks và correctness/game verification cần cho từng
+adapter vẫn chạy trong lúc làm chức năng; chỉ hoãn chiến dịch profiling/tối ưu.
+R2 linked components/material kits/sockets/generators và X formats/versions giữ
+sau R1, không ngầm coi chúng đã hoàn thành hoặc bắt buộc làm chung với N04.
+
 ## M0 — Nền đã triển khai
 
 | Khả năng | Trạng thái hiện tại và ranh giới |
@@ -30,7 +53,7 @@ triển khai, không phải kết quả chạy mới trong lượt nghiên cứu
 | Registry/profile | **Đã có cho vanilla 26.2/4903:** 1.196 block, 158 entity types, 14 creative tab, tags, legal string properties và 358 model layers trong profile đã trích. Registry không bảo đảm render/export mọi loại. |
 | Block appearance | **Một phần:** JSON/UV/animation và chest bindings; thêm static base-color standing/wall banners và inactive conduit từ game layers. Thiếu runtime effects/patterns/payload có reason rõ, chưa pixel parity toàn game. |
 | Entity appearance | **Một phần:** source hiện có **28 binding tĩnh tường minh**, chỉ hiện model khi có layer và texture phù hợp. Assets có preview/yaw; không có animation, equipment, runtime variants hoặc AI. |
-| Entity trong editor v2 | **Một phần ở dữ liệu:** giữ/render entity đã nhập qua JSON, xuất tập adapter hữu hạn. **Chưa có** workflow UI đặt/chọn/sửa entity trong Architecture/Component; không coi preview Assets là entity editor. |
+| Entity trong editor v2 | **Một phần:** panel Entities cho pig add/move/yaw/duplicate/remove qua nhập số, chọn nhiều, Preview/Confirm/Cancel và Save/Undo/Redo. Chưa ray selection/gizmo hoặc entity visibility riêng; coverage render/export vẫn hữu hạn. |
 | Logical multi-block | **Đã có:** bed/door/tall plant được tạo đủ phần, chọn/xóa/transform nguyên object; pair thiếu/lệch bị từ chối. Footprint dùng cell, không dùng mesh bounds. |
 | Selection/transform | **Đã có:** Select/Shift, box-through, Move/Y Rotate gizmo, numeric G/R, Global/Local, object/selection/individual pivots. Move nguyên ô, whole-object yaw bội 90°, legal state đi cùng tọa độ. Parity sai bị chặn. |
 | State Inspector nhiều đối tượng | **Đã có trong scope hữu hạn:** common legal fields/values, Mixed + indeterminate, atomic rewrite/validation/history cho block/multi-block. Same-ID và 6 cross-ID semantics; không flatten group/component, không neighbor simulation. |
@@ -969,6 +992,34 @@ hoặc có scope exception; R06 chạy ngay trên baseline, không chờ phát s
 
 N04/N05 không chờ full N01/N03. Unknown mod attachments có thể không hiểu semantics
 dù giữ bytes; không hứa an toàn khi di chuyển/duplicate/export nếu chưa adapter.
+
+**N04 domain subset — 05/11/2026:** đã có pure `entity-operations.ts` cho pig:
+thêm, World delta tọa độ thực, đặt yaw modulo 360, duplicate explicit fresh IDs
+theo selection order, xóa. Chặn unsupported selection, missing/duplicate IDs,
+nonfinite/out-of-bounds và cap 1.000 trước thêm/expand; toàn batch atomic.
+New IDs tránh entity và nested object IDs; không rewrite legacy cross-kind IDs.
+Giữ object tree, entity không chọn và input nguyên trạng; không snapping hoặc
+block/entity collision simulation. Base và candidate full-validate; no-op giữ
+document reference, history metadata có sẵn xử lý một Undo/Redo.
+
+**Xác thực:** code gate **628/628 tests, 56 files**, typecheck/lint/build đạt.
+8 domain tests kiểm finite coverage, fractional overlap, refs, yaw/no-op, ID/budget/
+bounds/invalid-base và actual history cho từng action. Một integration test chạy
+edit → history Undo/Redo → strict JSON → portable fresh-ID restore → export gzip
+NBT; typed reader đối chiếu positions double, Rotation float, floor blockPos,
+normalization origin và untouched blocks/document. Không thêm dependency/schema/
+storage writer. Production bundle không đổi vì chưa có UI consumer; không chạy
+lại browser trong slice domain này, không kế thừa kết quả cũ làm bằng chứng N05.
+
+**N04/N05 numeric UI subset đã xác nhận:** session/action giữ exact candidate,
+epoch/revision/catalog/view/cancel guards, entity selection riêng và Y-anchor policy;
+block isolation chặn entity edits. Inspector Entities có add/move/yaw/duplicate/delete,
+multi-select, Preview/Confirm/Cancel/Esc; Save/draft không ghi preview. Publish toàn
+component có entity bị chặn để tránh bỏ dữ liệu. **635 tests/57 files**, typecheck,
+lint/build và full native production browser suite đạt, gồm fractional coordinates,
+fresh IDs, Undo/Redo, Save/reload, workspace isolation, component guard và 620px.
+Đã kiểm ảnh/focus Confirm; không thêm dependency/schema. Còn ray selection/gizmo,
+entity hide/lock/isolate riêng và world/Fabric proof; N04/N05 toàn bộ vẫn PARTIAL.
 
 ### I — Import/export/formats/versions
 
