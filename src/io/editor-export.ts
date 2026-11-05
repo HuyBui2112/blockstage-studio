@@ -117,7 +117,7 @@ export function preflightEditorExport(
     let statesValid = true;
     for (const cell of object.cells) {
       const material = materials.get(cell.state.name);
-      const error = structureStateError(cell.state, materials);
+      const error = structureStateError(cell.state, materials, cell.blockEntity);
       if (error) {
         statesValid = false;
         const code =
@@ -222,7 +222,7 @@ function exportScene(
   return {
     name: document.name,
     target: document.target,
-    blocks: sceneBlocks(document).map(({ pos, state }) => ({ pos, state })),
+    blocks: sceneBlocks(document).map(({ owner: _owner, ...cell }) => cell),
     entities: document.entities,
   };
 }

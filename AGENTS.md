@@ -156,6 +156,13 @@ layers and arbitrary clip planes remain unsupported; full K05 remains partial.
 
 ## Data contracts
 
+- Empty single `minecraft:chest` cells may carry strict `blockEntity: {kind:
+  "chest", items: []}`. Keep it through copy/state/transform/portable/export.
+  This is the only payload exception to older blocks-only import/export notes:
+  nonempty inventory, paired chests, unknown payload/fields remain rejected.
+  Context slab merge replaces only same-ID standalone roots on exposed half
+  surfaces; preview/commit use the same replacement and final view/neighbor guards.
+
 - `scripts/fixtures/r1-scope.json` is an acceptance candidate, not an application
   palette filter or release READY declaration. Keep pig editing, typed single
   chest payload, named Fabric/world, real-hardware and human builder gates open.

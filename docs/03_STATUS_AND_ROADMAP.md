@@ -9,6 +9,16 @@ Các mục tương lai dưới đây là đề xuất ưu tiên, chưa phải t�
 
 ## Cách đọc trạng thái
 
+**05/11 — slice ưu tiên 1–5 (PARTIAL):** đã có rương đơn rỗng strict payload xuyên
+placement/state/move/copy/JSON/backup/NBT import-export; Context same-ID standalone
+slab merge; WebGL context-loss recovery; library rename/duplicate với fresh IDs.
+Code gate 645 tests/60 files, typecheck/lint/build đạt. Native library rename/
+duplicate/reload, ray slab merge/Undo/Redo và forced WebGL loss/restore đạt; không
+chạy full browser suite hoặc world/Fabric trong slice này. Rương qua codec test,
+chưa có UI/world roundtrip riêng. Còn inventory/sign/banner payload, stair-neighbor/
+door-hinge coverage, tint/fluid/render gaps, categories/thumbnails/relink, formats/
+large export. Không đánh toàn năm ưu tiên hoàn thành; NBT vẫn hữu hạn và cap48.
+
 | Trạng thái | Ý nghĩa |
 | --- | --- |
 | **Đã có** | Có đường thao tác hoặc module hiện hành; giới hạn được ghi cùng mục. |

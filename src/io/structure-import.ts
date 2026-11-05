@@ -104,7 +104,7 @@ export function inspectStructure(
         `Registry missing for ${state.name}. Import the matching game profile before importing this structure.`,
       );
     validateState(state, [material]);
-    if (material.hasBlockEntity)
+    if (material.hasBlockEntity && !(state.name === "minecraft:chest" && state.properties.type === "single"))
       throw new Error(
         `${state.name} requires block-entity payload support, which is not available in this import.`,
       );
@@ -117,10 +117,6 @@ export function inspectStructure(
   const blocks: Block[] = entries.map((tag) => {
     const entry = compound(tag);
     fields(entry, ["pos", "state", "nbt"]);
-    if (entry.nbt)
-      throw new Error(
-        "Block-entity NBT payload detected. This import will not discard payload data.",
-      );
     const pos = list(entry.pos, 3).map(int),
       index = int(entry.state);
     if (
@@ -130,10 +126,23 @@ export function inspectStructure(
       throw new Error("Block position is outside declared structure size");
     if (index < 0 || index >= palette.length)
       throw new Error("Palette index is out of range");
+    const state = palette[index];
+    const chest = state.name === "minecraft:chest" && state.properties.type === "single";
+    if (entry.nbt) {
+      if (!chest) throw new Error("Unsupported block-entity payload; nothing was imported");
+      const payload = compound(entry.nbt);
+      fields(payload, ["id", "Items", "x", "y", "z"]);
+      if (string(payload.id) !== "minecraft:chest") throw new Error("Chest payload ID mismatch");
+      if (payload.Items && list(payload.Items, 10).length)
+        throw new Error("Nonempty chest inventory is not supported; nothing was imported");
+      for (const [axis, field] of ["x", "y", "z"].entries())
+        if (payload[field] && int(payload[field]) !== pos[axis])
+          throw new Error("Chest payload coordinates do not match its structure cell");
+    }
     const key = pos.join(",");
     if (occupied.has(key)) throw new Error(`Duplicate block position: ${key}`);
     occupied.add(key);
-    return blockSchema.parse({ pos, state: palette[index] });
+    return blockSchema.parse({ pos, state, ...(chest ? { blockEntity: { kind: "chest", items: [] } } : {}) });
   });
   const groups = logicalCellGroups(blocks),
     document = newEditorDocument(workspace);

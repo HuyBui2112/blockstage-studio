@@ -633,10 +633,16 @@ export function EditorWorkbench({
             resources.catalog,
             placementHit,
             { mode: placementMode, turns: placementTurns },
+            document.objects.find((root) => root.kind === "block" && root.cells.length === 1 &&
+              placementHit.target && root.cells[0].pos.every((value, axis) => value === placementHit.target![axis])),
           );
+      const replaceObjectId = "replaceObjectId" in plan ? plan.replaceObjectId : undefined;
+      const candidateDocument = { ...document, objects: replaceObjectId
+        ? document.objects.map((root) => root.id === replaceObjectId ? plan.object : root)
+        : [...document.objects, plan.object] };
       assertViewEdit(
         document,
-        { ...document, objects: [...document.objects, plan.object] },
+        candidateDocument,
         viewState,
       );
       let candidate = objectCells(plan.object).map((cell) => ({
@@ -644,7 +650,8 @@ export function EditorWorkbench({
         owner: plan.object.id,
       }));
       const collision = candidate.some((cell) =>
-        occupied.has(cell.pos.join(",")),
+        occupied.has(cell.pos.join(",")) && !document.objects.find((root) =>
+          root.id === replaceObjectId && root.cells.some((old) => old.pos.every((value, axis) => value === cell.pos[axis]))),
       );
       if (
         !collision &&
@@ -653,7 +660,7 @@ export function EditorWorkbench({
       ) {
         const connected = planNeighborConnections(
           document,
-          { ...document, objects: [...document.objects, plan.object] },
+          candidateDocument,
           resources.profile.neighborRules,
         );
         for (const block of connected.changed) {
@@ -1381,6 +1388,8 @@ export function EditorWorkbench({
                   });
                 }}
                 onDelete={(id) => void session.removeComponent(id)}
+                onRename={session.renameComponent}
+                onDuplicate={session.duplicateComponent}
                 onImport={(file) => void session.importComponent(file)}
               />
             )}
@@ -2051,6 +2060,14 @@ export function EditorWorkbench({
                 </div>
               )}
               <SupportDetails issues={supportIssues} />
+              {selectedCells.some((cell) => cell.blockEntity?.kind === "chest") && (
+                <section className="editor-section">
+                  <div className="section-title"><h2>Chest data</h2><span>Empty</span></div>
+                  <small title="Only empty single chests are supported. Nonempty or unknown NBT is rejected during import.">
+                    Single chest · empty inventory
+                  </small>
+                </section>
+              )}
               {!readOnly && (
                 <EntityPanel
                   key={`${scope}:${slot.epoch}`}

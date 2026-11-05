@@ -16,6 +16,8 @@ type Props = {
   onEdit: (asset: ComponentAsset) => void;
   onDelete: (id: string) => void;
   onImport: (file: File) => void;
+  onRename: (id: string, name: string) => Promise<boolean>;
+  onDuplicate: (id: string) => Promise<boolean>;
 };
 const PAGE_SIZE = 24;
 
@@ -26,7 +28,13 @@ export function ComponentLibrary({
   onEdit,
   onDelete,
   onImport,
+  onRename,
+  onDuplicate,
 }: Props) {
+  const [renaming, setRenaming] = useState<string | null>(null);
+  const [name, setName] = useState("");
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState("");
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState<ComponentCatalogueSort>("name");
   const [limit, setLimit] = useState(PAGE_SIZE);
@@ -39,6 +47,23 @@ export function ComponentLibrary({
   const changeQuery = (value: string) => {
     setQuery(value);
     setLimit(PAGE_SIZE);
+  };
+  const renameValid = name.trim().length > 0 && name.trim().length <= 120;
+  const run = async (operation: () => Promise<boolean>, renamed = false) => {
+    if (pending) return;
+    setPending(true);
+    setError("");
+    try {
+      if (await operation()) {
+        if (renamed) setRenaming(null);
+      } else {
+        setError("Component was not saved. Please retry.");
+      }
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Component was not saved. Please retry.");
+    } finally {
+      setPending(false);
+    }
   };
 
   return (
@@ -93,6 +118,7 @@ export function ComponentLibrary({
         )}
       </div>
       <div className="component-assets">
+        {error && <div className="component-library-error" role="alert">{error}</div>}
         {shown.map(({ asset, cells }) => (
           <article
             className={`component-asset${selected === asset.id ? " chosen" : ""}`}
@@ -113,8 +139,55 @@ export function ComponentLibrary({
                 </small>
               </span>
             </button>
+            {renaming === asset.id && (
+              <form
+                className="component-rename"
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  if (renameValid) void run(() => onRename(asset.id, name.trim()), true);
+                }}
+              >
+                <input
+                  autoFocus
+                  aria-label={`New name for component ${asset.name}`}
+                  aria-invalid={!renameValid}
+                  value={name}
+                  disabled={pending}
+                  onChange={(event) => setName(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Escape") {
+                      event.stopPropagation();
+                      if (!pending) setRenaming(null);
+                    }
+                  }}
+                />
+                <button type="submit" disabled={pending || !renameValid}>Save</button>
+                <button type="button" disabled={pending} onClick={() => setRenaming(null)}>Cancel</button>
+                {!renameValid && <small>Name must contain 1–120 characters.</small>}
+              </form>
+            )}
             <div className="component-asset-actions">
               <button onClick={() => onEdit(asset)}>Edit</button>
+              <button
+                aria-label={`Rename component ${asset.name}`}
+                title="Rename component"
+                disabled={pending}
+                onClick={() => {
+                  setRenaming(asset.id);
+                  setName(asset.name);
+                  setError("");
+                }}
+              >
+                <Icon name="rename" size={13} />
+              </button>
+              <button
+                aria-label={`Duplicate component ${asset.name}`}
+                title="Duplicate component"
+                disabled={pending}
+                onClick={() => { void run(() => onDuplicate(asset.id)); }}
+              >
+                <Icon name="blocks" size={13} />
+              </button>
               <button
                 aria-label={`Export component ${asset.name}`}
                 onClick={() =>

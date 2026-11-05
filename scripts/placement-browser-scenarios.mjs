@@ -226,6 +226,27 @@ export async function runPlacementScenarios({ command, evaluate, until, click, a
   // The bed top itself is picked after placement; use a direct occupied grid case in domain tests.
   await screenshot('editor-component-yaw')
 
+  // A Context merge replaces one standalone slab root, never adds a second cell.
+  await importDocument(doc('Slab merge', [object('merge-slab', [cell('stone_brick_slab', [0, 0, 0], { type: 'bottom', waterlogged: 'true' })])]))
+  await palette('stone_brick_slab')
+  await input(aria('Placement mode'), 'context')
+  await click(aria('Editor Y view'))
+  const slabBefore = await snapshot(), slabHistory = await history()
+  const mergePoint = await hover([.5, .5, .5])
+  const mergeGhost = await ghost()
+  assert.equal(mergeGhost.cells[0].state.properties.type, 'double')
+  assert.deepEqual(mergeGhost.cells[0].pos, [0, 0, 0])
+  await press(mergePoint)
+  await until(`JSON.parse(document.querySelector('.editor-diagnostics').dataset.snapshot).cells[0].state.properties.type==='double'`)
+  assert.equal((await snapshot()).cells.length, 1)
+  assert.equal((await snapshot()).cells[0].owner, 'merge-slab')
+  assert.equal((await snapshot()).cells[0].state.properties.waterlogged, 'false')
+  assert.equal(Number(await history()), Number(slabHistory) + 1)
+  await click(aria('Undo editor'))
+  assert.deepEqual(await snapshot(), slabBefore)
+  await click(aria('Redo editor'))
+  assert.equal((await snapshot()).cells[0].state.properties.type, 'double')
+
   // Closed room, explicit upper slabs/axis/facing, complete pairs, all supported.
   const room = [], used = new Set()
   const put = (name, pos, properties) => { const k = pos.join(','); if (used.has(k)) return; used.add(k); room.push(object(`room-${k}`, [cell(name, pos, properties)])) }

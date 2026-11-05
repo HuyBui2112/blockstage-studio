@@ -121,11 +121,12 @@ const demoMaterials = new Map(
 export function structureStateError(
   state: BlockState,
   materials: ReadonlyMap<string, Material>,
+  payload?: Block["blockEntity"],
 ): string | undefined {
   const material = materials.get(state.name);
   if (!demoMaterials.has(state.name) && material?.source !== "game-profile")
     return `${state.name}: chưa có adapter/profile game để xác nhận xuất`;
-  if (material?.hasBlockEntity)
+  if (material?.hasBlockEntity && !(state.name === "minecraft:chest" && state.properties.type === "single" && payload?.kind === "chest"))
     return `${state.name}: cần payload block entity; chưa hỗ trợ xuất trong bản này`;
   try {
     validateState(state, material ? [material] : []);
@@ -163,7 +164,7 @@ export function exportStructureScene(
     states = new Map<string, number>(),
     materials = new Map(catalog.map((material) => [material.id, material]));
   const result = blocks.map((b) => {
-    const error = structureStateError(b.state, materials);
+    const error = structureStateError(b.state, materials, b.blockEntity);
     if (error) throw new Error(error);
     const k = stateKey(b.state);
     if (!states.has(k)) {
@@ -192,6 +193,7 @@ export function exportStructureScene(
         b.pos.map((v, n) => int(v - min[n])),
       ),
       state: int(states.get(k)!),
+      ...(b.blockEntity ? { nbt: compound({ id: string("minecraft:chest"), Items: list(10, []) }) } : {}),
     });
   });
   const entityTags = entities.map((e) => {

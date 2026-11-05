@@ -303,8 +303,8 @@ export function fromLegacyProject(project: Project): EditorDocument {
       (value) => value.id === instance.componentId,
     );
     if (!component) throw new Error("Legacy component is missing");
-    const cells = instantiate(component, instance).map(({ pos, state }) =>
-      structuredClone({ pos, state }),
+    const cells = instantiate(component, instance).map(({ owner: _owner, ...cell }) =>
+      structuredClone(cell),
     );
     logicalCellGroups(cells);
     objects.push({

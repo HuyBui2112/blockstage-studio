@@ -5,7 +5,7 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  color: var(--muted);
+  color: var(--soft);
   font-size: 10px;
 }
 .component-sort select {
@@ -26,4 +26,23 @@
 }
 .component-show-more {
   width: 100%;
+}
+.component-rename {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 8px;
+}
+.component-rename input {
+  min-width: 0;
+  flex: 1 1 100%;
+}
+.component-rename small {
+  flex-basis: 100%;
+  color: var(--muted);
+}
+.component-library-error {
+  padding: 8px;
+  color: var(--danger, #ffb4ab);
+  font-size: 11px;
 }

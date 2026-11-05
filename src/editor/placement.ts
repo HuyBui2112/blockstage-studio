@@ -85,6 +85,8 @@ function cellsFor(state: BlockState, position: Vec3): Block[] {
   const make = (pos: Vec3, properties: Record<string, string>): Block => ({
     pos: [...pos],
     state: { name: state.name, properties: { ...properties } },
+    ...(state.name === "minecraft:chest" && properties.type === "single"
+      ? { blockEntity: { kind: "chest" as const, items: [] } } : {}),
   });
   if (adapter)
     return [
@@ -307,7 +309,13 @@ export function rewriteLogicalState(
         properties: { ...cell.state.properties, [property]: value },
       };
       validateState(state, catalog);
-      cells.push(...cellsFor(state, cell.pos));
+      const rebuilt = cellsFor(state, cell.pos);
+      if (cell.blockEntity) {
+        if (state.name !== "minecraft:chest" || state.properties.type !== "single")
+          throw new Error("Chest payload cannot be changed into a paired or unsupported block");
+        rebuilt[0].blockEntity = structuredClone(cell.blockEntity);
+      }
+      cells.push(...rebuilt);
     }
   }
   const result: EditorObject = {

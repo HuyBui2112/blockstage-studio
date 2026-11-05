@@ -526,3 +526,32 @@ describe("component corner anchoring and yaw", () => {
     ).toThrow();
   });
 });
+
+describe("finite standalone slab merging", () => {
+  it.each(["bottom", "top"])("merges the exposed %s half surface without changing identity", (half) => {
+    const target = createPlacedObject(state("stone_brick_slab", { type: half, waterlogged: "true" }), pos, catalog);
+    const before = structuredClone(target);
+    const surface = { ...hit([0, half === "bottom" ? 1 : -1, 0]), target: pos };
+    const result = planBlockPlacement(state("stone_brick_slab"), pos, catalog, surface, context, target);
+    expect(result.replaceObjectId).toBe(target.id);
+    expect(result.object).toEqual({ ...target, cells: [{ ...target.cells[0], state: state("stone_brick_slab", { type: "double", waterlogged: "false" }) }] });
+    expect(target).toEqual(before);
+    const document = { ...newEditorDocument(), objects: [result.object] };
+    expect(() => validateDocument(document, catalog)).not.toThrow();
+  });
+
+  it("preserves Design insertion and refuses unrelated, nested, double or non-half surfaces", () => {
+    const target = createPlacedObject(state("stone_brick_slab"), pos, catalog);
+    const surface = { ...hit(), target: pos };
+    const request = (owner: EditorObject, source = state("stone_brick_slab"), clicked = surface, options = context) =>
+      planBlockPlacement(source, pos, catalog, clicked, options, owner);
+    expect(request(target, undefined, undefined, design).replaceObjectId).toBeUndefined();
+    expect(request(target, state("oak_log")).replaceObjectId).toBeUndefined();
+    expect(request({ ...target, kind: "component" }).replaceObjectId).toBeUndefined();
+    expect(request({ ...target, kind: "group", cells: [], children: [target] }).replaceObjectId).toBeUndefined();
+    expect(request(createPlacedObject(state("stone_brick_slab", { type: "double" }), pos, catalog)).replaceObjectId).toBeUndefined();
+    expect(request(target, undefined, { ...surface, face: [1, 0, 0] }).replaceObjectId).toBeUndefined();
+    expect(request(target, undefined, { ...surface, point: [pos[0], pos[1] + 1, pos[2]] }).replaceObjectId).toBeUndefined();
+    expect(request(target, undefined, { ...surface, target: [0, 0, 0] }).replaceObjectId).toBeUndefined();
+  });
+});

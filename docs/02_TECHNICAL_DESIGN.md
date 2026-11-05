@@ -23,6 +23,15 @@ Java không bắt buộc để mở UI khi đã có profile; cần JDK cho các 
 
 ## 2. Ranh giới module và nguồn sự thật
 
+Subset bổ sung: block cell có optional strict `blockEntity: {kind:"chest",items:[]}`
+chỉ cho `minecraft:chest[type=single]`. Placement mới khởi tạo rương rỗng; copy,
+state/yaw/move, JSON/backup và Structure NBT giữ payload. Import chỉ nhận empty
+Items và ID/coordinate fields đã hiểu; reject nonempty/unknown/paired payload.
+Không có inventory editor/generic typed NBT. Context slab merge thay standalone
+root cùng ID, giữ identity/Undo; không merge group/component hoặc Design.
+Library có rename/duplicate persist-before-publish. WebGL loss tạm dừng frames,
+restore dùng CPU resources hiện có; không đổi document/history.
+
 | Module | Trách nhiệm |
 | --- | --- |
 | `src/core` | Schema v1 được giữ tương thích, game profile/catalog, state và phép xoay cơ sở |

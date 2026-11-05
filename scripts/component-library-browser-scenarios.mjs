@@ -56,6 +56,46 @@ export async function runComponentLibraryScenarios({command,evaluate,until,click
   assert.ok(await evaluate(`document.documentElement.scrollWidth<=innerWidth+1`))
   assert.ok(await evaluate(`(()=>{const input=document.querySelector('[aria-label="Search components"]'),b=input.getBoundingClientRect();return b.width>100&&input===document.elementFromPoint(b.x+b.width/2,b.y+b.height/2)})()`))
   await command('Emulation.setDeviceMetricsOverride',{width:1500,height:1000,deviceScaleFactor:1,mobile:false})
+  // Mutations follow the fixed 25-card catalogue assertions above.
+  const mutationSnapshot=await evaluate(`document.querySelector('.editor-diagnostics').dataset.snapshot`),mutationStatus=await status()
+  const renamed='Library renamed fixture',duplicateName=`${renamed} copy`
+  await click(aria(`Rename component ${fixtures[24].name}`))
+  await input(aria(`New name for component ${fixtures[24].name}`),`  ${renamed}  `)
+  await click('.component-rename button[type="submit"]')
+  await until(`!document.querySelector('.component-rename')`)
+  await input(aria('Search components'),renamed)
+  assert.equal(await evaluate(`document.querySelector('.component-asset-main strong').textContent`),renamed)
+  assert.equal(await evaluate(`document.querySelector('.component-asset').dataset.componentId`),chosenId)
+  await click(aria(`Duplicate component ${renamed}`))
+  await until(`document.querySelectorAll('.component-asset').length===2`)
+  assert.equal(await evaluate(`Number(document.querySelector('.editor-library-tabs button:nth-child(2) span').textContent)`),initial+26)
+  const duplicatedId=await evaluate(`Array.from(document.querySelectorAll('.component-asset')).find(card=>card.querySelector('strong').textContent===${JSON.stringify(duplicateName)})?.dataset.componentId`)
+  assert.ok(duplicatedId);assert.notEqual(duplicatedId,chosenId)
+  const exportAsset=async(name)=>{
+    await click(aria(`Export component ${name}`))
+    for(let i=0;i<100;i++){
+      try{return JSON.parse(await readFile(join(downloads,`${name}.component.json`),'utf8'))}catch{await delay(100)}
+    }
+    throw new Error(`Missing component export: ${name}`)
+  }
+  const renamedExport=await exportAsset(renamed),duplicateExport=await exportAsset(duplicateName)
+  assert.deepEqual(renamedExport,{...exported,name:renamed})
+  assert.equal(duplicateExport.id,duplicatedId)
+  const stripIds=(asset)=>({...asset,id:'asset',name:'name',objects:asset.objects.map(function strip(object){return {...object,id:'object',children:object.children.map(strip)}})})
+  assert.deepEqual(stripIds(duplicateExport),stripIds(renamedExport))
+  const objectIds=(asset)=>{const ids=[];const visit=(objects)=>{for(const object of objects){ids.push(object.id);visit(object.children)}};visit(asset.objects);return ids}
+  const sourceIds=new Set([renamedExport.id,...objectIds(renamedExport)])
+  assert.ok([duplicateExport.id,...objectIds(duplicateExport)].every(id=>!sourceIds.has(id)))
+  assert.equal(new Set([duplicateExport.id,...objectIds(duplicateExport)]).size,objectIds(duplicateExport).length+1)
+  assert.equal(await evaluate(`document.querySelector('.editor-diagnostics').dataset.snapshot`),mutationSnapshot)
+  assert.deepEqual(await status(),mutationStatus)
+  const mutationOrigin=await evaluate('performance.timeOrigin');await command('Page.reload');await until(`performance.timeOrigin!==${mutationOrigin}&&document.querySelector('.editor-workspace')?.dataset.editorReady==='true'`)
+  if(!await evaluate(`!!document.querySelector('.editor-library')`))await click(aria('Toggle editor library'))
+  await click('.editor-library-tabs button:nth-child(2)');await input(aria('Search components'),renamed)
+  assert.equal(await evaluate(`document.querySelectorAll('.component-asset').length`),2)
+  assert.deepEqual(await evaluate(`Array.from(document.querySelectorAll('.component-asset')).map(card=>card.dataset.componentId).sort()`),[chosenId,duplicatedId].sort())
+  assert.equal(await evaluate(`Number(document.querySelector('.editor-library-tabs button:nth-child(2) span').textContent)`),initial+26)
+  await screenshot('component-library-renamed-duplicate')
   await click(aria('Clear component search'));await click(aria('Select tool'))
-  console.log(JSON.stringify({componentLibraryResult:'passed',checks:['25 component imports through public UI','24-card initial bound and show-more/reset','Vietnamese accent-insensitive name/block AND search','cell sorting','selected asset identity retained','empty search/clear','no document/revision/history changes','unchanged component export','reload persistence','620px search input visible']}))
+  console.log(JSON.stringify({componentLibraryResult:'passed',checks:['25 component imports through public UI','24-card initial bound and show-more/reset','Vietnamese accent-insensitive name/block AND search','cell sorting','selected asset identity retained','empty search/clear','no document/revision/history changes','unchanged component export','reload persistence','620px search input visible','trimmed rename persists','duplicate fresh IDs preserves cells and source export','rename/duplicate survive reload without document edits']}))
 }

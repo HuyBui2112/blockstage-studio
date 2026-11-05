@@ -17,9 +17,17 @@ export const stateSchema = z
       .default({}),
   })
   .strict();
+export const blockEntitySchema = z.object({
+  kind: z.literal("chest"),
+  items: z.array(z.never()).max(0),
+}).strict();
 export const blockSchema = z
-  .object({ pos: vecSchema, state: stateSchema })
-  .strict();
+  .object({ pos: vecSchema, state: stateSchema, blockEntity: blockEntitySchema.optional() })
+  .strict()
+  .superRefine((block, context) => {
+    if (block.blockEntity && (block.state.name !== "minecraft:chest" || block.state.properties.type !== "single"))
+      context.addIssue({ code: "custom", message: "Chest payload requires a single minecraft:chest" });
+  });
 export const componentSchema = z.object({
   id: z.string().min(1),
   name: z.string().min(1).max(120),

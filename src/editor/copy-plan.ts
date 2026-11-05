@@ -191,9 +191,10 @@ export function planObjectCopiesAt(
         name: cell.state.name,
         properties: { ...cell.state.properties },
       };
-      cells.push({ pos, state, owner: top });
+      const payload = cell.blockEntity ? { blockEntity: structuredClone(cell.blockEntity) } : {};
+      cells.push({ pos, state, ...payload, owner: top });
       chunks.add(pos.map((value) => Math.floor(value / 16)).join(","));
-      return { pos, state };
+      return { pos, state, ...payload };
     });
     return {
       ...object,

@@ -25,7 +25,11 @@ export type PlacementOptions = {
   mode: "design" | "context";
   turns: QuarterTurn;
 };
-export type BlockPlacementPlan = { object: EditorObject; notes: string[] };
+export type BlockPlacementPlan = {
+  object: EditorObject;
+  notes: string[];
+  replaceObjectId?: string;
+};
 
 // Explicit IDs checked against 26.2 classes by PlacementOracle.java. Logs use
 // RotatedPillarBlock's placement implementation; chains have a separate adapter.
@@ -184,7 +188,7 @@ function contextState(
       : "bottom";
     notes.push(
       slabs.has(state.name)
-        ? "Slab merging and fluids are not simulated."
+        ? "Slab fluids are not simulated; merging is limited to exposed half surfaces of standalone same-ID slabs."
         : "Stair shape, neighbors and fluids are not simulated.",
     );
   }
@@ -217,10 +221,45 @@ export function planBlockPlacement(
   catalog: Material[],
   hit: PlacementHit | undefined,
   options: PlacementOptions,
+  target?: EditorObject,
 ): BlockPlacementPlan {
   validTurns(options.turns);
   validateState(state, catalog);
   const notes: string[] = [];
+  // Callers supply a standalone root, never a nested leaf. This finite editor
+  // merge uses the actual exposed horizontal half surface, not an inferred cell.
+  if (
+    options.mode === "context" && hit?.target && target &&
+    slabs.has(state.name) && target.kind === "block" &&
+    target.cells.length === 1 && target.children.length === 0 &&
+    !target.componentId
+  ) {
+    validHit(hit, pos);
+    const cell = target.cells[0],
+      targetPos = hit.target,
+      half = cell.state.properties.type;
+    if (
+      cell.state.name === state.name &&
+      cell.pos.every((value, axis) => value === targetPos[axis]) &&
+      ((half === "bottom" && hit.face[1] === 1) ||
+        (half === "top" && hit.face[1] === -1)) &&
+      Math.abs(hit.point[1] - cell.pos[1] - 0.5) < 1e-7 &&
+      [0, 2].every((axis) =>
+        hit.point[axis] >= cell.pos[axis] && hit.point[axis] <= cell.pos[axis] + 1,
+      )
+    ) {
+      const merged = {
+        ...cell.state,
+        properties: { ...cell.state.properties, type: "double", waterlogged: "false" },
+      };
+      validateState(merged, catalog);
+      return {
+        object: { ...target, cells: [{ ...cell, state: merged }] },
+        replaceObjectId: target.id,
+        notes: ["Merged standalone same-ID slab; fluids are not simulated."],
+      };
+    }
+  }
   const source =
     options.mode === "context" ? contextState(state, pos, hit, notes) : state;
   let object = createPlacedObject(source, pos, catalog);

@@ -34,6 +34,7 @@ import {
   type EditorPlacementHit,
 } from "./editor-interaction";
 import { CellPicker } from "./cell-picking";
+import { ContextLifecycle } from "./context-lifecycle";
 import { CONTEXT_CHAIN_IDS } from "../editor/placement-plan";
 import {
   bakeSpecialBlock,
@@ -132,6 +133,7 @@ class ViewportController {
   observer: ResizeObserver;
   frame = 0;
   disposed = false;
+  contextLifecycle: ContextLifecycle | undefined;
   lastTime = 0;
   keys = new Set<string>();
   down: [number, number] | null = null;
@@ -217,6 +219,27 @@ class ViewportController {
     this.observer = new ResizeObserver(this.resize);
     this.observer.observe(host);
     const canvas = this.renderer.domElement;
+    this.contextLifecycle = new ContextLifecycle(
+      canvas,
+      () => {
+        cancelAnimationFrame(this.frame);
+        this.frame = 0;
+        this.blur();
+        canvas.dataset.contextStatus = "lost";
+        this.props.onMessage(
+          "Graphics context lost. Waiting for recovery; document edits are retained.",
+        );
+      },
+      () => {
+        // Three restores GPU state from the retained CPU geometry/textures.
+        // Keep shared resources and the latest scene rather than rebuilding data.
+        canvas.dataset.contextStatus = "ready";
+        this.lastTime = 0;
+        this.metricsKey = "";
+        this.invalidate();
+        this.props.onMessage("Graphics context restored.");
+      },
+    );
     canvas.addEventListener("pointerdown", this.pointerDown, true);
     canvas.addEventListener("pointermove", this.pointerMove, true);
     canvas.addEventListener("pointerleave", this.pointerLeave);
@@ -269,10 +292,11 @@ class ViewportController {
     this.invalidate();
   };
   invalidate = () => {
-    if (!this.frame && !this.disposed)
+    if (!this.frame && !this.disposed && !this.contextLifecycle?.lost)
       this.frame = requestAnimationFrame(this.render);
   };
   render = (time: number) => {
+    if (this.disposed || this.contextLifecycle?.lost) return;
     const measureStarted = this.measurement ? performance.now() : 0;
     this.frame = 0;
     if (this.flying) {
@@ -1436,6 +1460,7 @@ class ViewportController {
     this.releaseMeasurement?.();
     this.releaseMeasurement = null;
     this.disposed = true;
+    this.contextLifecycle?.dispose();
     cancelAnimationFrame(this.frame);
     this.observer.disconnect();
     if (this.flying) document.exitPointerLock();

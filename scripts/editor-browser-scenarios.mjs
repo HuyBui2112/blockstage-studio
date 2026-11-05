@@ -24,6 +24,7 @@ import { runInteractionScenarios } from "./interaction-browser-scenarios.mjs";
 import { runR1HouseScenarios } from "./r1-house-browser-scenarios.mjs";
 import { runPerformanceScenarios } from "./performance-browser-scenarios.mjs";
 import { runEntityScenarios } from "./entity-browser-scenarios.mjs";
+import { runContextScenarios } from "./context-browser-scenarios.mjs";
 
 /** Real input integration scenarios, called by the existing isolated-browser harness. */
 export async function runEditorScenarios({
@@ -40,6 +41,17 @@ export async function runEditorScenarios({
   profilePath,
   createPeer,
 }) {
+  if (process.env.BLOCKSTAGE_EDITOR_SLICE === "context") {
+    await click(aria("Architecture workspace"));
+    await until(`document.querySelector('.editor-workspace')?.dataset.editorReady==='true'`);
+    console.log(JSON.stringify({ contextResult: await runContextScenarios({ evaluate, until }) }));
+    return;
+  }
+  if (process.env.BLOCKSTAGE_EDITOR_SLICE === "placement") {
+    await click(aria("Component Editor workspace"));
+    await until(`document.querySelector('.editor-workspace')?.dataset.editorReady==='true'`);
+    return runPlacementScenarios({ command, evaluate, until, click, aria, input, upload, key, screenshot, directory, profilePath });
+  }
   if (process.env.BLOCKSTAGE_EDITOR_SLICE === "entities")
     return runEntityScenarios({
       command,

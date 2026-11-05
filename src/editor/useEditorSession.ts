@@ -79,6 +79,7 @@ import {
 } from "./material-plan";
 import { measurePhase } from "../core/measurement-phases";
 import { createTransformPreviewController } from "./transform-preview-controller";
+import { duplicateComponentAsset, renameComponentAsset } from "./component-library-operations";
 import {
   applyEntityAction,
   editableEntityIds,
@@ -881,10 +882,15 @@ export function useEditorSession(
     options: PlacementOptions = { mode: "design", turns: 0 },
   ) {
     try {
-      const { object } = planBlockPlacement(state, pos, catalog, hit, options);
+      const before = slots[scope].history.document;
+      const target = hit?.target && before.objects.find((root) => root.kind === "block" &&
+        root.cells.length === 1 && root.cells[0].pos.every((value, axis) => value === hit.target![axis]));
+      const { object, replaceObjectId } = planBlockPlacement(state, pos, catalog, hit, options, target || undefined);
+      const next = replaceObjectId ? { ...before, objects: before.objects.map((root) => root.id === replaceObjectId ? object : root) }
+        : insertObject(before, object, catalog);
       commit(
         scope,
-        insertObject(slots[scope].history.document, object, catalog),
+        next,
         "Place object",
         [object.id],
       );
@@ -1428,6 +1434,28 @@ export function useEditorSession(
       setError(messageOf(error));
     }
   }
+  async function renameComponent(id: string, name: string) {
+    try {
+      const source = components.find((asset) => asset.id === id);
+      if (!source) throw new Error("Component no longer exists");
+      const asset = renameComponentAsset(source, name);
+      await storage.saveComponentAsset(asset);
+      setComponents((previous) => previous.map((entry) => entry.id === id ? asset : entry));
+      setError("");
+      return true;
+    } catch (error) { setError(messageOf(error)); return false; }
+  }
+  async function duplicateComponent(id: string) {
+    try {
+      const source = components.find((asset) => asset.id === id);
+      if (!source) throw new Error("Component no longer exists");
+      const asset = duplicateComponentAsset(source, components, () => crypto.randomUUID());
+      await storage.saveComponentAsset(asset);
+      setComponents((previous) => [...previous, asset]);
+      setError("");
+      return true;
+    } catch (error) { setError(messageOf(error)); return false; }
+  }
   async function removeComponent(id: string) {
     try {
       await storage.removeComponentAsset(id);
@@ -1498,6 +1526,8 @@ export function useEditorSession(
     placeComponent,
     importComponent,
     removeComponent,
+    renameComponent,
+    duplicateComponent,
   };
 }
 

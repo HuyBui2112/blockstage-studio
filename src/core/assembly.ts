@@ -84,6 +84,7 @@ export function instantiate(c: Component, i: Instance): SceneBlock[] {
     if (replacement && family(replacement) !== family(b.state.name))
       throw new Error("Chỉ thay vật liệu cùng nhóm tương thích");
     return {
+      ...b,
       pos,
       state: rotateState(
         { ...b.state, name: replacement ?? b.state.name },
