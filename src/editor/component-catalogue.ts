@@ -1,4 +1,9 @@
-import type { ComponentAsset, EditorObject } from "./model";
+import { componentCategories, type ComponentAsset, type ComponentCategory, type EditorObject } from "./model";
+
+export const COMPONENT_CATEGORIES = componentCategories;
+export function componentCategoryLabel(category: ComponentCategory): string {
+  return category[0].toUpperCase() + category.slice(1);
+}
 
 export type ComponentCatalogueEntry = {
   readonly asset: ComponentAsset;
@@ -6,6 +11,7 @@ export type ComponentCatalogueEntry = {
   readonly cells: number;
   readonly blockIds: readonly string[];
   readonly search: string;
+  readonly category: ComponentCategory;
 };
 export type ComponentCatalogueSort = "name" | "cells-asc" | "cells-desc";
 
@@ -45,20 +51,23 @@ export function indexComponentCatalogue(
       asset,
       cells,
       blockIds: ids,
-      search: normalize([asset.name, ...ids].join(" ")),
+      category: asset.category ?? "custom",
+      search: normalize([asset.name, asset.category ?? "custom", ...ids].join(" ")),
     };
   });
 }
 
-/** All whitespace-separated query tokens must match the name or a stored block ID. */
+/** All query tokens must match the name, category or a stored block ID. */
 export function queryComponentCatalogue(
   entries: readonly ComponentCatalogueEntry[],
   query: string,
   sort: ComponentCatalogueSort,
+  category: ComponentCategory | "all" = "all",
 ): ComponentCatalogueEntry[] {
   const tokens = normalize(query).trim().split(/\s+/).filter(Boolean);
   return entries
-    .filter((entry) => tokens.every((token) => entry.search.includes(token)))
+    .filter((entry) => (category === "all" || entry.category === category) &&
+      tokens.every((token) => entry.search.includes(token)))
     .sort((a, b) => {
       const sizeOrder =
         sort === "cells-asc"

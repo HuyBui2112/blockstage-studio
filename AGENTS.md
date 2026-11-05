@@ -156,10 +156,10 @@ layers and arbitrary clip planes remain unsupported; full K05 remains partial.
 
 ## Data contracts
 
-- Empty single `minecraft:chest` cells may carry strict `blockEntity: {kind:
-  "chest", items: []}`. Keep it through copy/state/transform/portable/export.
-  This is the only payload exception to older blocks-only import/export notes:
-  nonempty inventory, paired chests, unknown payload/fields remain rejected.
+- Single `minecraft:chest` cells may carry strict `blockEntity: {kind:"chest",
+  items}` with 27 slots, four plain 26.2 item IDs and stacks 1–64. Keep it through
+  Inspector edits, copy/state/transform/portable/export. Item components, paired
+  chests and unknown payload/fields remain rejected.
   Context slab merge replaces only same-ID standalone roots on exposed half
   surfaces; preview/commit use the same replacement and final view/neighbor guards.
 

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { BASIC_CHEST_ITEMS } from "./chest-items";
 
 export const idSchema = z.string().regex(/^[a-z0-9_.-]+:[a-z0-9_./-]+$/);
 export const vecSchema = z.tuple([
@@ -17,9 +18,18 @@ export const stateSchema = z
       .default({}),
   })
   .strict();
+export const chestItemSchema = z.object({
+  slot: z.number().int().min(0).max(26),
+  id: z.enum(BASIC_CHEST_ITEMS),
+  count: z.number().int().min(1).max(64),
+}).strict();
+export type ChestItem = z.infer<typeof chestItemSchema>;
 export const blockEntitySchema = z.object({
   kind: z.literal("chest"),
-  items: z.array(z.never()).max(0),
+  items: z.array(chestItemSchema).max(27).refine(
+    (items) => new Set(items.map((item) => item.slot)).size === items.length,
+    "Duplicate chest inventory slot",
+  ),
 }).strict();
 export const blockSchema = z
   .object({ pos: vecSchema, state: stateSchema, blockEntity: blockEntitySchema.optional() })

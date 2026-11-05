@@ -14,7 +14,7 @@ import {
 import { DEMO_MATERIALS, validateState, type Material } from "../core/catalog";
 
 type Tag =
-  | { type: 3 | 5 | 6; value: number }
+  | { type: 1 | 3 | 5 | 6; value: number }
   | { type: 8; value: string }
   | { type: 9; element: number; value: Tag[] }
   | { type: 10; value: Record<string, Tag> };
@@ -40,6 +40,9 @@ export function encodeNbt(root: Tag): Uint8Array {
   };
   const payload = (tag: Tag) => {
     switch (tag.type) {
+      case 1:
+        number(tag.value, 1);
+        break;
       case 3:
         number(tag.value, 4);
         break;
@@ -193,7 +196,9 @@ export function exportStructureScene(
         b.pos.map((v, n) => int(v - min[n])),
       ),
       state: int(states.get(k)!),
-      ...(b.blockEntity ? { nbt: compound({ id: string("minecraft:chest"), Items: list(10, []) }) } : {}),
+      ...(b.blockEntity ? { nbt: compound({ id: string("minecraft:chest"), Items: list(10, b.blockEntity.items.map((item) => compound({
+        Slot: { type: 1, value: item.slot }, id: string(item.id), count: int(item.count),
+      }))) }) } : {}),
     });
   });
   const entityTags = entities.map((e) => {

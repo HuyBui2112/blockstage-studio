@@ -1,4 +1,8 @@
-import { componentAssetSchema, type ComponentAsset, type EditorObject } from "./model";
+import { componentAssetSchema, type ComponentAsset, type ComponentCategory, type EditorObject } from "./model";
+
+export function setComponentCategory(asset: ComponentAsset, category: ComponentCategory): ComponentAsset {
+  return componentAssetSchema.parse({ ...asset, category });
+}
 
 export function renameComponentAsset(asset: ComponentAsset, name: string): ComponentAsset {
   return componentAssetSchema.parse({ ...asset, name: name.trim() });

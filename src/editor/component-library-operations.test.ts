@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { ComponentAsset } from "./model";
-import { duplicateComponentAsset, renameComponentAsset } from "./component-library-operations";
+import { duplicateComponentAsset, renameComponentAsset, setComponentCategory } from "./component-library-operations";
 
 const asset: ComponentAsset = {
   schemaVersion: 1, id: "library", name: "Door", pivot2: [1, 0, 1], size: [1, 2, 1], orientation: 1,
@@ -17,6 +17,16 @@ const asset: ComponentAsset = {
 };
 
 describe("component library operations", () => {
+  it("edits only explicit category metadata, validates it and keeps it through rename/copy", () => {
+    const categorized = setComponentCategory(asset, "gate");
+    expect(categorized).toEqual({ ...asset, category: "gate" });
+    expect(asset).not.toHaveProperty("category");
+    expect(renameComponentAsset(categorized, "Entry").category).toBe("gate");
+    let id = 0;
+    expect(duplicateComponentAsset(categorized, [], () => `category-${id++}`).category).toBe("gate");
+    expect(() => setComponentCategory(asset, "unknown" as "gate")).toThrow();
+    expect(renameComponentAsset(asset, "Entry")).not.toHaveProperty("category");
+  });
   it("renames only library metadata and rejects invalid names", () => {
     expect(renameComponentAsset(asset, "  Entrance  ")).toEqual({ ...asset, name: "Entrance" });
     expect(asset.name).toBe("Door");

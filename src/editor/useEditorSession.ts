@@ -79,7 +79,10 @@ import {
 } from "./material-plan";
 import { measurePhase } from "../core/measurement-phases";
 import { createTransformPreviewController } from "./transform-preview-controller";
-import { duplicateComponentAsset, renameComponentAsset } from "./component-library-operations";
+import { duplicateComponentAsset, renameComponentAsset, setComponentCategory } from "./component-library-operations";
+import type { ComponentCategory } from "./model";
+import { setChestInventory } from "./chest-operations";
+import type { Block } from "../core/schema";
 import {
   applyEntityAction,
   editableEntityIds,
@@ -950,6 +953,10 @@ export function useEditorSession(
       [],
     );
   }
+  function updateChest(scope: EditorScope, rootId: string, position: Vec3, items: NonNullable<Block["blockEntity"]>["items"]) {
+    return perform(scope, "Change chest inventory", (document) =>
+      setChestInventory(document, rootId, position, items, catalog));
+  }
   function updateState(scope: EditorScope, property: string, value: string) {
     perform(scope, "Change block state", (document) =>
       updateObjectsState(
@@ -1144,6 +1151,10 @@ export function useEditorSession(
         ids,
         scope === "component" ? doc.name : `Component ${components.length + 1}`,
       );
+      if (scope === "component" && slot.editingAssetId) {
+        const previousAsset = components.find((component) => component.id === slot.editingAssetId);
+        if (previousAsset?.category) asset.category = previousAsset.category;
+      }
       if (scope === "component")
         asset.id = slot.editingAssetId ?? crypto.randomUUID();
       await storage.saveComponentAsset(asset);
@@ -1434,6 +1445,16 @@ export function useEditorSession(
       setError(messageOf(error));
     }
   }
+  async function changeComponentCategory(id: string, category: ComponentCategory) {
+    try {
+      const source = components.find((asset) => asset.id === id);
+      if (!source) throw new Error("Component no longer exists");
+      const asset = setComponentCategory(source, category);
+      await storage.saveComponentAsset(asset);
+      setComponents((previous) => previous.map((entry) => entry.id === id ? asset : entry));
+      setError(""); return true;
+    } catch (error) { setError(messageOf(error)); return false; }
+  }
   async function renameComponent(id: string, name: string) {
     try {
       const source = components.find((asset) => asset.id === id);
@@ -1513,6 +1534,7 @@ export function useEditorSession(
     ungroup,
     remove,
     updateState,
+    updateChest,
     setPivot,
     move,
     rotate,
@@ -1527,6 +1549,7 @@ export function useEditorSession(
     importComponent,
     removeComponent,
     renameComponent,
+    changeComponentCategory,
     duplicateComponent,
   };
 }

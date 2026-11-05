@@ -40,6 +40,17 @@ const ids = (entries: ReturnType<typeof indexComponentCatalogue>) =>
   entries.map((entry) => entry.asset.id);
 
 describe("component catalogue", () => {
+  it("filters and searches categories while preserving legacy asset references", () => {
+    const legacy = asset("legacy", "Old module");
+    const wall: ComponentAsset = { ...asset("wall", "Panel"), category: "wall" };
+    const entries = indexComponentCatalogue([legacy, wall]);
+    expect(queryComponentCatalogue(entries, "custom", "name", "custom")[0].asset).toBe(legacy);
+    expect(queryComponentCatalogue(entries, "wall panel", "name", "wall")[0].asset).toBe(wall);
+    expect(queryComponentCatalogue(entries, "panel", "name", "floor")).toEqual([]);
+    expect(legacy).not.toHaveProperty("category");
+    const updated = { ...wall, category: "gate" as const };
+    expect(queryComponentCatalogue(indexComponentCatalogue([updated]), "", "name", "gate")[0].asset).toBe(updated);
+  });
   it("matches Vietnamese accents, decomposed marks and crossed d without requiring resources", () => {
     const entries = indexComponentCatalogue([
       asset("one", "Đèn Cửa Sổ"),

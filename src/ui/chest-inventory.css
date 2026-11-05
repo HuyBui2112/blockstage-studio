@@ -1,0 +1,8 @@
+.chest-inventory { display: grid; gap: 8px; }
+.chest-slot-grid { display: grid; grid-template-columns: repeat(9, minmax(0,1fr)); gap: 3px; }
+.chest-slot-grid button { min-width: 0; padding: 5px 0; font-size: 10px; }
+.chest-slot-grid button[aria-pressed="true"] { border-color: var(--accent); background: #463b30; }
+.chest-inventory label { display: grid; gap: 5px; font-size: 10px; color: var(--soft); }
+.chest-inventory select, .chest-inventory input { width: 100%; min-width: 0; }
+.chest-inventory-actions { display: flex; gap: 6px; }
+.chest-inventory small { color: var(--soft); font-size: 10px; }

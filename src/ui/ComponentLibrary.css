@@ -8,6 +8,18 @@
   color: var(--soft);
   font-size: 10px;
 }
+.component-category {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 8px 8px;
+  color: var(--soft);
+  font-size: 10px;
+}
+.component-category select {
+  min-width: 0;
+  flex: 1;
+}
 .component-sort select {
   min-width: 0;
   flex: 1;

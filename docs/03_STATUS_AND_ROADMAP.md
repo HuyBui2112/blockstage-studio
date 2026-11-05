@@ -9,15 +9,23 @@ Các mục tương lai dưới đây là đề xuất ưu tiên, chưa phải t�
 
 ## Cách đọc trạng thái
 
-**05/11 — slice ưu tiên 1–5 (PARTIAL):** đã có rương đơn rỗng strict payload xuyên
+**05/11 — slice ưu tiên 1–5 (PARTIAL):** đã có rương đơn payload hữu hạn xuyên
 placement/state/move/copy/JSON/backup/NBT import-export; Context same-ID standalone
-slab merge; WebGL context-loss recovery; library rename/duplicate với fresh IDs.
-Code gate 645 tests/60 files, typecheck/lint/build đạt. Native library rename/
-duplicate/reload, ray slab merge/Undo/Redo và forced WebGL loss/restore đạt; không
+slab merge; WebGL context-loss recovery; library rename/duplicate/category với fresh IDs.
+Inspector chỉnh 27 slot, bốn item plain IDs, stack 1–64; component category filter/edit
+đã nối persistence. Code gate 647 tests/60 files, typecheck/lint/build đạt. Native
+library rename/duplicate/reload và forced WebGL loss/restore đạt; không
 chạy full browser suite hoặc world/Fabric trong slice này. Rương qua codec test,
-chưa có UI/world roundtrip riêng. Còn inventory/sign/banner payload, stair-neighbor/
+chưa có world roundtrip riêng. Còn item components/sign/banner payload, stair-neighbor/
 door-hinge coverage, tint/fluid/render gaps, categories/thumbnails/relink, formats/
 large export. Không đánh toàn năm ưu tiên hoàn thành; NBT vẫn hữu hạn và cap48.
+
+**Bổ sung tiếp theo:** rương đã có inventory cơ bản 27 slot với bốn item vanilla
+được chấp nhận, count 1–64, apply/reset và một Undo; NBT giữ `Slot/id/count`,
+reject components/unknown fields. Component library có category optional, lọc và
+đổi category; stair neighbor có finite subset oak/spruce/birch/stone-brick khi
+Auto connections bật. Code gate sau slice: **647 tests/60 files**, typecheck/lint/
+build đạt. Chưa có inventory item components/generic payload hoặc full stair palette.
 
 | Trạng thái | Ý nghĩa |
 | --- | --- |
@@ -258,7 +266,7 @@ BUG-03/04/06 đã có fixes trong scope công bố. BUG-01/02/05 còn PARTIAL; c
 | Dựng hằng ngày | **Đã có B01–B03/B08:** menu/phím Duplicate, internal Copy/Paste và Repeat World với numeric/pointer preview, cancel và atomic Undo/Redo. **B04/B05 + B09 primitive subset đã triển khai:** Build line/plane/solid/hollow box với World endpoints và Design state; native primitive browser đã đạt. B06/B07 + B09 Materials đã có replacement, ID/state counts và CSV/JSON với K02 material-contract subset; code/native browser gates đạt. Resize theo quy tắc, parametric wall/column/span và socket vẫn chưa triển khai. |
 | Nội thất/phân vùng | **Đã có finite root scope:** hide/lock/isolate/reset, click/box/frame theo policy và bảo vệ indirect neighbor edits; inclusive Y-range bảo vệ partial roots. **Đã có scripted journey:** nhà hai tầng/phòng/cầu thang và interior edit với complete JSON/NBT. **Chưa có:** automatic layers/roof/floor, arbitrary clip planes, visible-only/lasso hoặc nghiệm thu builder thật. |
 | Reuse/vật liệu | **Đã có:** selected material replacement trong finite families, giữ state/pairs/identity. **Chưa có:** linked component updates/overrides, roles/kits. Không suy safe replacement chỉ từ tags/creative tabs. |
-| Game behavior | **Một phần:** opt-in scene connections fence/wall/gate theo game predicates đã có. Chưa slab merge/player hinge, auto-pane/stairs, dynamic shapes, support tổng quát, gravity/redstone/fluid/ticks/player collision. |
+| Game behavior | **Một phần:** opt-in scene connections fence/wall/gate và finite same-ID standalone slab merge đã có. Chưa player hinge, auto-pane/stairs, dynamic shapes, support tổng quát, gravity/redstone/fluid/ticks/player collision. |
 | Payload/entities | **Chưa triển khai:** entity editing workflow, block-entity inventory/custom NBT, arbitrary payload preservation adapters, entity equipment/variants/animation. |
 | Appearance | **Một phần:** thiếu nhiều special renderer, fluid geometry/appearance, biome tint, lighting/AO parity và một số hiệu ứng động. Sprite animation hiện có không đồng nghĩa entity animation. |
 | Formats/versions | **Một phần:** import Java Structure NBT raw/gzip blocks-only 26.2/4903 đã có, registry exact state, complete pairs và report/atomic commit. Chưa nhập entity/BE payload, multi-palettes, `.schem`, `.litematic`, multi-version migration hoặc Fabric bridge. |

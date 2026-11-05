@@ -2,6 +2,7 @@ import type { NbtTag } from "./nbt-reader";
 import { validateState, type Material } from "../core/catalog";
 import {
   blockSchema,
+  blockEntitySchema,
   stateSchema,
   type Block,
   type BlockState,
@@ -128,13 +129,20 @@ export function inspectStructure(
       throw new Error("Palette index is out of range");
     const state = palette[index];
     const chest = state.name === "minecraft:chest" && state.properties.type === "single";
+    let blockEntity: Block["blockEntity"] = chest ? { kind: "chest", items: [] } : undefined;
     if (entry.nbt) {
       if (!chest) throw new Error("Unsupported block-entity payload; nothing was imported");
       const payload = compound(entry.nbt);
       fields(payload, ["id", "Items", "x", "y", "z"]);
       if (string(payload.id) !== "minecraft:chest") throw new Error("Chest payload ID mismatch");
-      if (payload.Items && list(payload.Items, 10).length)
-        throw new Error("Nonempty chest inventory is not supported; nothing was imported");
+      const itemTags = payload.Items ? list(payload.Items, 10) : [];
+      if (itemTags.length > 27) throw new Error("Chest inventory exceeds 27 entries");
+      blockEntity = blockEntitySchema.parse({ kind: "chest", items: itemTags.map((tag) => {
+        const item = compound(tag);
+        fields(item, ["Slot", "id", "count"]);
+        if (item.Slot?.type !== 1) throw new Error("Chest Slot requires TAG_Byte");
+        return { slot: item.Slot.value, id: string(item.id), count: int(item.count) };
+      }) });
       for (const [axis, field] of ["x", "y", "z"].entries())
         if (payload[field] && int(payload[field]) !== pos[axis])
           throw new Error("Chest payload coordinates do not match its structure cell");
@@ -142,7 +150,7 @@ export function inspectStructure(
     const key = pos.join(",");
     if (occupied.has(key)) throw new Error(`Duplicate block position: ${key}`);
     occupied.add(key);
-    return blockSchema.parse({ pos, state, ...(chest ? { blockEntity: { kind: "chest", items: [] } } : {}) });
+    return blockSchema.parse({ pos, state, ...(blockEntity ? { blockEntity } : {}) });
   });
   const groups = logicalCellGroups(blocks),
     document = newEditorDocument(workspace);

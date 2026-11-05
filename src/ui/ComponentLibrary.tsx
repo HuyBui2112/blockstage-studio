@@ -1,10 +1,12 @@
 import { useMemo, useState } from "react";
 import {
   indexComponentCatalogue,
+  COMPONENT_CATEGORIES,
+  componentCategoryLabel,
   queryComponentCatalogue,
   type ComponentCatalogueSort,
 } from "../editor/component-catalogue";
-import type { ComponentAsset } from "../editor/model";
+import type { ComponentAsset, ComponentCategory } from "../editor/model";
 import { download } from "../io/storage";
 import { Icon } from "./Icon";
 import "./ComponentLibrary.css";
@@ -18,6 +20,7 @@ type Props = {
   onImport: (file: File) => void;
   onRename: (id: string, name: string) => Promise<boolean>;
   onDuplicate: (id: string) => Promise<boolean>;
+  onCategory: (id: string, category: ComponentCategory) => Promise<boolean>;
 };
 const PAGE_SIZE = 24;
 
@@ -30,6 +33,7 @@ export function ComponentLibrary({
   onImport,
   onRename,
   onDuplicate,
+  onCategory,
 }: Props) {
   const [renaming, setRenaming] = useState<string | null>(null);
   const [name, setName] = useState("");
@@ -37,11 +41,12 @@ export function ComponentLibrary({
   const [error, setError] = useState("");
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState<ComponentCatalogueSort>("name");
+  const [category, setCategory] = useState<ComponentCategory | "all">("all");
   const [limit, setLimit] = useState(PAGE_SIZE);
   const entries = useMemo(() => indexComponentCatalogue(assets), [assets]);
   const results = useMemo(
-    () => queryComponentCatalogue(entries, query, sort),
-    [entries, query, sort],
+    () => queryComponentCatalogue(entries, query, sort, category),
+    [entries, query, sort, category],
   );
   const shown = results.slice(0, limit);
   const changeQuery = (value: string) => {
@@ -77,7 +82,7 @@ export function ComponentLibrary({
           <Icon name="search" size={16} />
           <input
             aria-label="Search components"
-            placeholder="Search names or block IDs…"
+            placeholder="Search names, categories or block IDs…"
             value={query}
             onChange={(event) => changeQuery(event.target.value)}
           />
@@ -90,6 +95,22 @@ export function ComponentLibrary({
               <Icon name="close" size={13} />
             </button>
           )}
+        </label>
+        <label className="component-sort">
+          <span>Category</span>
+          <select
+            aria-label="Filter component category"
+            value={category}
+            onChange={(event) => {
+              setCategory(event.target.value as ComponentCategory | "all");
+              setLimit(PAGE_SIZE);
+            }}
+          >
+            <option value="all">All categories</option>
+            {COMPONENT_CATEGORIES.map((value) => (
+              <option key={value} value={value}>{componentCategoryLabel(value)}</option>
+            ))}
+          </select>
         </label>
         <label className="component-sort">
           <span>Sort</span>
@@ -139,6 +160,22 @@ export function ComponentLibrary({
                 </small>
               </span>
             </button>
+            <label className="component-category">
+              <span>Category</span>
+              <select
+                aria-label={`Category for component ${asset.name}`}
+                value={asset.category ?? "custom"}
+                disabled={pending}
+                onChange={(event) => {
+                  const value = event.target.value as ComponentCategory;
+                  void run(() => onCategory(asset.id, value));
+                }}
+              >
+                {COMPONENT_CATEGORIES.map((value) => (
+                  <option key={value} value={value}>{componentCategoryLabel(value)}</option>
+                ))}
+              </select>
+            </label>
             {renaming === asset.id && (
               <form
                 className="component-rename"
@@ -223,8 +260,8 @@ export function ComponentLibrary({
           <div className="empty-state">
             <Icon name="search" size={30} />
             <strong>No matching components</strong>
-            <button className="button" onClick={() => changeQuery("")}>
-              Clear component search
+            <button className="button" onClick={() => { changeQuery(""); setCategory("all"); }}>
+              Clear component filters
             </button>
           </div>
         )}

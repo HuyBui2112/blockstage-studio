@@ -21,6 +21,49 @@ const offsets: Vec3[] = [
   [-1, 0, 0],
 ];
 const air: BlockState = { name: "minecraft:air", properties: {} };
+// Finite R1 subset, checked against actual 26.2 StairBlock by the class oracle.
+// Do not infer an adapter from a suffix, tag, render mesh or property names.
+const stairs = new Set([
+  "minecraft:oak_stairs", "minecraft:spruce_stairs",
+  "minecraft:birch_stairs", "minecraft:stone_brick_stairs",
+]);
+function stairShape(
+  state: BlockState,
+  at: (offset: Vec3) => BlockState,
+  rules: NeighborRules,
+): BlockState {
+  const facing = directions.indexOf(state.properties.facing as typeof directions[number]);
+  if (facing < 0 || !["top", "bottom"].includes(state.properties.half))
+    throw new Error("Unsupported stair facing/half");
+  const read = (i: number) => {
+    const other = at(offsets[i]);
+    if (!rules[other.name]) throw new Error(`No neighbor predicates for ${other.name}`);
+    if (!stairs.has(other.name) && "shape" in other.properties && "half" in other.properties)
+      throw new Error(`Unsupported stair neighbor: ${other.name}`);
+    if (stairs.has(other.name) &&
+        (!directions.includes(other.properties.facing as typeof directions[number]) ||
+         !["top", "bottom"].includes(other.properties.half)))
+      throw new Error(`Unsupported stair facing/half: ${other.name}`);
+    return other;
+  };
+  const matches = (other: BlockState) => stairs.has(other.name) &&
+    other.properties.half === state.properties.half;
+  const canTakeShape = (i: number) => {
+    const other = read(i);
+    return !(matches(other) && other.properties.facing === state.properties.facing);
+  };
+  let shape = "straight";
+  for (const outer of [true, false]) {
+    const other = read(outer ? facing : (facing + 2) % 4);
+    if (!matches(other)) continue;
+    const direction = directions.indexOf(other.properties.facing as typeof directions[number]);
+    if (direction % 2 === facing % 2 ||
+        !canTakeShape((direction + (outer ? 2 : 0)) % 4)) continue;
+    shape = `${outer ? "outer" : "inner"}_${direction === (facing + 3) % 4 ? "left" : "right"}`;
+    break;
+  }
+  return { ...state, properties: { ...state.properties, shape } };
+}
 const neighbors = (pos: Vec3) => [
   pos,
   ...offsets.map((d) => pos.map((v, i) => v + d[i]) as Vec3),
@@ -40,6 +83,7 @@ function derived(
   at: (offset: Vec3) => BlockState,
   rules: NeighborRules,
 ): BlockState {
+  if (stairs.has(state.name)) return stairShape(state, at, rules);
   const own = rules[state.name];
   if (!own || !["fence", "wall", "gate"].includes(own.kind)) return state;
   const properties = { ...state.properties };
@@ -188,7 +232,8 @@ export function planNeighborConnections(
     const block = lookup(id);
     if (
       !block ||
-      !["fence", "wall", "gate"].includes(rules[block.state.name]?.kind)
+      (!stairs.has(block.state.name) &&
+       !["fence", "wall", "gate"].includes(rules[block.state.name]?.kind))
     )
       continue;
     try {

@@ -40,11 +40,14 @@ export type ComponentAsset = {
   schemaVersion: 1;
   id: string;
   name: string;
+  category?: ComponentCategory;
   objects: EditorObject[];
   pivot2: Vec3;
   size: Vec3;
   orientation: QuarterTurn;
 };
+export const componentCategories = ["column", "wall", "gate", "floor", "decoration", "custom"] as const;
+export type ComponentCategory = typeof componentCategories[number];
 
 const pivotSchema = z.tuple([
   z.number().int().min(-60000000).max(60000002),
@@ -199,6 +202,7 @@ export const componentAssetSchema: z.ZodType<ComponentAsset> = z
     schemaVersion: z.literal(1),
     id: z.string().min(1).max(200),
     name: labelSchema,
+    category: z.enum(componentCategories).optional(),
     objects: objectsSchema.refine(
       (objects) => objects.length > 0,
       "A component must contain objects",

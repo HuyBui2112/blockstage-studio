@@ -62,6 +62,7 @@ import { Icon, type IconName } from "./Icon";
 import { ResourceBrowser } from "./ResourceBrowser";
 import { ComponentLibrary } from "./ComponentLibrary";
 import { EntityPanel } from "./EntityPanel";
+import { ChestInventory } from "./ChestInventory";
 import { editableEntityIds } from "../editor/entity-action";
 import "./editor.css";
 
@@ -1389,6 +1390,7 @@ export function EditorWorkbench({
                 }}
                 onDelete={(id) => void session.removeComponent(id)}
                 onRename={session.renameComponent}
+                onCategory={session.changeComponentCategory}
                 onDuplicate={session.duplicateComponent}
                 onImport={(file) => void session.importComponent(file)}
               />
@@ -2060,13 +2062,11 @@ export function EditorWorkbench({
                 </div>
               )}
               <SupportDetails issues={supportIssues} />
-              {selectedCells.some((cell) => cell.blockEntity?.kind === "chest") && (
-                <section className="editor-section">
-                  <div className="section-title"><h2>Chest data</h2><span>Empty</span></div>
-                  <small title="Only empty single chests are supported. Nonempty or unknown NBT is rejected during import.">
-                    Single chest · empty inventory
-                  </small>
-                </section>
+              {selectedObjects.length === 1 && selectedCells.length === 1 &&
+                selectedCells[0].state.name === "minecraft:chest" && selectedCells[0].state.properties.type === "single" && (
+                <ChestInventory key={`${slot.epoch}:${slot.revision}:${selectedObjects[0].id}`}
+                  cell={selectedCells[0]} disabled={!loaded}
+                  onApply={(items) => session.updateChest(scope, selectedObjects[0].id, selectedCells[0].pos, items)} />
               )}
               {!readOnly && (
                 <EntityPanel
