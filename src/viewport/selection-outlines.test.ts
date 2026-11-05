@@ -137,6 +137,50 @@ describe("selection outline batches", () => {
     batch!.dispose();
   });
 
+  it("retains the Box3Helper transform and padding for wide sparse owners", () => {
+    const bounds = new T.Box3(
+      new T.Vector3(-30_000_000, -1, -30_000_000),
+      new T.Vector3(30_000_001, 2, 30_000_001),
+    ).expandByScalar(0.015);
+    const snapshot = bounds.clone();
+    const [outline] = createSelectionOutlines(
+      new Map([["wide", bounds]]),
+      "wide",
+    );
+    const expected = new T.Box3Helper(snapshot);
+    expect(outline).toBeInstanceOf(T.Box3Helper);
+    expect(segments(outline!)).toEqual(segments(expected));
+    expect(outline!.material.color.getHexString()).toBe("ffe3a1");
+    expect(outline!.material.toneMapped).toBe(false);
+    expect(bounds).toEqual(snapshot);
+    bounds.expandByScalar(1);
+    expect(segments(outline!)).toEqual(segments(expected));
+    const geometry = vi.spyOn(outline!.geometry, "dispose");
+    const material = vi.spyOn(outline!.material, "dispose");
+    outline!.dispose();
+    outline!.dispose();
+    expect(geometry).toHaveBeenCalledTimes(1);
+    expect(material).toHaveBeenCalledTimes(1);
+    expected.dispose();
+  });
+
+  it("keeps batching at the extent limit and falls back above it", () => {
+    const compact = new T.Box3(new T.Vector3(), new T.Vector3(1024, 1, 1));
+    const wide = compact.clone();
+    wide.max.x += 0.03;
+    const outlines = createSelectionOutlines(
+      new Map([
+        ["compact", compact],
+        ["wide", wide],
+      ]),
+      null,
+    );
+    expect(outlines).toHaveLength(2);
+    expect(outlines[0]).not.toBeInstanceOf(T.Box3Helper);
+    expect(outlines[1]).toBeInstanceOf(T.Box3Helper);
+    outlines.forEach((outline) => outline.dispose());
+  });
+
   it("skips empty bounds and rejects oversized or nonfinite input", () => {
     expect(
       createSelectionOutlines(new Map([["empty", new T.Box3()]]), null),

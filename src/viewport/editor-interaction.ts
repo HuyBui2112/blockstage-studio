@@ -6,7 +6,7 @@ import { PreviewQueue } from "./preview-queue";
 import { measurePhase } from "../core/measurement-phases";
 import {
   createSelectionOutlines,
-  type SelectionOutlineBatch,
+  type SelectionOutline,
 } from "./selection-outlines";
 
 export type EditorTransformIntent =
@@ -123,7 +123,7 @@ export class EditorInteraction {
   proxy = new T.Object3D();
   anchor = new T.Group();
   outlines = new T.Group();
-  outlineBatches: SelectionOutlineBatch[] = [];
+  outlineBatches: SelectionOutline[] = [];
   ghost = new T.Group();
   ghostMaterials = new Map<
     T.Material,

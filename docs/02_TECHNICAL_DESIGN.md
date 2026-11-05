@@ -625,6 +625,15 @@ reconciliation, revision, draft protection và patch history/retention giữ ngu
 Index không cache qua Undo/Redo. `viewport.selection-outlines` đo riêng dựng viền;
 loại membership scan không đồng nghĩa mọi bước Undo/render đều tuyến tính hoặc mượt.
 
+Viền chọn compact được gom theo tâm chunk 16³ và màu active, dùng vertices tương
+đối với chunk để tránh mất precision ở tọa độ xa. Giữ 12 cạnh, padding 0,015,
+depth test và màu chọn; không tham gia picking. Root có bounds rộng hơn 1.024
+block trên một trục dùng Box3Helper riêng để giữ phép biến đổi unit-box cũ thay
+vì ép extents lớn vào Float32. Vì vậy sparse/wide selections vẫn có thể nhiều
+draw calls; không cam kết batching mọi group. Tối đa 100.000 bounds, index Uint32
+khi cần; mỗi drawable chỉ dispose geometry/material do nó sở hữu, không chạm
+resources của block. Không đổi dữ liệu, history, schema hoặc persistence.
+
 Import/load/commit và public `previewTransform` giữ full document schema. Mỗi lượt tạo registry
 index và deduplicate state hợp lệ theo nội dung, không cache qua các lượt/document.
 Sau schema và registry pass, footprint visitor vẫn kiểm complete pairs, shared

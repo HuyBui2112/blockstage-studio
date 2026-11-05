@@ -2,6 +2,9 @@ import * as T from "three";
 
 const CHUNK_SIZE = 16;
 const MAX_BOXES = 100_000;
+// Keep compact vertices near their origin. Wide sparse owners retain the old
+// unit-box transform instead of rounding their extents into Float32 vertices.
+const MAX_BATCH_EXTENT = 1024;
 // Same eight-corner order and twelve edges as Three's Box3Helper.
 const EDGES = [
   0, 1, 1, 2, 2, 3, 3, 0, 4, 5, 5, 6, 6, 7, 7, 4, 0, 4, 1, 5, 2, 6, 3, 7,
@@ -22,17 +25,32 @@ export class SelectionOutlineBatch extends T.LineSegments<
   }
 }
 
+export class SelectionOutlineHelper extends T.Box3Helper {
+  // Box3Helper always creates one LineBasicMaterial; Three's declaration is broad.
+  declare material: T.LineBasicMaterial;
+  private disposed = false;
+
+  override dispose(): void {
+    if (this.disposed) return;
+    this.disposed = true;
+    super.dispose();
+  }
+}
+
+export type SelectionOutline = SelectionOutlineBatch | SelectionOutlineHelper;
+
 /** Input bounds already include selection padding. Never modifies those bounds. */
 export function createSelectionOutlines(
   boxes: ReadonlyMap<string, T.Box3>,
   active: string | null,
-): SelectionOutlineBatch[] {
+): SelectionOutline[] {
   if (boxes.size > MAX_BOXES)
     throw new RangeError("Selection outlines exceed 100000 boxes");
   const groups = new Map<
     string,
     { origin: T.Vector3; active: boolean; boxes: T.Box3[] }
   >();
+  const wide: { box: T.Box3; active: boolean }[] = [];
   for (const [id, box] of boxes) {
     if (box.isEmpty()) continue;
     const coordinates = [
@@ -45,6 +63,16 @@ export function createSelectionOutlines(
     ];
     if (!coordinates.every(Number.isFinite))
       throw new RangeError("Selection bounds must be finite");
+    if (
+      Math.max(
+        box.max.x - box.min.x,
+        box.max.y - box.min.y,
+        box.max.z - box.min.z,
+      ) > MAX_BATCH_EXTENT
+    ) {
+      wide.push({ box, active: id === active });
+      continue;
+    }
     const x =
       Math.floor((box.min.x / 2 + box.max.x / 2) / CHUNK_SIZE) * CHUNK_SIZE;
     const y =
@@ -60,7 +88,7 @@ export function createSelectionOutlines(
     }
     group.boxes.push(box);
   }
-  const result: SelectionOutlineBatch[] = [];
+  const result: SelectionOutline[] = [];
   for (const group of groups.values()) {
     const vertexCount = group.boxes.length * 8;
     const positions = new Float32Array(vertexCount * 3);
@@ -116,6 +144,14 @@ export function createSelectionOutlines(
     );
     batch.position.copy(group.origin);
     result.push(batch);
+  }
+  for (const entry of wide) {
+    const helper = new SelectionOutlineHelper(
+      entry.box.clone(),
+      new T.Color(entry.active ? "#ffe3a1" : "#8ce1af"),
+    );
+    helper.material.toneMapped = false;
+    result.push(helper);
   }
   return result;
 }

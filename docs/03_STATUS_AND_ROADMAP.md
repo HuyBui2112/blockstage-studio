@@ -1278,9 +1278,55 @@ readback, immediate Enter/Esc và one-Undo: `editor-validation-multiselect-smoke
 Không suy SLO từ một mẫu; pair select-all Undo vẫn quan sát 3,05 s, chưa giải quyết
 bằng fast path preview này. Commit/history/rendering toàn scene cần profile riêng.
 
-**Đề xuất tiếp:** quy chiếu tail post-publish/frame và profile chọn nhiều/all roots
-trước khi tối ưu commit/history hoặc mở rộng proof sang neighbor rules. Không suy
-root đơn dense sang mọi scene/group, không nới cap hoặc giảm correctness gates.
+**Cập nhật P03/P04 Undo đa chọn — 05/11/2026:** đã profile cảnh pairs 25.000
+cells / 12.500 logical roots, chọn toàn bộ. Hai chi phí đã xác định là membership
+scan O(selection × roots) và một Box3Helper/drawable cho mỗi root. Membership dùng
+Set cục bộ, giữ nguyên thứ tự/ID lặp; empty/single giữ direct lookup. Viền compact
+gom theo chunk 16³/màu active, giữ padding/cạnh/depth; bounds rộng hơn 1.024 block
+dùng helper riêng để tránh mất precision Float32. Không thay history patch, draft,
+schema, picking, state validation hoặc dữ liệu công trình.
+
+Intel UHD/D3D11, Edge 156, i7-13650HX, 16 GiB, 1500×1000/DPR1; cùng fixture seed 1,
+resource/profile hashes, **30 mẫu/3 warmup**, native Undo→CPU frame submission:
+
+| Chỉ số (ms) | Trước | Chỉ sửa membership | Thêm batching viền |
+| --- | --- | --- | --- |
+| Undo p50 | 2.350,1 | 2.285,2 | 569,8 |
+| Undo p95 | 2.580,8 | 2.393,0 | 826,7 |
+| Membership p95 | 568,5 | 3,5 | 13,2 |
+| Dựng viền p95 | Chưa instrument | 122,1 | 23,9 |
+| Commit p95 | 615,1 | 586,4 | 1.002,2 |
+
+Undo cải thiện trong lượt đo này; commit lại chậm hơn. Full validation và history
+diff không đổi nhưng spans cũng tăng; runs khác ngày/background/thermal/GC chưa
+được kiểm soát, chưa kết luận nguyên nhân commit hoặc mọi delta là do code. Giữ
+đây là việc cần profile tiếp, không gọi toàn editor mượt. Một mẫu attribution
+trước batching có 15.461 draw calls/12.514 geometries khi Undo; sau batching quan
+sát 3.214/267. CPU submission sau p95 227,3 ms; mẫu attribution cũ 2.138 ms chỉ là
+một mẫu, không dùng làm baseline p95. Không là GPU completion/FPS/pixel proof.
+
+30 mẫu kiểm ordered selection và full downloaded JSON + CPU instance-buffer
+owner/state/position readback; native Redo/Undo và pending Enter/Esc đạt, idle một
+giây 0 frame. Report local: `editor-undo-before.json`,
+`editor-undo-membership-after.json`, `editor-undo-render-attribution.json`,
+`editor-undo-after.json`. Batching benchmark chạy trước bổ sung fallback wide-root;
+đường compact của fixture không đổi. Regression precision so sánh 12 cạnh với
+Box3Helper cũ ở ±30 triệu, kiểm padding, ngưỡng 1.024, Uint32 và disposal riêng.
+Code gate mới **619/619 tests, 54 files**, typecheck/lint/build đạt; bundle Three.js
+>500 kB vẫn cảnh báo. Không thêm dependency hoặc đóng gói game assets.
+Full native production browser regression sau fallback đạt: resources/animation/
+pack precedence, editor/gizmo/state/neighbors, component/R1 house, visibility/Y,
+NBT/portable, Save/draft/fault/recovery và keyboard/mouse. Assertion mới xác nhận
+batch Move Undo/Redo giữ thứ tự chọn ngược document order; Undo group bỏ ID đã mất,
+Redo không tự chọn group được khôi phục. Normal URL không bật measurement probes,
+không runtime exceptions. Đã xem ảnh viền active/inactive và cảnh 25k; không thay
+giao diện. Wide-root precision được kiểm bằng unit geometry, chưa có pixel/GPU
+proof cho tọa độ cực xa hoặc Minecraft world readback.
+
+**Đề xuất tiếp:** profile commit all-selection và tail post-publish/frame bằng
+đối chứng cùng điều kiện, trước khi tối ưu history diff hoặc mở rộng proof sang
+neighbor rules. Không suy root đơn dense sang mọi scene/group, không nới cap hoặc
+giảm correctness gates; wide sparse roots vẫn dùng helper riêng.
 
 **Q02:** audit chỉ đọc tìm bốn candidate version manifests, báo
 `INSTANCE_SELECTION_REQUIRED`. Một candidate `content 26.2` có embedded
