@@ -7,52 +7,19 @@ import {
   Vector3,
 } from "three";
 import type { EntityModelPart, GameProfile } from "../core/profile";
+import { chestAppearanceBinding, entityAdapter } from "../core/adapter-registry";
 import type { BakedMesh } from "./block-mesh";
 import type { ModelResolver } from "./models";
 
 export type EntityAppearance = { layer: string; texture: string };
-// Explicit 26.2 bindings. Geometry itself is baked by the game's LayerDefinitions.
-const bindings: Record<string, [string, string]> = {
-  armor_stand: ["armor_stand", "armorstand/armorstand"],
-  pig: ["pig", "pig/pig_temperate"],
-  cow: ["cow", "cow/cow_temperate"],
-  chicken: ["chicken", "chicken/chicken_temperate"],
-  creeper: ["creeper", "creeper/creeper"],
-  zombie: ["zombie", "zombie/zombie"],
-  skeleton: ["skeleton", "skeleton/skeleton"],
-  enderman: ["enderman", "enderman/enderman"],
-  spider: ["spider", "spider/spider"],
-  cave_spider: ["cave_spider", "spider/cave_spider"],
-  allay: ["allay", "allay/allay"],
-  bee: ["bee", "bee/bee"],
-  sheep: ["sheep", "sheep/sheep"],
-  fox: ["fox", "fox/fox"],
-  cat: ["cat", "cat/cat_tabby"],
-  wolf: ["wolf", "wolf/wolf"],
-  goat: ["goat", "goat/goat"],
-  iron_golem: ["iron_golem", "iron_golem/iron_golem"],
-  snow_golem: ["snow_golem", "snow_golem"],
-  slime: ["slime", "slime/slime"],
-  magma_cube: ["magma_cube", "slime/magmacube"],
-  villager: ["villager", "villager/villager"],
-  drowned: ["drowned", "zombie/drowned"],
-  husk: ["husk", "zombie/husk"],
-  wither_skeleton: ["wither_skeleton", "skeleton/wither_skeleton"],
-  stray: ["stray", "skeleton/stray"],
-  bogged: ["bogged", "skeleton/bogged"],
-  parched: ["parched", "skeleton/parched"],
-};
 export function entityAppearance(
   id: string,
   profile: GameProfile | null,
   resolver: ModelResolver,
 ): EntityAppearance | undefined {
-  const binding = id.startsWith("minecraft:")
-    ? bindings[id.slice(10)]
-    : undefined;
+  const binding = entityAdapter(id)?.appearance;
   if (!binding) return undefined;
-  const layer = `minecraft:${binding[0]}#main`,
-    texture = `assets/minecraft/textures/entity/${binding[1]}.png`;
+  const { layer, texture } = binding;
   return profile?.entityModels[layer] && resolver.files.has(texture)
     ? { layer, texture }
     : undefined;
@@ -111,33 +78,9 @@ export function bakeEntity(
   return { geometry, surfaces: [{ texture, tint: false, shade: true }] };
 }
 
-// ChestRenderer shares these three model layers across regular and copper chests.
-const chestTextures: Record<string, string> = {
-  chest: "normal",
-  trapped_chest: "trapped",
-  ender_chest: "ender",
-  copper_chest: "copper",
-  exposed_copper_chest: "copper_exposed",
-  weathered_copper_chest: "copper_weathered",
-  oxidized_copper_chest: "copper_oxidized",
-  waxed_copper_chest: "copper",
-  waxed_exposed_copper_chest: "copper_exposed",
-  waxed_weathered_copper_chest: "copper_weathered",
-  waxed_oxidized_copper_chest: "copper_oxidized",
-};
 export function blockEntityAppearance(
   id: string,
   state: Record<string, string>,
 ): EntityAppearance | undefined {
-  const name = id.startsWith("minecraft:")
-    ? chestTextures[id.slice(10)]
-    : undefined;
-  if (!name) return undefined;
-  const side =
-    state.type === "left" ? "_left" : state.type === "right" ? "_right" : "";
-  const layer = side
-    ? `minecraft:double_chest${side}#main`
-    : "minecraft:chest#main";
-  const texture = `assets/minecraft/textures/entity/chest/${name}${side}.png`;
-  return { layer, texture };
+  return chestAppearanceBinding(id, state);
 }

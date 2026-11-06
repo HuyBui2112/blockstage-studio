@@ -1,6 +1,7 @@
 import { rotatePos, rotateState, bounds } from "../core/assembly";
 import type { Material } from "../core/catalog";
 import type { BlockState, SceneBlock, Vec3 } from "../core/schema";
+import { blockYawError } from "../core/capabilities";
 import {
   componentAssetSchema,
   objectCells,
@@ -63,18 +64,8 @@ function turnsValue(turns: number): QuarterTurn {
   return (((turns % 4) + 4) % 4) as QuarterTurn;
 }
 function safeRotateState(state: BlockState, turns: QuarterTurn): BlockState {
-  // A registry proves state legality, not how an unfamiliar orientation transforms.
-  for (const [property, value] of Object.entries(state.properties)) {
-    if (property === "orientation")
-      throw new Error("This block needs a specialized rotation adapter");
-    if (
-      ["north", "east", "south", "west", "x", "y", "z"].includes(value) &&
-      !["facing", "axis", "north", "east", "south", "west"].includes(property)
-    )
-      throw new Error(`Rotation adapter does not support ${property}`);
-    if (property === "rotation" && !/^(?:[0-9]|1[0-5])$/.test(value))
-      throw new Error("Rotation adapter requires a 16-step block rotation");
-  }
+  const error = blockYawError(state);
+  if (error) throw new Error(error);
   return rotateState(state, turns);
 }
 function rotatePoint2(point: Vec3, pivot2: Vec3, turns: QuarterTurn): Vec3 {

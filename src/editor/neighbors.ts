@@ -1,3 +1,4 @@
+import { blockAdapter } from "../core/adapter-registry";
 import type { NeighborRule, NeighborRules } from "../core/profile";
 import {
   key,
@@ -21,12 +22,7 @@ const offsets: Vec3[] = [
   [-1, 0, 0],
 ];
 const air: BlockState = { name: "minecraft:air", properties: {} };
-// Finite R1 subset, checked against actual 26.2 StairBlock by the class oracle.
-// Do not infer an adapter from a suffix, tag, render mesh or property names.
-const stairs = new Set([
-  "minecraft:oak_stairs", "minecraft:spruce_stairs",
-  "minecraft:birch_stairs", "minecraft:stone_brick_stairs",
-]);
+const isNeighborStair = (id: string) => blockAdapter(id)?.neighbors === "stairs";
 function stairShape(
   state: BlockState,
   at: (offset: Vec3) => BlockState,
@@ -38,15 +34,15 @@ function stairShape(
   const read = (i: number) => {
     const other = at(offsets[i]);
     if (!rules[other.name]) throw new Error(`No neighbor predicates for ${other.name}`);
-    if (!stairs.has(other.name) && "shape" in other.properties && "half" in other.properties)
+    if (!isNeighborStair(other.name) && "shape" in other.properties && "half" in other.properties)
       throw new Error(`Unsupported stair neighbor: ${other.name}`);
-    if (stairs.has(other.name) &&
+    if (isNeighborStair(other.name) &&
         (!directions.includes(other.properties.facing as typeof directions[number]) ||
          !["top", "bottom"].includes(other.properties.half)))
       throw new Error(`Unsupported stair facing/half: ${other.name}`);
     return other;
   };
-  const matches = (other: BlockState) => stairs.has(other.name) &&
+  const matches = (other: BlockState) => isNeighborStair(other.name) &&
     other.properties.half === state.properties.half;
   const canTakeShape = (i: number) => {
     const other = read(i);
@@ -83,7 +79,7 @@ function derived(
   at: (offset: Vec3) => BlockState,
   rules: NeighborRules,
 ): BlockState {
-  if (stairs.has(state.name)) return stairShape(state, at, rules);
+  if (isNeighborStair(state.name)) return stairShape(state, at, rules);
   const own = rules[state.name];
   if (!own || !["fence", "wall", "gate"].includes(own.kind)) return state;
   const properties = { ...state.properties };
@@ -232,7 +228,7 @@ export function planNeighborConnections(
     const block = lookup(id);
     if (
       !block ||
-      (!stairs.has(block.state.name) &&
+      (!isNeighborStair(block.state.name) &&
        !["fence", "wall", "gate"].includes(rules[block.state.name]?.kind))
     )
       continue;

@@ -1,5 +1,6 @@
 import type { NbtTag } from "./nbt-reader";
-import { validateState, type Material } from "../core/catalog";
+import type { Material } from "../core/catalog";
+import { resolveBlockCapability } from "../core/capabilities";
 import {
   blockSchema,
   blockEntitySchema,
@@ -104,11 +105,8 @@ export function inspectStructure(
       throw new Error(
         `Registry missing for ${state.name}. Import the matching game profile before importing this structure.`,
       );
-    validateState(state, [material]);
-    if (material.hasBlockEntity && !(state.name === "minecraft:chest" && state.properties.type === "single"))
-      throw new Error(
-        `${state.name} requires block-entity payload support, which is not available in this import.`,
-      );
+    const capability = resolveBlockCapability(state, "structure-import", material);
+    if (!capability.supported) throw new Error(capability.reason);
     return state;
   });
   const entries = list(data.blocks, 10);

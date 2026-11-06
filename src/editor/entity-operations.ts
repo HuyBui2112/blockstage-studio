@@ -1,5 +1,6 @@
 import type { Material } from "../core/catalog";
 import type { SceneEntity, Vec3 } from "../core/schema";
+import { resolveEntityCapability, type CapabilityAction } from "../core/capabilities";
 import {
   validateDocument,
   type EditorDocument,
@@ -7,27 +8,16 @@ import {
 } from "./model";
 
 /** Editing coverage is independent of registry, rendering and export coverage. */
-export function entityEditCapability(type: string): {
-  supported: boolean;
-  reason: string;
-} {
-  return type === "minecraft:pig"
-    ? {
-        supported: true,
-        reason: "Basic pig position/yaw editing; no payload or simulation",
-      }
-    : {
-        supported: false,
-        reason: `Entity editing is not supported for ${type}`,
-      };
+export function entityEditCapability(type: string) {
+  return resolveEntityCapability(type, "design");
 }
 
-function requireSupported(entity: SceneEntity): void {
-  const capability = entityEditCapability(entity.type);
+function requireSupported(entity: SceneEntity, action: CapabilityAction): void {
+  const capability = resolveEntityCapability(entity.type, action);
   if (!capability.supported) throw new Error(capability.reason);
 }
 
-function selected(document: EditorDocument, ids: string[]): SceneEntity[] {
+function selected(document: EditorDocument, ids: string[], action: CapabilityAction): SceneEntity[] {
   if (!ids.length) throw new Error("Select at least one entity");
   if (new Set(ids).size !== ids.length)
     throw new Error("Duplicate entity selection ID");
@@ -35,7 +25,7 @@ function selected(document: EditorDocument, ids: string[]): SceneEntity[] {
   return ids.map((id) => {
     const entity = index.get(id);
     if (!entity) throw new Error("Selected entity is missing");
-    requireSupported(entity);
+    requireSupported(entity, action);
     return entity;
   });
 }
@@ -84,7 +74,7 @@ export function addEntity(
   catalog: Material[],
 ): EditorDocument {
   validateDocument(document, catalog);
-  requireSupported(entity);
+  requireSupported(entity, "design");
   freshIds(document, [entity.id]);
   if (document.entities.length >= 1000)
     throw new Error("Document exceeds 1,000 entities");
@@ -109,7 +99,7 @@ export function moveEntities(
   catalog: Material[],
 ): EditorDocument {
   validateDocument(document, catalog);
-  selected(document, ids);
+  selected(document, ids, "translate");
   finiteVector(delta);
   const selectedIds = new Set(ids);
   const entities = document.entities.map((entity) =>
@@ -132,7 +122,7 @@ export function setEntityYaw(
   catalog: Material[],
 ): EditorDocument {
   validateDocument(document, catalog);
-  selected(document, ids);
+  selected(document, ids, "yaw");
   const value = normalizedYaw(yaw),
     selectedIds = new Set(ids);
   const entities = document.entities.map((entity) =>
@@ -152,7 +142,7 @@ export function duplicateEntities(
   catalog: Material[],
 ): EditorDocument {
   validateDocument(document, catalog);
-  const sources = selected(document, ids);
+  const sources = selected(document, ids, "copy");
   if (newIds.length !== sources.length)
     throw new Error("One fresh ID per entity is required");
   if (document.entities.length + sources.length > 1000)
@@ -175,7 +165,7 @@ export function removeEntities(
   catalog: Material[],
 ): EditorDocument {
   validateDocument(document, catalog);
-  selected(document, ids);
+  selected(document, ids, "remove");
   const selectedIds = new Set(ids);
   return commit(
     document,

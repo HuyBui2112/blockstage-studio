@@ -1,14 +1,11 @@
 import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
 import type { GameProfile } from "../core/profile";
+import { DYE_COLORS } from "../core/adapter-registry";
 import type { BlockState } from "../core/schema";
 import { bakeEntity } from "./entities";
 import type { BakedMesh } from "./block-mesh";
 import type { ModelResolver } from "./models";
 
-const colors =
-  "white orange magenta light_blue yellow lime pink gray light_gray cyan purple blue brown green red black".split(
-    " ",
-  );
 type Definition = {
   layers: string[];
   textures: string[];
@@ -28,7 +25,7 @@ export function specialBlockAppearance(
       banner: false,
       note: "Inactive conduit preview; activation, wind and eye effects are not simulated.",
     };
-  const color = colors.find(
+  const color = DYE_COLORS.find(
     (color) =>
       state.name === `minecraft:${color}_banner` ||
       state.name === `minecraft:${color}_wall_banner`,

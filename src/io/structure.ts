@@ -11,7 +11,10 @@ import {
   type SceneEntity,
   type Vec3,
 } from "../core/schema";
-import { DEMO_MATERIALS, validateState, type Material } from "../core/catalog";
+import type { Material } from "../core/catalog";
+import { resolveBlockCapability, resolveEntityCapability } from "../core/capabilities";
+
+export { STRUCTURE_ENTITY_TYPES } from "../core/adapter-registry";
 
 type Tag =
   | { type: 1 | 3 | 5 | 6; value: number }
@@ -86,59 +89,14 @@ export type StructureScene = {
   entities: SceneEntity[];
 };
 
-export const STRUCTURE_ENTITY_TYPES: ReadonlySet<string> = new Set(
-  [
-    "armor_stand",
-    "pig",
-    "cow",
-    "chicken",
-    "creeper",
-    "zombie",
-    "skeleton",
-    "enderman",
-    "spider",
-    "cave_spider",
-    "allay",
-    "bee",
-    "sheep",
-    "fox",
-    "cat",
-    "wolf",
-    "goat",
-    "iron_golem",
-    "snow_golem",
-    "villager",
-    "drowned",
-    "husk",
-    "wither_skeleton",
-    "stray",
-    "bogged",
-    "parched",
-  ].map((id) => "minecraft:" + id),
-);
-const demoMaterials = new Map(
-  DEMO_MATERIALS.map((material) => [material.id, material]),
-);
-
 /** A resource-pack catalog alone is not evidence of a legal game blockstate. */
 export function structureStateError(
   state: BlockState,
   materials: ReadonlyMap<string, Material>,
   payload?: Block["blockEntity"],
 ): string | undefined {
-  const material = materials.get(state.name);
-  if (!demoMaterials.has(state.name) && material?.source !== "game-profile")
-    return `${state.name}: chưa có adapter/profile game để xác nhận xuất`;
-  if (material?.hasBlockEntity && !(state.name === "minecraft:chest" && state.properties.type === "single" && payload?.kind === "chest"))
-    return `${state.name}: cần payload block entity; chưa hỗ trợ xuất trong bản này`;
-  try {
-    validateState(state, material ? [material] : []);
-    // The built-in fallback verifies its own finite states, never arbitrary pack metadata.
-    if (material?.source !== "game-profile")
-      validateState(state, [demoMaterials.get(state.name)!]);
-  } catch (error) {
-    return error instanceof Error ? error.message : "Invalid blockstate";
-  }
+  const decision = resolveBlockCapability(state, "structure-export", materials.get(state.name), { payload });
+  return decision.supported ? undefined : decision.reason;
 }
 
 export function exportStructureScene(
@@ -202,7 +160,7 @@ export function exportStructureScene(
     });
   });
   const entityTags = entities.map((e) => {
-    if (!STRUCTURE_ENTITY_TYPES.has(e.type))
+    if (!resolveEntityCapability(e.type, "structure-export").supported)
       throw new Error(`${e.type}: chưa hỗ trợ xuất dữ liệu entity loại này`);
     const pos = e.position.map((v, i) => v - min[i]);
     return compound({

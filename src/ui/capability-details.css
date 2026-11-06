@@ -1,0 +1,11 @@
+.inspector-content > .capability-details { margin: 16px 20px; }
+.editor-section > .capability-details { margin-top: 12px; }
+.capability-details dl { margin: 12px 0 0; }
+.capability-details dl > div { padding: 7px 0; border-bottom: 1px solid var(--border, #30343c); }
+.capability-details dt { font-size: 11px; color: var(--text-muted, #a2a7b3); }
+.capability-details dd { margin: 3px 0 0; font-size: 12px; }
+.capability-details dd > span { color: #cbd5e1; }
+.capability-details dd[data-status="supported"] > span { color: #a6d5b4; }
+.capability-details dd[data-status="partial"] > span,
+.capability-details dd[data-status="unverified"] > span { color: #e1bf81; }
+.capability-details dd small { display: block; margin-top: 3px; font-size: 11px; line-height: 1.5; color: var(--text-muted, #a2a7b3); overflow-wrap: anywhere; }

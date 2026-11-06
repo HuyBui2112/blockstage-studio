@@ -1,12 +1,13 @@
 import { useMemo } from "react";
 import type { Material } from "../core/catalog";
+import { createCapabilityResolver, type CapabilityAction } from "../core/capabilities";
 import { resourceName } from "../core/labels";
 import type { GameProfile } from "../core/profile";
 import type { BlockState } from "../core/schema";
-import { blockEntityAppearance, entityAppearance } from "../render/entities";
-import { specialBlockSupport } from "../render/special-blocks";
+import { assessAppearance } from "../render/appearance-capability";
 import type { ModelResolver } from "../render/models";
 import { Icon } from "./Icon";
+import { CapabilityDetails } from "./CapabilityDetails";
 
 type Props = {
   kind: "block" | "entity";
@@ -23,90 +24,20 @@ type Props = {
 export function ResourceInspector(p: Props) {
   const material = p.catalog.find((m) => m.id === p.id);
   const entity = p.profile?.entities.find((e) => e.id === p.id);
-  const support = useMemo(() => {
-    if (p.kind === "entity")
-      return entityAppearance(p.id, p.profile, p.resolver)
-        ? {
-            label: "Static model",
-            detail:
-              "Baked default pose. Animation, equipment and runtime variants are not simulated.",
-            ok: true,
-          }
-        : {
-            label: "Bounds preview",
-            detail:
-              "No static renderer binding is available with the current resources.",
-            ok: false,
-          };
-    if (p.id === "minecraft:water" || p.id === "minecraft:lava")
-      return {
-        label: "Fluid preview unavailable",
-        detail:
-          "Fluid rendering is not supported. Registry data remains available.",
-        ok: false,
-      };
-    const special = specialBlockSupport(p.state, p.profile, p.resolver);
-    if (special)
-      return {
-        label: special.available
-          ? "Static partial model"
-          : "Special renderer unavailable",
-        detail: special.detail,
-        ok: special.available,
-      };
-    if (material?.renderShape === "INVISIBLE")
-      return {
-        label: "No block model",
-        detail:
-          "The registry marks this block model as invisible. Runtime or special appearances are not simulated.",
-        ok: false,
-      };
-    const binding = blockEntityAppearance(p.id, p.state.properties);
-    if (
-      binding &&
-      p.profile?.entityModels[binding.layer] &&
-      p.resolver.files.has(binding.texture)
-    )
-      return {
-        label: "Static model",
-        detail:
-          "A static block entity binding is available. No runtime behavior is simulated.",
-        ok: true,
-      };
-    try {
-      const resolved = p.resolver.resolve(p.state);
-      const faces = resolved.parts.flatMap((part) =>
-        (part.model.elements ?? []).flatMap((element) =>
-          Object.values(element.faces).map((face) => ({
-            model: part.model,
-            face,
-          })),
-        ),
-      );
-      for (const { model, face } of faces)
-        p.resolver.texture(model, face.texture);
-      return faces.length
-        ? {
-            label: "Model available",
-            detail:
-              "Resolved from the enabled resource stack. The viewport reports any unsupported appearance.",
-            ok: true,
-          }
-        : {
-            label: "Partial appearance",
-            detail:
-              "No model faces resolved. A special renderer may be required.",
-            ok: false,
-          };
-    } catch {
-      return {
-        label: "Fallback preview",
-        detail:
-          "Model or texture assets are missing or unsupported. Add a compatible client JAR in Resources.",
-        ok: false,
-      };
-    }
-  }, [p.kind, p.id, p.profile, p.resolver, p.state, material?.renderShape]);
+  const support = useMemo(() => assessAppearance({
+    kind: p.kind, id: p.id, state: p.state, material,
+    profile: p.profile, resolver: p.resolver,
+  }), [p.kind, p.id, p.profile, p.resolver, p.state, material]);
+  const capabilities = useMemo(() => {
+    const resolver = createCapabilityResolver(p.catalog, { profile: p.profile ?? undefined });
+    const actions: CapabilityAction[] = [
+      "registry", "appearance", "design", "context", "translate", "yaw",
+      "payload-edit", "structure-import", "structure-export", "world",
+    ];
+    return actions.map((action) => p.kind === "block"
+      ? resolver.block(p.state, action, { appearance: support })
+      : resolver.entity(p.id, action, { appearance: support }));
+  }, [p.catalog, p.profile, p.kind, p.state, p.id, support]);
   const properties = material ? Object.entries(material.properties) : [];
 
   return (
@@ -128,17 +59,19 @@ export function ResourceInspector(p: Props) {
         <section className="appearance-section">
           <h2>Appearance</h2>
           <span
-            className={`render-support ${support.ok ? "supported" : "partial"}`}
-            title={support.detail}
+            className={`render-support ${support.status === "supported" ? "supported" : "partial"}`}
+            data-status={support.status}
+            title={support.reason}
           >
-            <Icon name={support.ok ? "check" : "warning"} size={14} />
+            <Icon name={support.status === "supported" ? "check" : "warning"} size={14} />
             {support.label}
           </span>
           <details className="quiet-details">
             <summary>Rendering details</summary>
-            <p>{support.detail}</p>
+            <p>{support.reason}</p>
           </details>
         </section>
+        <CapabilityDetails decisions={capabilities} />
         {p.kind === "block" ? (
           <section>
             <div className="section-title">

@@ -16,6 +16,9 @@ import {
   type KeyboardEvent,
 } from "react";
 import { defaultState, validateState } from "../core/catalog";
+import { blockAdapter } from "../core/adapter-registry";
+import { createCapabilityResolver, type CapabilityAction } from "../core/capabilities";
+import { assessAppearance } from "../render/appearance-capability";
 import { bounds } from "../core/assembly";
 import { resourceName } from "../core/labels";
 import type { BlockState, SceneBlock, Vec3 } from "../core/schema";
@@ -63,6 +66,7 @@ import { ResourceBrowser } from "./ResourceBrowser";
 import { ComponentLibrary } from "./ComponentLibrary";
 import { EntityPanel } from "./EntityPanel";
 import { ChestInventory } from "./ChestInventory";
+import { CapabilityDetails } from "./CapabilityDetails";
 import { editableEntityIds } from "../editor/entity-action";
 import "./editor.css";
 
@@ -613,6 +617,17 @@ export function EditorWorkbench({
       );
     }
   }, [requestedState, resources.catalog]);
+  const capabilities = useMemo(
+    () => createCapabilityResolver(resources.catalog, { target: document.target, profile: resources.profile }),
+    [resources.catalog, resources.profile, document.target],
+  );
+  const placementCapabilities = useMemo(() => {
+    if (tool !== "place" || libraryTab === "components") return [];
+    const appearance = assessAppearance({ kind: "block", id: state.name, state,
+      material: materials.get(state.name), profile: resources.profile, resolver: resources.resolver });
+    const actions: CapabilityAction[] = ["appearance", "design", "context", "yaw", "neighbors", "payload-edit"];
+    return actions.map((action) => capabilities.block(state, action, { appearance }));
+  }, [tool, libraryTab, state, materials, resources.profile, resources.resolver, capabilities]);
   const asset = session.components.find((item) => item.id === componentId);
   const placingComponent = asset && libraryTab === "components" ? asset : null;
   const placementPlan = useMemo(() => {
@@ -740,6 +755,16 @@ export function EditorWorkbench({
     () => selectedObjects.flatMap(objectCells),
     [selectedObjects],
   );
+  const selectionCapabilities = useMemo(() => {
+    if (selectedObjects.length !== 1 ||
+      (selectedCells.length !== 1 && !["block", "multiblock"].includes(selectedObjects[0].kind))) return [];
+    const cell = selectedCells[0];
+    if (!cell) return [];
+    const appearance = assessAppearance({ kind: "block", id: cell.state.name, state: cell.state,
+      material: materials.get(cell.state.name), profile: resources.profile, resolver: resources.resolver });
+    const actions: CapabilityAction[] = ["appearance", "translate", "yaw", "payload-edit", "structure-export", "world"];
+    return actions.map((action) => capabilities.block(cell.state, action, { payload: cell.blockEntity, appearance }));
+  }, [selectedObjects, selectedCells, materials, resources.profile, resources.resolver, capabilities]);
   const selectedBounds = useMemo(() => bounds(selectedCells), [selectedCells]);
   const diagnosticSnapshot = useMemo(
     () =>
@@ -1921,15 +1946,7 @@ export function EditorWorkbench({
                       <StateFields
                         state={state}
                         resources={resources}
-                        paired={
-                          ["part", "half"].some(
-                            (property) => property in state.properties,
-                          ) &&
-                          (state.name.endsWith("_bed") ||
-                            state.name.endsWith("_door") ||
-                            state.properties.half === "lower" ||
-                            state.properties.half === "upper")
-                        }
+                        paired={!!blockAdapter(state.name)?.logical}
                         onChange={(property, value) =>
                           setRequestedState({
                             ...state,
@@ -1940,6 +1957,7 @@ export function EditorWorkbench({
                           })
                         }
                       />
+                      {!!placementCapabilities.length && <CapabilityDetails decisions={placementCapabilities} />}
                     </>
                   )}
                   {!placingComponent && placementPlan?.object?.cells[0] && (
@@ -2032,6 +2050,7 @@ export function EditorWorkbench({
                       session.updateState(scope, property, value)
                     }
                   />
+                  {!!selectionCapabilities.length && <CapabilityDetails decisions={selectionCapabilities} />}
                   <section className="editor-section">
                     <button
                       className="button wide"
@@ -2063,7 +2082,7 @@ export function EditorWorkbench({
               )}
               <SupportDetails issues={supportIssues} />
               {selectedObjects.length === 1 && selectedCells.length === 1 &&
-                selectedCells[0].state.name === "minecraft:chest" && selectedCells[0].state.properties.type === "single" && (
+                selectionCapabilities.some((decision) => decision.action === "payload-edit" && decision.supported) && (
                 <ChestInventory key={`${slot.epoch}:${slot.revision}:${selectedObjects[0].id}`}
                   cell={selectedCells[0]} disabled={!loaded}
                   onApply={(items) => session.updateChest(scope, selectedObjects[0].id, selectedCells[0].pos, items)} />

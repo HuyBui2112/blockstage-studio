@@ -1,6 +1,6 @@
 import { validateState, type Material } from "../core/catalog";
 import { key, type Block, type Vec3 } from "../core/schema";
-import { CONTEXT_CHAIN_IDS } from "./placement-plan";
+import { blockAdapter, CONTEXT_CHAIN_IDS, WOOD_TYPES } from "../core/adapter-registry";
 
 export type SupportIssue = {
   code: "missing_support" | "invalid_support" | "support_unknown";
@@ -14,28 +14,6 @@ export const MAX_SUPPORT_ISSUES = 100;
 
 const vanilla = (ids: string) =>
   new Set(ids.split(" ").map((id) => `minecraft:${id}`));
-const woods =
-  "oak spruce birch jungle acacia cherry dark_oak pale_oak mangrove bamboo crimson warped".split(
-    " ",
-  );
-const doors = vanilla(
-  [
-    ...woods.map((wood) => `${wood}_door`),
-    "iron_door",
-    "copper_door",
-    "exposed_copper_door",
-    "weathered_copper_door",
-    "oxidized_copper_door",
-    "waxed_copper_door",
-    "waxed_exposed_copper_door",
-    "waxed_weathered_copper_door",
-    "waxed_oxidized_copper_door",
-  ].join(" "),
-);
-const soilPlants = vanilla(
-  "sunflower lilac rose_bush peony tall_grass large_fern pitcher_plant",
-);
-const otherPlants = vanilla("tall_seagrass small_dripleaf pitcher_crop");
 const air = vanilla("air cave_air void_air");
 // Vanilla 26.2 SUPPORTS_VEGETATION, verified against the matching ServerLevel.
 // Keep the snapshot explicit: resource/profile tags and render models do not
@@ -46,8 +24,8 @@ const plantSoil = vanilla(
 const solidSupport = vanilla(
   [
     "stone stone_bricks cobblestone dirt grass_block coarse_dirt podzol rooted_dirt mycelium clay",
-    ...woods.map((wood) => `${wood}_planks`),
-    ...woods
+    ...WOOD_TYPES.map((wood) => `${wood}_planks`),
+    ...WOOD_TYPES
       .filter((wood) => !["bamboo", "crimson", "warped"].includes(wood))
       .map((wood) => `${wood}_log`),
   ].join(" "),
@@ -55,10 +33,6 @@ const solidSupport = vanilla(
 const knownNonSupport = vanilla(
   "water lava short_grass fern dead_bush torch redstone_torch soul_torch",
 );
-// Actual dry BlockItem placements/readbacks for these two IDs, stone and every
-// chain axis are in PlacementOracle. Other lantern/support/fluid cases stay unknown.
-const lanterns = vanilla("lantern soul_lantern");
-
 /** Cache occupancy and registry indexes for an immutable committed scene. Each
  * call assesses the supplied subjects and overlays their cells for support lookup,
  * so component previews can provide their own floor without copying the scene.
@@ -118,7 +92,8 @@ export function createSupportChecker(
     };
     for (const block of subjects) {
       const id = block.state.name;
-      if (lanterns.has(id)) {
+      const supportKind = blockAdapter(id)?.support;
+      if (supportKind === "lantern") {
         const supportPos: Vec3 = [
           block.pos[0],
           block.pos[1] + (block.state.properties.hanging === "true" ? 1 : -1),
@@ -194,7 +169,7 @@ export function createSupportChecker(
         continue;
       }
       if (
-        (!doors.has(id) && !soilPlants.has(id) && !otherPlants.has(id)) ||
+        !supportKind ||
         block.state.properties.half !== "lower"
       )
         continue;
@@ -236,7 +211,7 @@ export function createSupportChecker(
         );
         continue;
       }
-      if (otherPlants.has(id)) {
+      if (supportKind === "unknown-plant") {
         report(
           block,
           below,
@@ -245,7 +220,7 @@ export function createSupportChecker(
         );
         continue;
       }
-      if (soilPlants.has(id)) {
+      if (supportKind === "soil-plant") {
         if (plantSoil.has(support.state.name)) continue;
         if (
           solidSupport.has(support.state.name) ||

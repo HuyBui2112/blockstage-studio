@@ -1,5 +1,6 @@
 import { bounds } from "../core/assembly";
 import { DEMO_MATERIALS, type Material } from "../core/catalog";
+import { resolveEntityCapability } from "../core/capabilities";
 import type { Vec3 } from "../core/schema";
 import {
   editorDocumentSchema,
@@ -12,7 +13,6 @@ import { assessSupport } from "../editor/support";
 import {
   exportDatapackScene,
   exportStructureScene,
-  STRUCTURE_ENTITY_TYPES,
   structureStateError,
   type StructureScene,
 } from "./structure";
@@ -147,10 +147,11 @@ export function preflightEditorExport(
   };
   for (const object of committed.objects) visit(object);
   for (const entity of committed.entities) {
-    if (!STRUCTURE_ENTITY_TYPES.has(entity.type))
+    const capability = resolveEntityCapability(entity.type, "structure-export", { target: committed.target });
+    if (!capability.supported)
       addError(
         "unsupported_entity",
-        `${entity.type}: no supported entity export adapter.`,
+        capability.reason,
         entity.id,
       );
   }

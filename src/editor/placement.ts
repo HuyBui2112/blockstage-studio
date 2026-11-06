@@ -1,4 +1,6 @@
+import { blockAdapter } from "../core/adapter-registry";
 import { validateState, type Material } from "../core/catalog";
+import { resolveBlockCapability } from "../core/capabilities";
 import {
   blockSchema,
   key,
@@ -8,38 +10,8 @@ import {
 } from "../core/schema";
 import type { EditorObject } from "./model";
 
-// Verified against BedBlock/DoorBlock/DoublePlantBlock subclasses in the 26.2
-// client by scripts/java/EditorOracle.java. Tags and suffixes are not adapters.
-const colors =
-  "white orange magenta light_blue yellow lime pink gray light_gray cyan purple blue brown green red black".split(
-    " ",
-  );
-const woods =
-  "oak spruce birch jungle acacia cherry dark_oak pale_oak mangrove bamboo crimson warped".split(
-    " ",
-  );
-const beds = new Set(colors.map((color) => `minecraft:${color}_bed`));
-const doors = new Set(
-  [
-    ...woods.map((wood) => `${wood}_door`),
-    "iron_door",
-    "copper_door",
-    "exposed_copper_door",
-    "weathered_copper_door",
-    "oxidized_copper_door",
-    "waxed_copper_door",
-    "waxed_exposed_copper_door",
-    "waxed_weathered_copper_door",
-    "waxed_oxidized_copper_door",
-  ].map((id) => `minecraft:${id}`),
-);
-const plants = new Set(
-  "tall_seagrass sunflower lilac rose_bush peony tall_grass large_fern pitcher_plant small_dripleaf"
-    .split(" ")
-    .map((id) => `minecraft:${id}`),
-);
-export const isBedBlock = (id: string): boolean => beds.has(id);
-export const isDoorBlock = (id: string): boolean => doors.has(id);
+export const isBedBlock = (id: string): boolean => blockAdapter(id)?.logical === "bed";
+export const isDoorBlock = (id: string): boolean => blockAdapter(id)?.logical === "door";
 const directions: Record<string, Vec3> = {
   north: [0, 0, -1],
   east: [1, 0, 0],
@@ -60,15 +32,15 @@ const sharedProperty = (state: BlockState, adapter: Pair, property: string) =>
   !(state.name === "minecraft:small_dripleaf" && property === "waterlogged");
 
 function pair(state: BlockState): Pair | undefined {
-  if (beds.has(state.name)) {
+  if (isBedBlock(state.name)) {
     const offset = directions[state.properties.facing];
     if (!offset) throw new Error("Bed requires a horizontal facing");
     return { property: "part", first: "foot", second: "head", offset };
   }
   if (
-    doors.has(state.name) ||
-    plants.has(state.name) ||
-    (state.name === "minecraft:pitcher_crop" &&
+    isDoorBlock(state.name) ||
+    blockAdapter(state.name)?.logical === "plant" ||
+    (blockAdapter(state.name)?.logical === "pitcher" &&
       Number(state.properties.age) >= 3)
   )
     return {
@@ -99,7 +71,7 @@ function cellsFor(state: BlockState, position: Vec3): Block[] {
         [adapter.property]: adapter.second,
       }),
     ];
-  if (state.name === "minecraft:pitcher_crop")
+  if (blockAdapter(state.name)?.logical === "pitcher")
     return [make(position, { ...state.properties, half: "lower" })];
   if (
     ["head", "foot"].includes(state.properties.part) ||
@@ -118,7 +90,8 @@ export function createPlacedObject(
   _hit?: { face?: Vec3; point?: [number, number, number] },
   id: string = crypto.randomUUID(),
 ): EditorObject {
-  validateState(state, catalog);
+  const capability = resolveBlockCapability(state, "design", catalog.find((material) => material.id === state.name));
+  if (!capability.supported) throw new Error(capability.reason);
   const cells = cellsFor(state, pos);
   const object: EditorObject = {
     id,

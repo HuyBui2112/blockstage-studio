@@ -2,7 +2,8 @@ import { memo, useEffect, useMemo, useRef, useState } from "react";
 import type { Material } from "../core/catalog";
 import { resourceName } from "../core/labels";
 import type { GameProfile } from "../core/profile";
-import { entityAppearance } from "../render/entities";
+import { createCapabilityResolver } from "../core/capabilities";
+import { assessAppearance } from "../render/appearance-capability";
 import type { ModelResolver } from "../render/models";
 import { Icon } from "./Icon";
 
@@ -97,6 +98,7 @@ export function ResourceBrowser(p: Props) {
   const [query, setQuery] = useState("");
   const [facet, setFacet] = useState("");
   const [limit, setLimit] = useState(PAGE_SIZE);
+  const capabilities = useMemo(() => createCapabilityResolver(p.catalog, { profile: p.profile }), [p.catalog, p.profile]);
   const tags = useMemo(
     () => [...new Set(p.catalog.flatMap((m) => m.tags ?? []))].sort(),
     [p.catalog],
@@ -230,7 +232,12 @@ export function ResourceBrowser(p: Props) {
         aria-label={p.kind === "block" ? "Blocks" : "Entities"}
       >
         {p.kind === "block"
-          ? blocks.slice(0, limit).map((m) => (
+          ? blocks.slice(0, limit).map((m) => {
+            const state = { name: m.id, properties: m.defaults };
+            const design = capabilities.block(state, "design");
+            const context = capabilities.block(state, "context");
+            const exported = capabilities.block(state, "structure-export");
+            return (
               <button
                 key={m.id}
                 className={`resource-item${m.id === p.selected ? " selected" : ""}`}
@@ -239,26 +246,26 @@ export function ResourceBrowser(p: Props) {
                 title={m.id}
               >
                 <TextureThumbnail material={m} resolver={p.resolver} />
-                <span className="resource-item-copy">
+                <span className="resource-item-copy" title={`Design: ${design.reason}\nContext: ${context.reason}\nNBT: ${exported.reason}`}>
                   <strong>{resourceName(m.id)}</strong>
                   <small>{m.id}</small>
                 </span>
                 {m.id === p.selected && <span className="selection-mark" />}
               </button>
-            ))
+            ); })
           : entities.slice(0, limit).map((entity) => {
-              const supported = !!entityAppearance(
-                entity.id,
-                p.profile,
-                p.resolver,
-              );
+              const appearance = assessAppearance({ kind: "entity", id: entity.id,
+                state: { name: entity.id, properties: {} }, profile: p.profile, resolver: p.resolver });
+              const supported = appearance.supported;
+              const edit = capabilities.entity(entity.id, "design");
+              const exported = capabilities.entity(entity.id, "structure-export");
               return (
                 <button
                   key={entity.id}
                   className={`resource-item${entity.id === p.selected ? " selected" : ""}`}
                   onClick={() => p.onSelect(entity.id)}
                   aria-pressed={entity.id === p.selected}
-                  title={`${entity.id} · ${supported ? "Static model" : "Bounds preview"}`}
+                  title={`${entity.id} · ${appearance.label}\n${appearance.reason}\nEdit: ${edit.reason}\nNBT: ${exported.reason}`}
                 >
                   <span className="resource-thumb">
                     <Icon name="entity" size={23} />
