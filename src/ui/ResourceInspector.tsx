@@ -31,7 +31,7 @@ export function ResourceInspector(p: Props) {
   const capabilities = useMemo(() => {
     const resolver = createCapabilityResolver(p.catalog, { profile: p.profile ?? undefined });
     const actions: CapabilityAction[] = [
-      "registry", "appearance", "design", "context", "translate", "yaw",
+      "registry", "appearance", "design", "context", "translate", "yaw", "mirror",
       "payload-edit", "structure-import", "structure-export", "world",
     ];
     return actions.map((action) => p.kind === "block"

@@ -77,6 +77,7 @@ import {
   applyMaterialReplacement,
   type MaterialReplacementPlan,
 } from "./material-plan";
+import { applyMirrorPlan, type MirrorPlan } from "./mirror-plan";
 import { measurePhase } from "../core/measurement-phases";
 import { createTransformPreviewController } from "./transform-preview-controller";
 import { duplicateComponentAsset, renameComponentAsset, setComponentCategory } from "./component-library-operations";
@@ -784,6 +785,24 @@ export function useEditorSession(
       commit(scope, next, "Replace material", plan.selection, {
         notes: plan.notes,
       });
+      return true;
+    } catch (error) {
+      setError(messageOf(error));
+      return false;
+    }
+  }
+  function commitMirror(scope: EditorScope, plan: MirrorPlan) {
+    if (lifecycle.current.has(scope)) return false;
+    try {
+      if (plan.source.workspace !== scope)
+        throw new Error("Mirror plan belongs to another workspace");
+      const slot = currentSlots.current[scope];
+      const next = applyMirrorPlan(plan, slot.history.document, {
+        documentId: slot.history.document.id,
+        sessionEpoch: slot.epoch,
+        revision: slot.revision,
+      }, catalog, autoConnections[scope] ? neighborRules : undefined);
+      commit(scope, next, "Mirror objects", plan.selection, { notes: plan.notes });
       return true;
     } catch (error) {
       setError(messageOf(error));
@@ -1515,6 +1534,7 @@ export function useEditorSession(
     commitCopy,
     commitPrimitive,
     commitMaterial,
+    commitMirror,
     importStructure,
     restorePortable,
     draftStatus,

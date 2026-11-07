@@ -27,6 +27,7 @@ import { runEntityScenarios } from "./entity-browser-scenarios.mjs";
 import { runEntityViewportScenarios } from "./entity-viewport-browser-scenarios.mjs";
 import { runContextScenarios } from "./context-browser-scenarios.mjs";
 import { runBuildingToolsScenarios } from "./building-tools-browser-scenarios.mjs";
+import { runMirrorScenarios } from "./mirror-browser-scenarios.mjs";
 
 /** Real input integration scenarios, called by the existing isolated-browser harness. */
 export async function runEditorScenarios({
@@ -43,6 +44,8 @@ export async function runEditorScenarios({
   profilePath,
   createPeer,
 }) {
+  if (process.env.BLOCKSTAGE_EDITOR_SLICE === "mirror")
+    return runMirrorScenarios({command,evaluate,until,click,aria,input,upload,key,screenshot,directory,profilePath});
   if (process.env.BLOCKSTAGE_EDITOR_SLICE === "building-tools")
     return runBuildingToolsScenarios({command,evaluate,until,click,aria,input,upload,key,screenshot,directory});
   if (process.env.BLOCKSTAGE_EDITOR_SLICE === "context") {
@@ -1131,6 +1134,7 @@ export async function runEditorScenarios({
   });
   await runEntityViewportScenarios({ command, evaluate, until, click, aria, input, upload, key, screenshot, directory });
   await runBuildingToolsScenarios({ command, evaluate, until, click, aria, input, upload, key, screenshot, directory });
+  await runMirrorScenarios({ command, evaluate, until, click, aria, input, upload, key, screenshot, directory, profilePath });
   await runDataSafetyScenarios({
     command,
     evaluate,

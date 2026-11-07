@@ -41,6 +41,8 @@ import { CopyActionMenu, CopyActionPanel } from "./CopyActionPanel";
 import { useCopyActions } from "../editor/useCopyActions";
 import { MaterialsPanel } from "./MaterialsPanel";
 import { useMaterialActions } from "../editor/useMaterialActions";
+import { useMirrorActions } from "../editor/useMirrorActions";
+import { MirrorActionPanel } from "./MirrorActionPanel";
 import { usePrimitiveActions } from "../editor/usePrimitiveActions";
 import type { PrimitiveKind } from "../editor/primitive-plan";
 import {
@@ -779,7 +781,7 @@ export function EditorWorkbench({
     if (!cell) return [];
     const appearance = assessAppearance({ kind: "block", id: cell.state.name, state: cell.state,
       material: materials.get(cell.state.name), profile: resources.profile, resolver: resources.resolver });
-    const actions: CapabilityAction[] = ["appearance", "translate", "yaw", "payload-edit", "structure-export", "world"];
+    const actions: CapabilityAction[] = ["appearance", "translate", "yaw", "mirror", "payload-edit", "structure-export", "world"];
     return actions.map((action) => capabilities.block(cell.state, action, { payload: cell.blockEntity, appearance }));
   }, [selectedObjects, selectedCells, materials, resources.profile, resources.resolver, capabilities]);
   const selectedBounds = useMemo(() => bounds(selectedCells), [selectedCells]);
@@ -894,6 +896,15 @@ export function EditorWorkbench({
     resourceKey: primitiveResourceKey,
     onCommit: session.commitMaterial,
   });
+  const mirrorActions = useMirrorActions({
+    document, scope, revision: slot.revision, epoch: slot.epoch,
+    selection: slot.selection, catalog: resources.catalog,
+    rules: session.autoConnections[scope] ? resources.profile?.neighborRules : undefined,
+    enabled: !readOnly && session.ready && resources.ready && !session.busy[scope] &&
+      !documentsOpen && !structureImportOpen && !exportSnapshot,
+    resourceKey: primitiveResourceKey,
+    onCommit: session.commitMirror,
+  });
   function protectionError(
     plan: { document: EditorDocument } | undefined | null,
   ) {
@@ -913,6 +924,7 @@ export function EditorWorkbench({
     return plan && !protectionError(plan) ? plan : undefined;
   }
   const materialPlan = protectedPlan(materialActions.result?.plan);
+  const mirrorPlan = protectedPlan(mirrorActions.result?.plan);
   const selectedStates = useMemo(
     () => selectedCells.map((cell) => cell.state),
     [selectedCells],
@@ -923,7 +935,9 @@ export function EditorWorkbench({
     session.preview?.scope === scope ? session.preview.result : null;
   const ghost = useMemo(
     () =>
-      materialActions.active
+      mirrorActions.active
+        ? mirrorPlan ? { blocks: mirrorPlan.cells, valid: true } : undefined
+        : materialActions.active
         ? materialPlan
           ? { blocks: materialPlan.cells, valid: true }
           : undefined
@@ -941,6 +955,8 @@ export function EditorWorkbench({
                 ? { blocks: placementPlan.blocks, valid: placementPlan.valid }
                 : undefined,
     [
+      mirrorActions.active,
+      mirrorPlan,
       materialActions.active,
       materialPlan,
       primitiveActions.active,
@@ -960,6 +976,7 @@ export function EditorWorkbench({
     next: EditorViewportState["tool"],
     focusViewport = true,
   ) => {
+    mirrorActions.cancel();
     materialActions.cancel();
     setMaterialsOpen(false);
     primitiveActions.cancel();
@@ -980,6 +997,19 @@ export function EditorWorkbench({
   const beginPrimitive = (kind: PrimitiveKind) => {
     changeTool("select");
     primitiveActions.begin(kind, placementHit?.pos ?? [0, layer, 0]);
+    focusCopyCanvas();
+  };
+  const beginMirror = () => {
+    changeTool("select");
+    mirrorActions.begin();
+    focusCopyCanvas();
+  };
+  const completeMirror = () => {
+    mirrorActions.confirm();
+    focusCopyCanvas();
+  };
+  const cancelMirror = () => {
+    mirrorActions.cancel();
     focusCopyCanvas();
   };
   const completePrimitive = () => {
@@ -1042,6 +1072,7 @@ export function EditorWorkbench({
         hit,
         { mode: placementMode, turns: placementTurns },
       ).object.cells[0].state;
+      mirrorActions.cancel();
       materialActions.cancel();
       setMaterialsOpen(false);
       copyActions.cancel();
@@ -1061,6 +1092,7 @@ export function EditorWorkbench({
     name: Parameters<EditorViewportState["onCommand"]>[0],
   ) {
     if (!loaded) return;
+    mirrorActions.cancel();
     if (slot.entitySelection.length) {
       if (name === "delete" || name === "duplicate") {
         session.previewEntity(scope, name === "delete" ? { kind: "remove" } : {
@@ -1134,6 +1166,7 @@ export function EditorWorkbench({
           },
           selectableOwners,
           tool:
+            mirrorActions.active ||
             materialActions.active ||
             primitiveActions.active ||
             copyActions.active
@@ -1146,12 +1179,13 @@ export function EditorWorkbench({
           localYaw: active?.orientation ?? 0,
           ghost,
           placementSession:
+            mirrorActions.active?.id ??
             materialActions.active?.id ??
             primitiveActions.active?.id ??
             copyActions.active?.id,
           onTool: changeTool,
           onSelect: (ids, toggle) => session.select(scope, ids, toggle),
-          onPlace: materialActions.active
+          onPlace: mirrorActions.active || materialActions.active
             ? noop
             : primitiveActions.active
               ? regionPlacement
@@ -1163,6 +1197,7 @@ export function EditorWorkbench({
           onPlacementRegionStart:
             tool === "place" &&
             libraryTab === "blocks" &&
+            !mirrorActions.active &&
             !materialActions.active &&
             !primitiveActions.active &&
             !copyActions.active
@@ -1176,7 +1211,7 @@ export function EditorWorkbench({
             setRegionDragging(false);
             if (cancel) changeTool("select");
           },
-          onPlacementHover: materialActions.active
+          onPlacementHover: mirrorActions.active || materialActions.active
             ? noop
             : primitiveActions.active
               ? regionPlacement
@@ -1190,12 +1225,15 @@ export function EditorWorkbench({
                   }
                 : setPlacementHit,
           onPlacementRotate:
+            mirrorActions.active ||
             materialActions.active ||
             primitiveActions.active ||
             copyActions.active
               ? noop
               : rotatePlacement,
-          onPlacementConfirm: materialActions.active
+          onPlacementConfirm: mirrorActions.active
+            ? completeMirror
+            : materialActions.active
             ? () => {
                 materialActions.confirm();
                 focusCopyCanvas();
@@ -1262,7 +1300,7 @@ export function EditorWorkbench({
   ];
   return (
     <div
-      className={`editor-workspace${materialsOpen || materialActions.active || copyActions.active || (primitiveActions.active && !regionDragging) ? " copying" : ""}${!libraryOpen || readOnly ? " library-hidden" : ""}${!inspectorOpen || readOnly ? " inspector-hidden" : ""}`}
+      className={`editor-workspace${materialsOpen || mirrorActions.active || materialActions.active || copyActions.active || (primitiveActions.active && !regionDragging) ? " copying" : ""}${!libraryOpen || readOnly ? " library-hidden" : ""}${!inspectorOpen || readOnly ? " inspector-hidden" : ""}`}
       data-region-dragging={regionDragging}
       data-editor-scope={scope}
       data-editor-ready={loaded}
@@ -1499,6 +1537,7 @@ export function EditorWorkbench({
                   hasClipboard={!!session.clipboard}
                   onAction={(action) => {
                     if (action === "copy") {
+                      mirrorActions.cancel();
                       materialActions.cancel();
                       setMaterialsOpen(false);
                       primitiveActions.cancel();
@@ -1515,6 +1554,11 @@ export function EditorWorkbench({
                   enabled={loaded && libraryTab === "blocks"}
                   onAction={beginPrimitive}
                 />
+              )}
+              {!readOnly && (
+                <button type="button" aria-label="Mirror selection"
+                  title="Reflect selected blocks, groups or component copies in a vertical World plane"
+                  disabled={!loaded || !slot.selection.length} onClick={beginMirror}>Mirror</button>
               )}
               {!readOnly && (
                 <>
@@ -1707,6 +1751,7 @@ export function EditorWorkbench({
                   ""
                 }
                 onBegin={(intent) => {
+                  mirrorActions.cancel();
                   primitiveActions.cancel();
                   copyActions.cancel();
                   session.cancelPreview();
@@ -1727,6 +1772,19 @@ export function EditorWorkbench({
                   setMaterialsOpen(false);
                   focusCopyCanvas();
                 }}
+              />
+            )}
+            {mirrorActions.active && (
+              <MirrorActionPanel
+                key={mirrorActions.active.id}
+                intent={mirrorActions.active.intent}
+                onChange={mirrorActions.change}
+                valid={!!mirrorPlan}
+                error={protectionError(mirrorActions.result?.plan) || mirrorActions.result?.error || ""}
+                cells={mirrorPlan?.cells.length ?? 0}
+                notes={mirrorPlan?.notes ?? []}
+                onCommit={completeMirror}
+                onCancel={cancelMirror}
               />
             )}
             {primitiveActions.active && (
@@ -1856,7 +1914,7 @@ export function EditorWorkbench({
                 Z
               </button>
             </div>
-            {!primitiveActions.active && tool === "place" && placementPlan && (
+            {!mirrorActions.active && !primitiveActions.active && tool === "place" && placementPlan && (
               <div
                 className={`placement-hud ${placementPlan.valid ? "valid" : "invalid"}`}
                 role="status"
@@ -2320,6 +2378,11 @@ export function EditorWorkbench({
             : ""
         }
       />
+      <output hidden className="mirror-action-diagnostics" data-valid={!!mirrorPlan}
+        data-snapshot={mirrorPlan ? JSON.stringify({
+          cells: mirrorPlan.cells.slice(0, 64), selection: mirrorPlan.selection,
+          intent: mirrorPlan.intent, notes: mirrorPlan.notes,
+        }) : ""} />
       <output
         hidden
         className="primitive-action-diagnostics"

@@ -63,7 +63,7 @@ describe("versioned action capability resolver", () => {
     expect(context).toMatchObject({ supported: true, status: "partial", derivedProperties: ["facing"] });
     expect(context.preservedProperties).toContain("hinge");
     expect(context.evidence).toContain("world-readback:unverified");
-    expect(resolver.block(defaultState("minecraft:oak_log"), "mirror").supported).toBe(false);
+    expect(resolver.block(defaultState("minecraft:oak_log"), "mirror").supported).toBe(true);
   });
 
   it("matches actual logical placement and yaw rejection rather than rotating only appearance", () => {

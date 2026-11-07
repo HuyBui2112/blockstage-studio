@@ -1,6 +1,7 @@
 import { DEMO_MATERIALS, validateState, type Material } from "./catalog";
 import { blockEntitySchema, type Block, type BlockState } from "./schema";
 import type { GameProfile } from "./profile";
+import { mirrorStateCapability, type MirrorPlane } from "./mirror";
 import {
   GAME_TARGET,
   blockAdapter,
@@ -60,6 +61,7 @@ export function capabilityDecision(
 type CapabilityProfile = Pick<GameProfile, "entities" | "neighborRules">;
 type ResolverOptions = { target?: CapabilityTarget; profile?: CapabilityProfile | null };
 type BlockOptions = {
+  mirrorPlane?: MirrorPlane;
   payload?: Block["blockEntity"];
   appearance?: CapabilityDecision;
 };
@@ -139,8 +141,13 @@ export function resolveBlockCapability(
     return result("supported", material.source === "game-profile"
       ? "Complete state is legal in the imported game profile"
       : "Complete state is legal in the local catalog; this alone does not establish export support", "blockstage:registry-v1");
-  if (action === "mirror")
-    return result("unsupported", "No editor mirror adapter is implemented", "blockstage:mirror-v1");
+  if (action === "mirror") {
+    const mirror = mirrorStateCapability(state, material, options.mirrorPlane ?? "yz", options.payload);
+    return result(mirror.supported ? "supported" : "unsupported", mirror.reason, mirror.adapterId, {
+      evidence: mirror.evidence,
+      requiredContext: ["complete logical owners", "vertical World mirror plane", "validated final candidate"],
+    });
+  }
   if (action === "yaw") {
     const error = blockYawError(state);
     return error
