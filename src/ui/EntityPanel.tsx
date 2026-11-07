@@ -8,6 +8,12 @@ import {
 import type { SceneEntity, Vec3 } from "../core/schema";
 import type { EntityActionIntent } from "../editor/entity-action";
 import { entityEditCapability } from "../editor/entity-operations";
+import {
+  toggleEntityHidden,
+  toggleEntityLocked,
+  type EditorViewState,
+} from "../editor/view-state";
+import { Icon } from "./Icon";
 import "./entity-panel.css";
 
 export type EntityPanelProps = {
@@ -21,9 +27,12 @@ export type EntityPanelProps = {
   onPreview: (intent: EntityActionIntent) => void;
   onConfirm: () => void;
   onCancel: () => void;
+  view?: EditorViewState;
+  onViewChange?: (view: EditorViewState) => void;
+  onPlace?: () => void;
 };
 
-type Action = EntityActionIntent["kind"];
+type Action = Exclude<EntityActionIntent["kind"], "rotate">;
 const axes = ["X", "Y", "Z"] as const;
 
 export function EntityPanel({
@@ -37,6 +46,9 @@ export function EntityPanel({
   onPreview,
   onConfirm,
   onCancel,
+  view,
+  onViewChange,
+  onPlace,
 }: EntityPanelProps) {
   const [action, setAction] = useState<Action>("add");
   const [coordinates, setCoordinates] = useState(["0", "0", "0"]);
@@ -52,7 +64,7 @@ export function EntityPanel({
     selection.length > 0 &&
     selection.every((id) => {
       const entity = entities.find((item) => item.id === id);
-      return entity && entityEditCapability(entity.type).supported;
+      return entity && entityEditCapability(entity.type).supported && selectableIds.has(id);
     });
   const canPreview = !disabled && (action === "add" || editableSelection);
 
@@ -123,20 +135,27 @@ export function EntityPanel({
         Entities <span>{entities.length}</span>
       </summary>
       <div className="entity-panel-body">
+        {onPlace && <button type="button" disabled={disabled}
+          aria-label="Place pig in viewport" onClick={() => { change(); onPlace(); }}>
+          <Icon name="plus" size={13} /> Place pig in viewport
+        </button>}
         <div className="entity-panel-list" aria-label="Scene entities">
           {entities.length === 0 && (
             <p className="entity-panel-muted">No entities</p>
           )}
           {entities.slice(0, limit).map((entity) => {
             const capability = entityEditCapability(entity.type);
+            const hidden = view?.entityHidden?.includes(entity.id) ?? false;
+            const locked = view?.entityLocked?.includes(entity.id) ?? false;
             return (
+              <div className="entity-panel-row" key={entity.id}>
               <button
-                key={entity.id}
+                className="entity-panel-select"
                 type="button"
                 aria-label={`Select entity ${entity.id}`}
                 aria-pressed={selectedIds.has(entity.id)}
                 disabled={disabled || !selectableIds.has(entity.id)}
-                title={`${entity.id}\n${entity.position.join(", ")} · yaw ${entity.yaw}°\n${capability.supported && !selectableIds.has(entity.id) ? "Outside the current editing view" : capability.reason}`}
+                title={`${entity.id}\n${entity.position.join(", ")} · yaw ${entity.yaw}°\n${capability.supported && !selectableIds.has(entity.id) ? "Hidden, locked, isolated or outside the anchor Y range" : capability.reason}`}
                 onClick={(event) => {
                   change();
                   onSelect(entity.id, event.shiftKey);
@@ -151,6 +170,21 @@ export function EntityPanel({
                     : "Editing unsupported"}
                 </small>
               </button>
+              {view && onViewChange && <div className="entity-panel-view-actions">
+                <button type="button" disabled={disabled}
+                  aria-label={`${hidden ? "Show" : "Hide"} entity ${entity.id}`}
+                  aria-pressed={hidden} title={hidden ? "Show entity" : "Hide entity"}
+                  onClick={() => { change(); onViewChange(toggleEntityHidden(view, [entity.id])); }}>
+                  <Icon name={hidden ? "eye-off" : "eye"} size={13} />
+                </button>
+                <button type="button" disabled={disabled}
+                  aria-label={`${locked ? "Unlock" : "Lock"} entity ${entity.id}`}
+                  aria-pressed={locked} title={locked ? "Unlock entity" : "Lock entity"}
+                  onClick={() => { change(); onViewChange(toggleEntityLocked(view, [entity.id])); }}>
+                  {locked ? "Unlock" : "Lock"}
+                </button>
+              </div>}
+              </div>
             );
           })}
         </div>

@@ -290,6 +290,13 @@ export function useEditorSession(
             isolated: [...new Set([...activeView.isolated, ...added])],
           };
       }
+      if (!boundary && activeView.entityIsolated != null &&
+        slot.history.document !== before[scope].history.document) {
+        const previousEntities = new Set(before[scope].history.document.entities.map((entity) => entity.id));
+        const added = slot.history.document.entities.filter((entity) => !previousEntities.has(entity.id)).map((entity) => entity.id);
+        if (added.length) activeView = { ...activeView,
+          entityIsolated: [...new Set([...activeView.entityIsolated, ...added])] };
+      }
       const view = boundary
         ? emptyEditorViewState()
         : pruneEditorViewState(slot.history.document, activeView);
@@ -590,22 +597,27 @@ export function useEditorSession(
       };
     });
   }
-  function selectEntity(scope: EditorScope, id: string, toggle: boolean) {
+  function selectEntities(scope: EditorScope, ids: readonly string[], toggle: boolean) {
     if (lifecycle.current.has(scope)) return;
     cancelPreview();
     setSlots((previous) => {
       const slot = previous[scope];
       const view = viewRef.current[scope];
-      if (!editableEntityIds(slot.history.document, view).includes(id))
-        return previous;
+      const allowed = new Set(editableEntityIds(slot.history.document, view));
       const selected = new Set(toggle ? slot.entitySelection : []);
-      if (toggle && selected.has(id)) selected.delete(id);
-      else selected.add(id);
+      for (const id of ids) {
+        if (!allowed.has(id)) continue;
+        if (toggle && selected.has(id)) selected.delete(id);
+        else selected.add(id);
+      }
       return {
         ...previous,
         [scope]: { ...slot, selection: [], entitySelection: [...selected] },
       };
     }, false);
+  }
+  function selectEntity(scope: EditorScope, id: string, toggle: boolean) {
+    selectEntities(scope, [id], toggle);
   }
   function previewEntity(scope: EditorScope, intent: EntityActionIntent) {
     cancelPreview();
@@ -1493,6 +1505,7 @@ export function useEditorSession(
   return {
     entityPreview,
     selectEntity,
+    selectEntities,
     previewEntity,
     commitEntity,
     views,

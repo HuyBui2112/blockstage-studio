@@ -2,6 +2,7 @@ import * as T from "three";
 import { TransformControls } from "three/addons/controls/TransformControls.js";
 import type { SceneBlock, Vec3 } from "../core/schema";
 import type { PlacementHit } from "../editor/placement-plan";
+import type { EntityViewportState } from "./entity-interaction";
 import { PreviewQueue } from "./preview-queue";
 import { measurePhase } from "../core/measurement-phases";
 import {
@@ -14,6 +15,7 @@ export type EditorTransformIntent =
   | { kind: "rotate"; turns: number };
 export type EditorPlacementHit = PlacementHit;
 export type EditorViewportState = {
+  entities?: EntityViewportState;
   /** Measurement acknowledgement only; never a persistence or plan token. */
   revisionKey?: string;
   /** Session context identity; never a validation or persistence token. */

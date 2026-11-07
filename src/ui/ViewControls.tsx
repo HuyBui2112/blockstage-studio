@@ -1,6 +1,5 @@
 import { useRef, useState } from "react";
 import {
-  isolateRoots,
   resetEditorViewState,
   setViewYRange,
   type EditorViewState,
@@ -11,11 +10,13 @@ type YBounds = { min: number; max: number };
 export function ViewControls({
   view,
   selection,
+  entitySelection = [],
   selectionBounds,
   onChange,
 }: {
   view: EditorViewState;
   selection: string[];
+  entitySelection?: string[];
   selectionBounds: YBounds | null;
   onChange: (view: EditorViewState) => void;
 }) {
@@ -23,6 +24,7 @@ export function ViewControls({
   const [minimum, setMinimum] = useState(String(view.yRange?.min ?? 0));
   const [maximum, setMaximum] = useState(String(view.yRange?.max ?? 0));
   const [error, setError] = useState("");
+  const hasSelection = selection.length > 0 || entitySelection.length > 0;
   const change = (next: EditorViewState) => {
     onChange(next);
     setError("");
@@ -66,11 +68,12 @@ export function ViewControls({
       </summary>
       <div role="group" aria-label="Object visibility">
         <button
-          disabled={!selection.length}
+          disabled={!hasSelection}
           onClick={() =>
             change({
               ...view,
               hidden: [...new Set([...view.hidden, ...selection])],
+              entityHidden: [...new Set([...(view.entityHidden ?? []), ...entitySelection])],
             })
           }
           aria-label="Hide selected"
@@ -78,18 +81,19 @@ export function ViewControls({
           Hide selected
         </button>
         <button
-          disabled={!view.hidden.length}
-          onClick={() => change({ ...view, hidden: [] })}
+          disabled={!view.hidden.length && !view.entityHidden?.length}
+          onClick={() => change({ ...view, hidden: [], entityHidden: [] })}
           aria-label="Show all"
         >
           Show all
         </button>
         <button
-          disabled={!selection.length}
+          disabled={!hasSelection}
           onClick={() =>
             change({
               ...view,
               locked: [...new Set([...view.locked, ...selection])],
+              entityLocked: [...new Set([...(view.entityLocked ?? []), ...entitySelection])],
             })
           }
           aria-label="Lock selected"
@@ -97,22 +101,25 @@ export function ViewControls({
           Lock selected
         </button>
         <button
-          disabled={!view.locked.length}
-          onClick={() => change({ ...view, locked: [] })}
+          disabled={!view.locked.length && !view.entityLocked?.length}
+          onClick={() => change({ ...view, locked: [], entityLocked: [] })}
           aria-label="Unlock all"
         >
           Unlock all
         </button>
         <button
-          disabled={!selection.length}
-          onClick={() => change(isolateRoots(view, selection))}
+          disabled={!hasSelection}
+          onClick={() => change({ ...view,
+            isolated: selection.length ? [...new Set(selection)] : null,
+            entityIsolated: entitySelection.length ? [...new Set(entitySelection)] : null,
+          })}
           aria-label="Isolate selected"
         >
           Isolate selected
         </button>
         <button
-          disabled={view.isolated === null}
-          onClick={() => change({ ...view, isolated: null })}
+          disabled={view.isolated === null && view.entityIsolated == null}
+          onClick={() => change({ ...view, isolated: null, entityIsolated: null })}
           aria-label="Exit isolate"
         >
           Exit isolate
@@ -166,7 +173,7 @@ export function ViewControls({
           <button
             aria-label="Focus selected Y"
             disabled={!selectionBounds}
-            title="Show the complete selected cell Y bounds"
+            title="Show selected block cells and entity anchor Y positions"
             onClick={() => {
               if (selectionBounds) applyRange(selectionBounds);
             }}
@@ -179,7 +186,7 @@ export function ViewControls({
             </small>
           )}
           <small className="view-range-help">
-            Inclusive cells · free entities stay visible
+            Block cells · entity anchor Y · inclusive bounds
           </small>
         </fieldset>
         <button

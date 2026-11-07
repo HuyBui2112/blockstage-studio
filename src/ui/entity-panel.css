@@ -24,6 +24,32 @@
   max-height: 190px;
   overflow: auto;
 }
+.entity-panel-row {
+  display: flex;
+  gap: 4px;
+  min-width: 0;
+}
+.entity-panel-select {
+  flex: 1;
+  min-width: 0;
+  flex-direction: column;
+  align-items: flex-start;
+}
+.entity-panel-view-actions {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+.entity-panel-view-actions button {
+  padding: 5px;
+  font-size: 10px;
+}
+.entity-panel-body > button {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 6px;
+}
 .entity-panel-list button {
   display: flex;
   justify-content: space-between;

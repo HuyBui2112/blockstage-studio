@@ -1,4 +1,4 @@
-import type { SceneBlock } from "../core/schema";
+import type { SceneBlock, SceneEntity } from "../core/schema";
 import { sceneBlocks, type EditorDocument, type EditorObject } from "./model";
 
 /** Transient root-owner policy. Never serialize into a document or history. */
@@ -7,6 +7,9 @@ export type EditorViewState = Readonly<{
   locked: readonly string[];
   isolated: readonly string[] | null;
   yRange?: Readonly<{ min: number; max: number }> | null;
+  entityHidden?: readonly string[];
+  entityLocked?: readonly string[];
+  entityIsolated?: readonly string[] | null;
 }>;
 export function emptyEditorViewState(): EditorViewState {
   return { hidden: [], locked: [], isolated: null };
@@ -81,8 +84,24 @@ export function createRootViewResolver(
         extent.min >= range.min &&
         extent.max <= range.max);
     const drawn =
-      !hidden.has(id) && (isolated === null || isolated.has(id)) && intersects;
+      !hidden.has(id) && (isolated === null || isolated.has(id)) &&
+      (view.entityIsolated == null || isolated !== null) && intersects;
     const editable = drawn && !locked.has(id) && contained;
+    return { drawn, selectable: editable, editable };
+  };
+}
+/** Free entities use their real-valued position anchor, not mesh or registry bounds. */
+export function createEntityViewResolver(view: EditorViewState) {
+  validateYRange(view.yRange);
+  const hidden = new Set(view.entityHidden ?? []),
+    locked = new Set(view.entityLocked ?? []),
+    isolated = view.entityIsolated == null ? null : new Set(view.entityIsolated);
+  return (entity: SceneEntity) => {
+    const drawn = !hidden.has(entity.id) &&
+      (isolated === null || isolated.has(entity.id)) &&
+      (view.isolated === null || isolated !== null) &&
+      inYRange(entity.position[1], view);
+    const editable = drawn && !locked.has(entity.id);
     return { drawn, selectable: editable, editable };
   };
 }
@@ -105,17 +124,29 @@ export function pruneEditorViewState(
   const hidden = prune(view.hidden),
     locked = prune(view.locked),
     isolated = view.isolated === null ? null : prune(view.isolated);
+  const entities = new Set(document.entities.map((entity) => entity.id));
+  const pruneEntities = (ids: readonly string[]) => [...new Set(ids)].filter((id) => entities.has(id));
+  const entityHidden = view.entityHidden === undefined ? undefined : pruneEntities(view.entityHidden),
+    entityLocked = view.entityLocked === undefined ? undefined : pruneEntities(view.entityLocked),
+    entityIsolated = view.entityIsolated == null ? view.entityIsolated : pruneEntities(view.entityIsolated);
   // A vanished isolate target must not leave an accidentally invisible workspace.
   const next = {
     ...view,
     hidden,
     locked,
     isolated: isolated?.length === 0 ? null : isolated,
+    ...(entityHidden === undefined ? {} : { entityHidden }),
+    ...(entityLocked === undefined ? {} : { entityLocked }),
+    ...(entityIsolated === undefined ? {} : { entityIsolated: entityIsolated?.length === 0 ? null : entityIsolated }),
   };
   const same = (a: readonly string[], b: readonly string[]) =>
     a.length === b.length && a.every((id, i) => id === b[i]);
   return same(view.hidden, hidden) &&
     same(view.locked, locked) &&
+    same(view.entityHidden ?? [], next.entityHidden ?? []) &&
+    same(view.entityLocked ?? [], next.entityLocked ?? []) &&
+    (view.entityIsolated === next.entityIsolated ||
+      (view.entityIsolated != null && next.entityIsolated != null && same(view.entityIsolated, next.entityIsolated))) &&
     (view.isolated === next.isolated ||
       (view.isolated !== null &&
         next.isolated !== null &&
@@ -153,12 +184,25 @@ export function isolateRoots(
   ids: readonly string[],
 ): EditorViewState {
   if (!ids.length) throw new Error("Select at least one root to isolate");
-  return { ...view, isolated: [...new Set(ids)] };
+  return { ...view, isolated: [...new Set(ids)], entityIsolated: null };
+}
+export function toggleEntityHidden(view: EditorViewState, ids: readonly string[]): EditorViewState {
+  return ids.length ? { ...view, entityHidden: toggle(view.entityHidden ?? [], ids) } : view;
+}
+export function toggleEntityLocked(view: EditorViewState, ids: readonly string[]): EditorViewState {
+  return ids.length ? { ...view, entityLocked: toggle(view.entityLocked ?? [], ids) } : view;
+}
+export function isolateEntities(view: EditorViewState, ids: readonly string[]): EditorViewState {
+  if (!ids.length) throw new Error("Select at least one entity to isolate");
+  return { ...view, isolated: null, entityIsolated: [...new Set(ids)] };
 }
 export function resetEditorViewState(view: EditorViewState): EditorViewState {
   return !view.hidden.length &&
     !view.locked.length &&
     view.isolated === null &&
+    !(view.entityHidden?.length) &&
+    !(view.entityLocked?.length) &&
+    view.entityIsolated == null &&
     view.yRange == null
     ? view
     : emptyEditorViewState();
@@ -207,12 +251,16 @@ export function assertViewEdit(
     !view.hidden.length &&
     !view.locked.length &&
     view.isolated === null &&
+    view.entityIsolated == null &&
     view.yRange == null
   )
     return;
   const after = new Map(candidate.objects.map((object) => [object.id, object])),
     policy = createRootViewResolver(view, before.objects);
   const previous = new Map(before.objects.map((object) => [object.id, object]));
+  if (view.entityIsolated != null && view.isolated === null &&
+    candidate.objects.some((root) => !previous.has(root.id)))
+    throw new Error("Block creation is unavailable while entity isolation is active");
   if (view.yRange != null) {
     const candidateRangePolicy = createRootViewResolver(
       { hidden: [], locked: [], isolated: null, yRange: view.yRange },

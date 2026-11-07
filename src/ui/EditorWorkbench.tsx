@@ -1,6 +1,7 @@
 import { ViewControls } from "./ViewControls";
 import {
   createRootViewResolver,
+  createEntityViewResolver,
   editableRootIds,
   assertViewEdit,
   toggleRootHidden,
@@ -500,6 +501,7 @@ export function EditorWorkbench({
   const slot = session.slots[scope],
     document = slot.history.document;
   const [tool, setTool] = useState<EditorViewportState["tool"]>("select");
+  const [entityPlacement, setEntityPlacement] = useState<string | null>(null);
   const [space, setSpace] = useState<CoordinateSpace>("global");
   const [pivotMode, setPivotMode] = useState<PivotMode>("active");
   const [requestedState, setRequestedState] = useState<BlockState>(() =>
@@ -550,6 +552,7 @@ export function EditorWorkbench({
   if (interactionOwner !== interactionKey) {
     setInteractionOwner(interactionKey);
     setTool("select");
+    setEntityPlacement(null);
     setPlacementHit(null);
     setRegionPlacement(false);
     setRegionDragging(false);
@@ -573,6 +576,7 @@ export function EditorWorkbench({
   );
   const blocks = useMemo(() => sceneBlocks(document), [document]);
   const visibleBlocks = useMemo(() => {
+    if (viewState.entityIsolated != null && viewState.isolated === null) return [];
     if (
       !viewState.hidden.length &&
       viewState.isolated === null &&
@@ -590,7 +594,19 @@ export function EditorWorkbench({
           (block.pos[1] >= viewState.yRange.min &&
             block.pos[1] <= viewState.yRange.max)),
     );
-  }, [blocks, viewState.hidden, viewState.isolated, viewState.yRange]);
+  }, [blocks, viewState.hidden, viewState.isolated, viewState.entityIsolated, viewState.yRange]);
+  const visibleEntities = useMemo(() => {
+    const candidates = stagedEntity?.document.entities ?? document.entities;
+    let previewView = viewState;
+    if (stagedEntity && viewState.entityIsolated != null) {
+      const existing = new Set(document.entities.map((entity) => entity.id));
+      const added = candidates.filter((entity) => !existing.has(entity.id)).map((entity) => entity.id);
+      if (added.length) previewView = { ...viewState,
+        entityIsolated: [...viewState.entityIsolated, ...added] };
+    }
+    const resolve = createEntityViewResolver(previewView);
+    return candidates.filter((entity) => resolve(entity).drawn);
+  }, [stagedEntity, document.entities, viewState]);
   const occupied = useMemo(
     () => new Set(blocks.map((block) => block.pos.join(","))),
     [blocks],
@@ -631,7 +647,7 @@ export function EditorWorkbench({
   const asset = session.components.find((item) => item.id === componentId);
   const placingComponent = asset && libraryTab === "components" ? asset : null;
   const placementPlan = useMemo(() => {
-    if (!placementHit || tool !== "place" || readOnly) return null;
+    if (!placementHit || tool !== "place" || readOnly || entityPlacement) return null;
     try {
       const plan = placingComponent
         ? {
@@ -723,6 +739,7 @@ export function EditorWorkbench({
     placementHit,
     tool,
     readOnly,
+    entityPlacement,
     placingComponent,
     placementTurns,
     placementMode,
@@ -830,6 +847,10 @@ export function EditorWorkbench({
       pivotMode,
     ],
   );
+  const entityContext = useMemo(() => ({
+    transformContext, documentId: document.id, epoch: slot.epoch,
+    revision: slot.revision, readOnly, key: crypto.randomUUID(),
+  }), [transformContext, document.id, slot.epoch, slot.revision, readOnly]);
   const primitiveActions = usePrimitiveActions({
     document,
     scope,
@@ -949,6 +970,7 @@ export function EditorWorkbench({
     setRegionDragging(false);
     setPlacementHit(null);
     setTool(next);
+    if (next !== "place") setEntityPlacement(null);
     if (focusViewport) focusCopyCanvas();
   };
   const changeView = (next: EditorViewState) => {
@@ -972,6 +994,14 @@ export function EditorWorkbench({
   const beginCopy = (kind: "duplicate" | "paste" | "repeat") => {
     changeTool("select");
     copyActions.begin(kind);
+  };
+  const beginEntityPlacement = () => {
+    changeTool("select");
+    session.select(scope, [], false);
+    setEntityPlacement(crypto.randomUUID());
+    setTool("place");
+    setInspectorOpen(true);
+    focusCopyCanvas();
   };
   const focusCopyCanvas = () =>
     globalThis.document
@@ -1031,6 +1061,22 @@ export function EditorWorkbench({
     name: Parameters<EditorViewportState["onCommand"]>[0],
   ) {
     if (!loaded) return;
+    if (slot.entitySelection.length) {
+      if (name === "delete" || name === "duplicate") {
+        session.previewEntity(scope, name === "delete" ? { kind: "remove" } : {
+          kind: "duplicate", newIds: slot.entitySelection.map(() => crypto.randomUUID()), offset: [1, 0, 0],
+        });
+        setInspectorOpen(true);
+        return;
+      }
+      if (name === "select-all") {
+        session.selectEntities(scope, [...selectableEntities], false); return;
+      }
+      if (name === "deselect") { session.selectEntities(scope, [], false); return; }
+      if (["copy", "paste", "repeat", "group", "ungroup"].includes(name)) {
+        session.setError("Use entity Duplicate; block clipboard and groups do not include free entities."); return;
+      }
+    }
     if (name === "copy") {
       materialActions.cancel();
       setMaterialsOpen(false);
@@ -1061,11 +1107,31 @@ export function EditorWorkbench({
     else if (name === "deselect") session.select(scope, [], false);
   }
   const editor: EditorViewportState | undefined =
-    readOnly || !loaded || !!stagedEntity
+    readOnly || !loaded
       ? undefined
       : {
           revisionKey: `${scope}:${document.id}:${slot.epoch}:${slot.revision}`,
           transformContext,
+          entities: {
+            source: document.entities,
+            selected: slot.entitySelection,
+            selectable: [...selectableEntities],
+            tool: entityPlacement && tool === "place" ? "place" : tool === "move" || tool === "rotate" ? tool : "select",
+            placementId: entityPlacement ?? undefined,
+            yaw: 0,
+            contextKey: entityContext.key,
+            previewing: !!stagedEntity,
+            onSelect: (id, toggle) => {
+              if (id) session.selectEntity(scope, id, toggle);
+              else session.selectEntities(scope, [], false);
+            },
+            onPreview: (intent) => session.previewEntity(scope, intent),
+            onConfirm: () => {
+              if (session.commitEntity(scope) && entityPlacement) { setEntityPlacement(null); setTool("select"); }
+            },
+            onCancel: () => { session.cancelPreview(); if (entityPlacement) { setEntityPlacement(null); setTool("select"); } },
+            onTool: (next) => changeTool(next),
+          },
           selectableOwners,
           tool:
             materialActions.active ||
@@ -1157,6 +1223,7 @@ export function EditorWorkbench({
       event.preventDefault();
       event.stopPropagation();
       session.cancelPreview();
+      if (entityPlacement) { setEntityPlacement(null); setTool("select"); }
       return;
     }
     if (event.ctrlKey && event.code === "KeyS") {
@@ -1505,13 +1572,17 @@ export function EditorWorkbench({
                 key={`${document.id}:${scope}`}
                 view={viewState}
                 selection={slot.selection}
+                entitySelection={slot.entitySelection}
                 selectionBounds={
                   selectedCells.length
                     ? {
                         min: selectedBounds.min[1],
                         max: selectedBounds.min[1] + selectedBounds.size[1] - 1,
                       }
-                    : null
+                    : slot.entitySelection.length ? (() => {
+                      const ys = document.entities.filter((entity) => slot.entitySelection.includes(entity.id)).map((entity) => entity.position[1]);
+                      return ys.length ? { min: Math.floor(Math.min(...ys)), max: Math.ceil(Math.max(...ys)) } : null;
+                    })() : null
                 }
                 onChange={changeView}
               />
@@ -1563,6 +1634,7 @@ export function EditorWorkbench({
                 Space
                 <select
                   aria-label="Transform space"
+                  disabled={!!slot.entitySelection.length || !!entityPlacement}
                   value={space}
                   onChange={(event) => {
                     session.cancelPreview();
@@ -1577,6 +1649,7 @@ export function EditorWorkbench({
                 Pivot
                 <select
                   aria-label="Transform pivot"
+                  disabled={!!slot.entitySelection.length || !!entityPlacement}
                   value={pivotMode}
                   onChange={(event) => {
                     session.cancelPreview();
@@ -1588,7 +1661,7 @@ export function EditorWorkbench({
                   <option value="individual">Individual origins</option>
                 </select>
               </label>
-              {tool === "place" ? (
+              {entityPlacement ? <span className="design-mode">Place pig · pointer surface · Enter confirms · Esc cancels</span> : tool === "place" ? (
                 <PlacementControls
                   mode={placementMode}
                   turns={placementTurns}
@@ -1597,7 +1670,7 @@ export function EditorWorkbench({
                   onRotate={rotatePlacement}
                 />
               ) : (
-                <span className="design-mode">Grid edit</span>
+                <span className="design-mode">{slot.entitySelection.length ? "Entity · World move · individual yaw" : "Grid edit"}</span>
               )}
               <span className="context-spacer" />
               <button
@@ -1695,7 +1768,7 @@ export function EditorWorkbench({
             >
               <Viewport
                 blocks={visibleBlocks}
-                entities={stagedEntity?.document.entities ?? document.entities}
+                entities={visibleEntities}
                 packs={resources.packs}
                 resolver={resources.resolver}
                 catalog={resources.catalog}
@@ -1720,6 +1793,18 @@ export function EditorWorkbench({
                 command={command}
               />
             </Suspense>
+            {stagedEntity && !readOnly && (
+              <div className="transform-hud entity-preview-actions" role="group" aria-label="Entity preview controls">
+                <span>{stagedEntity.label}</span>
+                <button type="button" aria-label="Apply entity viewport preview" onClick={() => {
+                  if (session.commitEntity(scope) && entityPlacement) { setEntityPlacement(null); setTool("select"); }
+                  focusCopyCanvas();
+                }}>Confirm</button>
+                <button type="button" aria-label="Cancel entity viewport preview" onClick={() => {
+                  session.cancelPreview(); setEntityPlacement(null); setTool("select"); focusCopyCanvas();
+                }}>Cancel</button>
+              </div>
+            )}
             <div className="viewport-caption">
               <span>{document.name}</span>
               <small>
@@ -2076,7 +2161,7 @@ export function EditorWorkbench({
                       : "Select an object in the viewport"}
                   </span>
                   <small>
-                    Drag selects a region · Shift toggles · Ctrl A selects all
+                    {slot.entitySelection.length ? "G move · R yaw · Shift click toggles entities" : "Drag selects a region · Shift toggles · Ctrl A selects all"}
                   </small>
                 </div>
               )}
@@ -2095,7 +2180,10 @@ export function EditorWorkbench({
                   selectableIds={selectableEntities}
                   previewing={!!stagedEntity}
                   error={session.error}
-                  disabled={!loaded || viewState.isolated !== null}
+                  disabled={!loaded}
+                  view={viewState}
+                  onViewChange={changeView}
+                  onPlace={beginEntityPlacement}
                   onSelect={(id, toggle) => {
                     changeTool("select", false);
                     session.selectEntity(scope, id, toggle);
@@ -2104,8 +2192,10 @@ export function EditorWorkbench({
                     changeTool("select", false);
                     session.previewEntity(scope, intent);
                   }}
-                  onConfirm={() => session.commitEntity(scope)}
-                  onCancel={session.cancelPreview}
+                  onConfirm={() => {
+                    if (session.commitEntity(scope) && entityPlacement) { setEntityPlacement(null); setTool("select"); }
+                  }}
+                  onCancel={() => { session.cancelPreview(); if (entityPlacement) { setEntityPlacement(null); setTool("select"); } }}
                 />
               )}
               <section className="editor-section outliner-section">
@@ -2281,6 +2371,8 @@ export function EditorWorkbench({
         data-entity-preview={
           stagedEntity ? JSON.stringify(stagedEntity.document.entities) : ""
         }
+        data-visible-entities={JSON.stringify(visibleEntities.map((entity) => entity.id))}
+        data-entity-placement={entityPlacement ?? ""}
         data-snapshot={diagnosticSnapshot}
         data-revision={slot.revision}
         data-saved-revision={slot.savedRevision ?? ""}

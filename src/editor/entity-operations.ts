@@ -133,6 +133,24 @@ export function setEntityYaw(
   return commit(document, entities, catalog);
 }
 
+/** Relative yaw preserves each selected entity's heading difference and position. */
+export function rotateEntities(
+  document: EditorDocument,
+  ids: string[],
+  degrees: number,
+  catalog: Material[],
+): EditorDocument {
+  validateDocument(document, catalog);
+  selected(document, ids, "yaw");
+  const delta = normalizedYaw(degrees), selectedIds = new Set(ids);
+  const entities = document.entities.map((entity) => {
+    if (!selectedIds.has(entity.id) || delta === 0) return entity;
+    const yaw = normalizedYaw(entity.yaw + delta);
+    return yaw === entity.yaw ? entity : { ...entity, yaw };
+  });
+  return commit(document, entities, catalog);
+}
+
 /** Explicit IDs correspond to selection order. Overlap with blocks/entities is permitted. */
 export function duplicateEntities(
   document: EditorDocument,

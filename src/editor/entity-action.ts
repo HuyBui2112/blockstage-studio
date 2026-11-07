@@ -6,6 +6,7 @@ import {
   entityEditCapability,
   moveEntities,
   removeEntities,
+  rotateEntities,
   setEntityYaw,
 } from "./entity-operations";
 import { validateDocument, type EditorDocument } from "./model";
@@ -15,12 +16,13 @@ import {
   validateOperationBase,
   type OperationBase,
 } from "./operation-plan";
-import { inYRange, type EditorViewState } from "./view-state";
+import { createEntityViewResolver, inYRange, type EditorViewState } from "./view-state";
 
 export type EntityActionIntent =
   | { kind: "add"; entity: SceneEntity }
   | { kind: "move"; delta: Vec3 }
   | { kind: "yaw"; yaw: number }
+  | { kind: "rotate"; degrees: number }
   | { kind: "duplicate"; newIds: string[]; offset: Vec3 }
   | { kind: "remove" };
 
@@ -28,13 +30,12 @@ export function editableEntityIds(
   document: EditorDocument,
   view: EditorViewState,
 ): string[] {
-  inYRange(0, view);
-  if (view.isolated !== null) return [];
+  const policy = createEntityViewResolver(view);
   return document.entities
     .filter(
       (entity) =>
         entityEditCapability(entity.type).supported &&
-        inYRange(entity.position[1], view),
+        policy(entity).editable,
     )
     .map((entity) => entity.id);
 }
@@ -57,29 +58,34 @@ function assertEntityView(
   ids: readonly string[],
   view: EditorViewState,
 ): void {
-  // Hidden/locked IDs belong to block roots, including legacy cross-kind IDs.
+  // Block and entity flags use distinct namespaces, even for legacy equal IDs.
   inYRange(0, view);
-  if (view.isolated !== null)
+  if (view.isolated !== null && view.entityIsolated == null)
     throw new Error(
       "Entity editing is unavailable while block isolation is active",
     );
   if (candidate.objects !== source.objects)
     throw new Error("Entity actions cannot change block objects");
+  const policy = createEntityViewResolver(view);
   const selected = new Set(ids),
     previous = new Map(source.entities.map((entity) => [entity.id, entity]));
-  for (const entity of source.entities)
+  const after = new Map(candidate.entities.map((entity) => [entity.id, entity]));
+  const unchanged = (entity: SceneEntity, next: SceneEntity | undefined) =>
+    next !== undefined && entity.id === next.id && entity.type === next.type &&
+    entity.yaw === next.yaw && entity.position.every((value, axis) => value === next.position[axis]);
+  for (const entity of source.entities) {
     if (selected.has(entity.id) && !inYRange(entity.position[1], view))
-      throw new Error(
-        "Selected entity is outside the active Y range: " + entity.id,
-      );
-  for (const entity of candidate.entities)
-    if (
-      entity !== previous.get(entity.id) &&
-      !inYRange(entity.position[1], view)
-    )
-      throw new Error(
-        "Entity extends outside the active Y range: " + entity.id,
-      );
+      throw new Error("Selected entity is outside the active Y range: " + entity.id);
+    if (!policy(entity).editable && (selected.has(entity.id) || !unchanged(entity, after.get(entity.id))))
+      throw new Error("Protected entity cannot be changed: " + entity.id);
+  }
+  for (const entity of candidate.entities) {
+    if (entity === previous.get(entity.id)) continue;
+    if (!inYRange(entity.position[1], view))
+      throw new Error("Entity extends outside the active Y range: " + entity.id);
+    if (view.entityHidden?.includes(entity.id) || view.entityLocked?.includes(entity.id))
+      throw new Error("Protected entity cannot be changed: " + entity.id);
+  }
 }
 
 export function planEntityAction(
@@ -107,6 +113,10 @@ export function planEntityAction(
       break;
     case "yaw":
       candidate = setEntityYaw(document, selection, intent.yaw, catalog);
+      label = "Rotate entities";
+      break;
+    case "rotate":
+      candidate = rotateEntities(document, selection, intent.degrees, catalog);
       label = "Rotate entities";
       break;
     case "duplicate":

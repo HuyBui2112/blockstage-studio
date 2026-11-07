@@ -34,6 +34,7 @@ import {
   type EditorPlacementHit,
 } from "./editor-interaction";
 import { CellPicker } from "./cell-picking";
+import { EntityInteraction } from "./entity-interaction";
 import { ContextLifecycle } from "./context-lifecycle";
 import { CONTEXT_CHAIN_IDS } from "../editor/placement-plan";
 import {
@@ -160,6 +161,7 @@ class ViewportController {
     session?: string;
   } | null = null;
   editorInteraction: EditorInteraction;
+  entityInteraction: EntityInteraction;
   measurement: PerformanceProbe | null = null;
   releaseMeasurement: (() => void) | null = null;
   constructor(host: HTMLDivElement, props: Props) {
@@ -212,6 +214,12 @@ class ViewportController {
       },
     });
     this.selection.visible = this.preview.visible = false;
+    this.entityInteraction = new EntityInteraction({
+      canvas: this.renderer.domElement, host, scene: this.scene,
+      camera: () => this.camera, meshes: () => this.entityMeshes,
+      navigation: (enabled) => { this.controls.enabled = enabled && !this.flying; },
+      invalidate: this.invalidate,
+    });
     this.scene.add(new T.HemisphereLight(0xe3f4ff, 0x535c54, 2.1));
     const sun = new T.DirectionalLight(0xfff0d9, 2.5);
     sun.position.set(10, 18, 6);
@@ -322,6 +330,7 @@ class ViewportController {
     this.lastTime = time;
     if (
       this.props.editor?.tool === "place" &&
+      this.props.editor.entities?.tool !== "place" &&
       this.placementPointer &&
       !this.flying
     ) {
@@ -357,6 +366,7 @@ class ViewportController {
         this.renderer.domElement.dataset.editorCamera = cameraData;
     }
     this.editorInteraction.publishHandles();
+    this.entityInteraction.publishHandles();
     this.measurement?.frame(
       this.renderer,
       measureStarted,
@@ -790,6 +800,7 @@ class ViewportController {
       this.props.blocks,
       clearCaches,
     );
+    this.entityInteraction.update(this.props.previewMode ? undefined : this.props.editor?.entities);
     this.refreshAnimations();
     this.invalidate();
   }
@@ -847,6 +858,13 @@ class ViewportController {
             : undefined,
       );
       if (!placing)
+      {
+        const eligibleEntities = new Set(this.props.editor.entities?.selectable ?? []);
+        const entity = this.ray.intersectObjects(this.entityMeshes.filter((mesh) => eligibleEntities.has(mesh.userData.entityId)), false)[0];
+        if (entity && (!cell || entity.distance < cell.distance - 1e-7))
+          return { block: undefined, adjacent: entity.point.toArray() as Vec3,
+            face: [0, 1, 0] as Vec3, point: entity.point.toArray() as Vec3,
+            entityId: entity.object.userData.entityId as string };
         return cell
           ? {
               block: cell.block,
@@ -855,6 +873,7 @@ class ViewportController {
               point: cell.point,
             }
           : undefined;
+      }
       if (cell) {
         const visual = this.ray.intersectObjects(
           [...this.batches, ...this.entityMeshes],
@@ -925,6 +944,18 @@ class ViewportController {
   pointerDown = (e: PointerEvent) => {
     this.renderer.domElement.focus();
     if (this.flying) return;
+    if (!this.props.previewMode && this.props.editor?.entities) {
+      if (this.props.editor.entities.tool === "place") this.entityInteraction.placement(this.entityPlacementPoint(e));
+      const hit = this.hit(e, true);
+      const entityId = hit && "entityId" in hit ? hit.entityId : undefined;
+      const allow = this.props.editor.tool !== "place" || this.props.editor.entities.tool === "place";
+      const capture = allow && this.entityInteraction.pointerDown(e, entityId);
+      if (capture) {
+        this.down = null;
+        if (capture === "capture") { e.stopImmediatePropagation(); e.preventDefault(); }
+        return;
+      }
+    }
     if (e.button === 2 && this.placementRegion) {
       this.endPlacementRegion(true);
       e.stopImmediatePropagation();
@@ -1002,8 +1033,15 @@ class ViewportController {
     }
     if (this.flying) return;
     if (this.props.previewMode) return;
+    if (this.entityInteraction.pointerMove(e)) return;
+    if (this.props.editor?.entities?.tool === "place") {
+      this.entityInteraction.placement(this.entityPlacementPoint(e));
+      this.invalidate();
+      return;
+    }
     if (this.editorInteraction.pointerMove(e)) return;
     const hit = this.hit(e);
+    this.entityInteraction.hoverEntity(hit && "entityId" in hit ? hit.entityId : undefined);
     if (!hit) {
       this.pointerLeave();
       return;
@@ -1035,6 +1073,7 @@ class ViewportController {
     this.invalidate();
   };
   pointerLeave = () => {
+    this.entityInteraction.hoverEntity();
     this.placementPointer = null;
     if (this.placementRegion) return;
     this.preview.visible = false;
@@ -1045,6 +1084,14 @@ class ViewportController {
     this.invalidate();
   };
   pointerUp = (e: PointerEvent) => {
+    if (!this.props.previewMode && this.props.editor?.entities) {
+      const hit = this.hit(e, true);
+      if (this.entityInteraction.pointerUp(e, hit && "entityId" in hit ? hit.entityId : undefined)) {
+        this.down = null;
+        this.invalidate();
+        return;
+      }
+    }
     if (e.button === 0 && this.placementRegion?.pointerId === e.pointerId) {
       const outside = !this.renderer.domElement.contains(e.target as Node);
       if (!outside) this.pointPlacementRegion(e);
@@ -1075,6 +1122,11 @@ class ViewportController {
       const editor = this.props.editor,
         quickSelect = editor.tool === "place" && e.altKey;
       const hit = this.hit(e, quickSelect);
+      if (hit && "entityId" in hit && hit.entityId && (editor.tool !== "place" || quickSelect)) {
+        if (quickSelect) editor.onTool?.("select");
+        editor.entities?.onSelect(hit.entityId, e.shiftKey);
+        return;
+      }
       if (quickSelect) {
         editor.onTool?.("select");
         editor.onSelect(hit?.block ? [hit.block.owner] : [], e.shiftKey);
@@ -1124,7 +1176,17 @@ class ViewportController {
     this.endPlacementRegion(true);
     this.down = null;
     this.editorInteraction.cancel();
+    this.entityInteraction.cancel();
   };
+  entityPlacementPoint(e: PointerEvent): Vec3 | undefined {
+    const rect = this.renderer.domElement.getBoundingClientRect();
+    this.ray.setFromCamera(new T.Vector2((e.clientX - rect.left) / rect.width * 2 - 1,
+      1 - (e.clientY - rect.top) / rect.height * 2), this.camera);
+    const surface = this.ray.intersectObjects(this.batches, false)[0];
+    const point = surface?.point ?? this.ray.ray.intersectPlane(
+      new T.Plane(new T.Vector3(0, 1, 0), -this.props.layer), new T.Vector3());
+    return point?.toArray() as Vec3 | undefined;
+  }
   placementHit(
     hit: NonNullable<ReturnType<ViewportController["hit"]>>,
   ): EditorPlacementHit {
@@ -1167,7 +1229,9 @@ class ViewportController {
       : this.props.blocks;
     let entities = this.entityMeshes.filter(
       (m) =>
-        !selected || `entity:${m.userData.entityId}` === this.props.selected,
+        !selected || (this.props.editor?.entities
+          ? this.props.editor.entities.selected.includes(m.userData.entityId)
+          : `entity:${m.userData.entityId}` === this.props.selected),
     );
     if (selected && !blocks.length && !entities.length) {
       blocks = this.props.blocks;
@@ -1223,6 +1287,7 @@ class ViewportController {
     this.controls.update();
     this.resize();
     this.editorInteraction.syncTransform();
+    this.entityInteraction.update(this.props.previewMode ? undefined : this.props.editor?.entities);
   }
   command(kind: ViewCommandKind) {
     if (kind === "frame-all" || kind === "frame-selected") {
@@ -1293,6 +1358,10 @@ class ViewportController {
       e.preventDefault();
       return;
     }
+    if (!this.props.previewMode && this.entityInteraction.keyDown(e)) {
+      e.preventDefault();
+      return;
+    }
     if (!this.props.previewMode && this.editorInteraction.keyDown(e)) {
       e.preventDefault();
       return;
@@ -1314,6 +1383,7 @@ class ViewportController {
     else if (e.code === "KeyR") this.props.onRotate();
   };
   async startFly() {
+    this.entityInteraction.cancel();
     if (this.editorInteraction.modal || this.editorInteraction.dragging)
       this.editorInteraction.cancel();
     if (this.camera instanceof T.OrthographicCamera) this.toggleProjection();
@@ -1338,6 +1408,7 @@ class ViewportController {
     this.keys.delete(e.code);
   };
   blur = () => {
+    this.entityInteraction.cancel();
     this.keys.clear();
     this.ctrlZoom = false;
     this.endPlacementRegion(true);
@@ -1452,6 +1523,7 @@ class ViewportController {
         props.previewMode ? undefined : props.editor,
         props.blocks,
       );
+      this.entityInteraction.update(props.previewMode ? undefined : props.editor?.entities);
     }
     if (frame) this.frameBlocks(false);
     if (command) this.command(command.kind);
@@ -1465,6 +1537,7 @@ class ViewportController {
     this.observer.disconnect();
     if (this.flying) document.exitPointerLock();
     this.editorInteraction.dispose();
+    this.entityInteraction.dispose();
     this.controls.dispose();
     this.disposeMeshes();
     this.grid.geometry.dispose();

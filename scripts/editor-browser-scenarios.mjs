@@ -24,6 +24,7 @@ import { runInteractionScenarios } from "./interaction-browser-scenarios.mjs";
 import { runR1HouseScenarios } from "./r1-house-browser-scenarios.mjs";
 import { runPerformanceScenarios } from "./performance-browser-scenarios.mjs";
 import { runEntityScenarios } from "./entity-browser-scenarios.mjs";
+import { runEntityViewportScenarios } from "./entity-viewport-browser-scenarios.mjs";
 import { runContextScenarios } from "./context-browser-scenarios.mjs";
 
 /** Real input integration scenarios, called by the existing isolated-browser harness. */
@@ -63,6 +64,8 @@ export async function runEditorScenarios({
       key,
       screenshot,
     });
+  if (process.env.BLOCKSTAGE_EDITOR_SLICE === "entity-viewport")
+    return runEntityViewportScenarios({ command, evaluate, until, click, aria, input, upload, key, screenshot, directory });
   if (process.env.BLOCKSTAGE_EDITOR_SLICE === "performance")
     return runPerformanceScenarios({
       command,
@@ -1123,6 +1126,7 @@ export async function runEditorScenarios({
     key,
     screenshot,
   });
+  await runEntityViewportScenarios({ command, evaluate, until, click, aria, input, upload, key, screenshot, directory });
   await runDataSafetyScenarios({
     command,
     evaluate,

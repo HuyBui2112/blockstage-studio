@@ -382,6 +382,12 @@
   border-color: #a26b5e;
   color: #edb4a4;
 }
+.entity-transform-hud[hidden] {
+  display: none;
+}
+.entity-preview-actions {
+  bottom: 60px;
+}
 .transform-hud > span:first-of-type {
   min-width: 0;
   overflow-wrap: anywhere;
