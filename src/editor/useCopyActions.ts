@@ -104,7 +104,9 @@ export function useCopyActions(
         ? { kind, position: [...anchor] }
         : kind === "repeat"
           ? { kind, axis: "x", count: 2, spacing: box.size[0] }
-          : { kind, delta: [box.size[0], 0, 0] };
+          : kind === "repeat-grid"
+            ? { kind, counts: [3, 1, 1], spacing: [...box.size] }
+            : { kind, delta: [box.size[0], 0, 0] };
     const controller = new AbortController();
     owned.current = controller;
     setOperation({
@@ -128,7 +130,7 @@ export function useCopyActions(
     );
   }
   function point(pos: Vec3) {
-    if (!active) return;
+    if (!active || active.intent.kind === "repeat-grid") return;
     const delta = pos.map((value, axis) => value - active.anchor[axis]) as Vec3;
     const intent: CopyActionIntent =
       active.intent.kind === "duplicate"

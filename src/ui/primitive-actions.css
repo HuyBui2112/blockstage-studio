@@ -4,6 +4,10 @@
   color: var(--muted);
   overflow-wrap: anywhere;
 }
+.primitive-sizing-controls { margin-bottom: 12px; }
+.primitive-dimensions-fields { margin-top: 12px; }
+.primitive-dimension-axis { display: grid; gap: 7px; min-width: 0; }
+.primitive-dimensions-end { display: block; color: var(--muted); margin-top: 8px; overflow-wrap: anywhere; }
 .primitive-action-panel .copy-action-vector + .copy-action-vector {
   margin-top: 12px;
 }

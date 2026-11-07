@@ -14,11 +14,13 @@ import { checkPlanCancelled } from "./operation-plan";
 import { planNeighborConnections } from "./neighbors";
 import type { OperationBase } from "./operation-plan";
 import { planRepeat } from "./repeat-plan";
+import { planGridRepeat } from "./grid-repeat-plan";
 
 export type CopyActionIntent =
   | { kind: "duplicate"; delta: Vec3 }
   | { kind: "paste"; position: Vec3 }
-  | { kind: "repeat"; axis: "x" | "y" | "z"; count: number; spacing: number };
+  | { kind: "repeat"; axis: "x" | "y" | "z"; count: number; spacing: number }
+  | { kind: "repeat-grid"; counts: Vec3; spacing: Vec3 };
 export type CopyActionPlan = ObjectCopyPlan &
   Readonly<{
     kind: CopyActionIntent["kind"];
@@ -43,7 +45,9 @@ export function planCopyAction(
       ? planDuplicate(document, ids, intent.delta, catalog, options)
       : intent.kind === "paste"
         ? planPaste(document, clipboard!, intent.position, catalog, options)
-        : planRepeat(document, ids, intent, catalog, options);
+        : intent.kind === "repeat-grid"
+          ? planGridRepeat(document, ids, intent, catalog, options)
+          : planRepeat(document, ids, intent, catalog, options);
   return finalizeCopyPlan(plan, catalog, rules);
 }
 

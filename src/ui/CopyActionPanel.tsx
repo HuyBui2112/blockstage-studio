@@ -15,7 +15,7 @@ type CopyActionPanelProps = {
 };
 
 const axes = ["X", "Y", "Z"] as const;
-const titles = { duplicate: "Duplicate", paste: "Paste", repeat: "Repeat" };
+const titles = { duplicate: "Duplicate", paste: "Paste", repeat: "Repeat", "repeat-grid": "Repeat grid" };
 
 export function CopyActionMenu({
   enabled,
@@ -26,7 +26,7 @@ export function CopyActionMenu({
   enabled: boolean;
   selected: boolean;
   hasClipboard: boolean;
-  onAction: (action: "duplicate" | "copy" | "paste" | "repeat") => void;
+  onAction: (action: CopyActionIntent["kind"] | "copy") => void;
 }) {
   return (
     <details className="copy-action-menu">
@@ -34,11 +34,11 @@ export function CopyActionMenu({
         Copy
       </summary>
       <div>
-        {(["duplicate", "copy", "paste", "repeat"] as const).map((action) => (
+        {(["duplicate", "copy", "paste", "repeat", "repeat-grid"] as const).map((action) => (
           <button
             key={action}
             type="button"
-            aria-label={`${action[0].toUpperCase() + action.slice(1)} objects`}
+            aria-label={`${action === "repeat-grid" ? "Repeat grid" : action[0].toUpperCase() + action.slice(1)} objects`}
             disabled={
               !enabled || (action === "paste" ? !hasClipboard : !selected)
             }
@@ -48,6 +48,7 @@ export function CopyActionMenu({
                 copy: "Ctrl C",
                 paste: "Ctrl V",
                 repeat: "Ctrl Shift D",
+                "repeat-grid": "Arrange whole selected objects on a World grid",
               }[action]
             }
             onClick={(event) => {
@@ -55,7 +56,7 @@ export function CopyActionMenu({
               onAction(action);
             }}
           >
-            {action[0].toUpperCase() + action.slice(1)}
+            {action === "repeat-grid" ? "Repeat grid" : action[0].toUpperCase() + action.slice(1)}
           </button>
         ))}
       </div>
@@ -90,7 +91,7 @@ export function CopyActionPanel({
   }
 
   function changeVector(index: number, value: number) {
-    if (intent.kind === "repeat") return;
+    if (intent.kind === "repeat" || intent.kind === "repeat-grid") return;
     const vector: Vec3 = [
       ...(intent.kind === "duplicate" ? intent.delta : intent.position),
     ];
@@ -100,6 +101,26 @@ export function CopyActionPanel({
         ? { ...intent, delta: vector }
         : { ...intent, position: vector },
     );
+  }
+
+  function changeGrid(field: "counts" | "spacing", index: number, value: number) {
+    if (intent.kind !== "repeat-grid") return;
+    const vector: Vec3 = [...intent[field]];
+    vector[index] = value;
+    onChange({ ...intent, [field]: vector });
+  }
+
+  let newCopies: number | undefined;
+  if (intent.kind === "repeat-grid") {
+    let positions = 1;
+    for (const count of intent.counts) {
+      if (!Number.isSafeInteger(count) || count < 1 || positions > 100001 / count) {
+        positions = 0;
+        break;
+      }
+      positions *= count;
+    }
+    if (positions > 0) newCopies = positions - 1;
   }
 
   return (
@@ -115,9 +136,43 @@ export function CopyActionPanel({
             {cells.toLocaleString()} {cells === 1 ? "cell" : "cells"}
           </span>
         )}
-        <span className="copy-action-world">World</span>
+        <span className="copy-action-world">{intent.kind === "repeat-grid" ? "World · numeric" : "World"}</span>
       </header>
-      {intent.kind === "repeat" ? (
+      {intent.kind === "repeat-grid" ? (
+        <div className="copy-action-grid-repeat">
+          <fieldset className="copy-action-vector">
+            <legend>Positions · includes original</legend>
+            <div className="copy-action-fields">
+              {axes.map((axis, index) => (
+                <label key={axis}>
+                  <span>{axis}</span>
+                  <input type="number" min={1} step={1}
+                    aria-label={`Grid count ${axis}`}
+                    value={Number.isFinite(intent.counts[index]) ? intent.counts[index] : ""}
+                    onChange={(event) => changeGrid("counts", index, event.currentTarget.valueAsNumber)} />
+                </label>
+              ))}
+            </div>
+          </fieldset>
+          <fieldset className="copy-action-vector">
+            <legend>Spacing · signed blocks between anchors</legend>
+            <div className="copy-action-fields">
+              {axes.map((axis, index) => (
+                <label key={axis} title="Use a nonzero integer on axes with more than one position. Negative spacing repeats in the opposite direction.">
+                  <span>{axis}</span>
+                  <input type="number" step={1}
+                    aria-label={`Grid spacing ${axis}`}
+                    value={Number.isFinite(intent.spacing[index]) ? intent.spacing[index] : ""}
+                    onChange={(event) => changeGrid("spacing", index, event.currentTarget.valueAsNumber)} />
+                </label>
+              ))}
+            </div>
+          </fieldset>
+          {newCopies !== undefined && <p className="copy-action-grid-count" role="status">
+            {newCopies.toLocaleString()} new {newCopies === 1 ? "copy" : "copies"} · original stays in place
+          </p>}
+        </div>
+      ) : intent.kind === "repeat" ? (
         <div className="copy-action-fields copy-action-repeat">
           <label>
             <span>Axis</span>
@@ -212,8 +267,10 @@ export function CopyActionPanel({
         </details>
       )}
       <footer className="copy-action-footer">
-        <span title="Point/click in the viewport to position. Enter confirms; Escape cancels. Camera navigation remains available.">
-          Point to position · Enter / Esc
+        <span title={intent.kind === "repeat-grid"
+          ? "Set grid counts and spacing in World axes. Pointer movement does not change the grid. Enter confirms; Escape cancels."
+          : "Point/click in the viewport to position. Enter confirms; Escape cancels. Camera navigation remains available."}>
+          {intent.kind === "repeat-grid" ? "Set counts and spacing · Enter / Esc" : "Point to position · Enter / Esc"}
         </span>
         <button
           type="button"

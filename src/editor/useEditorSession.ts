@@ -724,7 +724,7 @@ export function useEditorSession(
       commit(
         scope,
         next,
-        plan.kind === "repeat"
+        plan.kind === "repeat" || plan.kind === "repeat-grid"
           ? "Repeat objects"
           : plan.kind === "paste"
             ? "Paste objects"

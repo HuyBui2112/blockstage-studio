@@ -991,7 +991,7 @@ export function EditorWorkbench({
     setRegionPlacement(false);
     focusCopyCanvas();
   };
-  const beginCopy = (kind: "duplicate" | "paste" | "repeat") => {
+  const beginCopy = (kind: "duplicate" | "paste" | "repeat" | "repeat-grid") => {
     changeTool("select");
     copyActions.begin(kind);
   };
@@ -1731,6 +1731,7 @@ export function EditorWorkbench({
             )}
             {primitiveActions.active && (
               <PrimitiveActionPanel
+                key={primitiveActions.active.id}
                 fixed={regionPlacement}
                 intent={primitiveActions.active.intent}
                 onChange={primitiveActions.change}

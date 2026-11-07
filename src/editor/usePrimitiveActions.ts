@@ -140,6 +140,7 @@ export function usePrimitiveActions({
     // Update the queued operation, preserving its identity and captured template.
     setOperation((previous) =>
       previous &&
+      previous.intent.sizing !== "dimensions" &&
       enabled &&
       previous.source === document &&
       previous.scope === scope &&

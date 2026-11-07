@@ -20,6 +20,8 @@ export type PrimitiveIntent = {
   start: Vec3;
   end: Vec3;
   state: BlockState;
+  /** Numeric sizing freezes pointer targeting; never part of a saved document. */
+  sizing?: "dimensions";
 };
 export type PrimitivePlan = ObjectCopyPlan &
   Readonly<{ kind: PrimitiveKind; anchor: Vec3; size: Vec3; anchors: number }>;

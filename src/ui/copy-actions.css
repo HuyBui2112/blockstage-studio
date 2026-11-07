@@ -54,6 +54,16 @@
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 9px;
 }
+.copy-action-grid-repeat {
+  display: grid;
+  gap: 12px;
+}
+.copy-action-grid-count {
+  margin: 0;
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.5;
+}
 .copy-action-fields label {
   display: flex;
   flex-direction: column;
