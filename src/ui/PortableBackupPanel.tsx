@@ -13,6 +13,7 @@ import {
 } from "../io/portable-backup";
 import { download } from "../io/storage";
 import { Icon } from "./Icon";
+import { ResourceCompatibilityPanel } from "./ResourceCompatibilityPanel";
 
 export type BackupProps = {
   document: EditorDocument;
@@ -44,6 +45,10 @@ export function PortableBackupPanel({
     bundle: PortableBackup;
     report: BackupReport;
     current: EditorDocument;
+    manifest: Awaited<ReturnType<typeof resourceManifest>>;
+    packs: ResourceSession["packs"];
+    profile: ResourceSession["profile"];
+    catalog: ResourceSession["catalog"];
   } | null>(null);
   const [ack, setAck] = useState(false);
   const mounted = useRef(true),
@@ -54,6 +59,26 @@ export function PortableBackupPanel({
       mounted.current = false;
     };
   }, []);
+  const bundle = candidate?.bundle;
+  const { packs, profile, catalog } = resources;
+  const reportFresh = !!candidate && candidate.packs === resources.packs &&
+    candidate.profile === resources.profile && candidate.catalog === resources.catalog;
+  useEffect(() => {
+    if (!bundle || reportFresh) return;
+    let active = true;
+    void resourceManifest(packs, profile).then((manifest) => {
+      const report = reportPortableBackup(bundle, manifest, catalog);
+      if (active) {
+        setAck(false);
+        setFailure("");
+        setCandidate((previous) => previous?.bundle === bundle
+          ? { ...previous, report, manifest, packs, profile, catalog } : previous);
+      }
+    }).catch((cause) => {
+      if (active) setFailure(cause instanceof Error ? cause.message : String(cause));
+    });
+    return () => { active = false; };
+  }, [bundle, packs, profile, catalog, reportFresh]);
   async function run(work: () => Promise<void>) {
     if (running.current) return;
     running.current = true;
@@ -118,11 +143,12 @@ export function PortableBackupPanel({
         resources.profile,
       );
       const report = reportPortableBackup(bundle, manifest, resources.catalog);
-      if (mounted.current) setCandidate({ bundle, report, current });
+      if (mounted.current) setCandidate({ bundle, report, current, manifest,
+        packs: resources.packs, profile: resources.profile, catalog: resources.catalog });
     });
   }
   async function restore() {
-    if (!candidate || (candidate.report.totalIssues > 0 && !ack)) return;
+    if (!candidate || !reportFresh || resources.busy || (candidate.report.totalIssues > 0 && !ack)) return;
     await run(async () => {
       if (await onRestoreBackup(candidate.bundle, candidate.current)) onClose();
     });
@@ -189,6 +215,9 @@ export function PortableBackupPanel({
             Restore creates a new saved document and independent library copies.
             Existing documents, resources and library items are kept.
           </p>
+          <ResourceCompatibilityPanel required={candidate.bundle.resources}
+            current={candidate.manifest} resources={resources} disabled={busy} />
+          {!reportFresh && <p role="status">Checking current resources…</p>}
           {candidate.report.totalIssues > 0 && (
             <details open>
               <summary>
@@ -215,7 +244,7 @@ export function PortableBackupPanel({
                 type="checkbox"
                 aria-label="Accept missing backup resources"
                 checked={ack}
-                disabled={busy}
+                disabled={busy || !reportFresh || resources.busy}
                 onChange={(event) => setAck(event.target.checked)}
               />
               Keep original data and restore despite these notes
@@ -236,7 +265,7 @@ export function PortableBackupPanel({
             <button
               className="button primary"
               aria-label="Restore portable backup"
-              disabled={busy || (candidate.report.totalIssues > 0 && !ack)}
+              disabled={busy || !reportFresh || resources.busy || (candidate.report.totalIssues > 0 && !ack)}
               onClick={() => void restore()}
             >
               Restore as new
