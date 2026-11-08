@@ -2256,6 +2256,15 @@ export function EditorWorkbench({
                     >
                       Save selection as component
                     </button>
+                    {selectedObjects.length > 0 && selectedObjects.every((object) => object.kind === "component") && (
+                      <button type="button" className="button wide"
+                        aria-label="Make component copies editable" disabled={!loaded}
+                        title="Convert selected copies to editable objects. Library sources and other copies stay unchanged. Ungroup converted groups to edit their members."
+                        onClick={() => {
+                          changeTool("select");
+                          session.makeEditable(scope);
+                        }}>Make editable</button>
+                    )}
                     <button
                       className="button wide danger-button"
                       onClick={() => session.remove(scope)}

@@ -39,6 +39,7 @@ import {
 import {
   componentFromSelection,
   groupObjects,
+  makeComponentsEditable,
   insertObject,
   moveObjects,
   previewTransform,
@@ -975,6 +976,16 @@ export function useEditorSession(
       setError(messageOf(error));
     }
   }
+  function makeEditable(scope: EditorScope) {
+    if (lifecycle.current.has(scope)) return;
+    try {
+      const next = makeComponentsEditable(slots[scope].history.document, slots[scope].selection, catalog);
+      // Ownership changes only; keep every existing state even with Auto connections enabled.
+      commit(scope, next, "Make component copies editable", undefined, { notes: [] });
+    } catch (error) {
+      setError(messageOf(error));
+    }
+  }
   function ungroup(scope: EditorScope) {
     try {
       const before = slots[scope].history.document;
@@ -1585,6 +1596,7 @@ export function useEditorSession(
     place,
     group,
     ungroup,
+    makeEditable,
     remove,
     updateState,
     updateChest,

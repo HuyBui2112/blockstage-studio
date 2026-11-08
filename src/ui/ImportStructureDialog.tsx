@@ -96,7 +96,7 @@ export function ImportStructureDialog({
         </label>
         <p className="backup-note">
           Java Structure NBT · 26.2 / DataVersion 4903 · gzip or uncompressed ·
-          blocks and empty single chests
+          blocks and single chests with basic inventory
         </p>
         {busy && <p role="status">Reading and validating structure…</p>}
         {result && (
@@ -140,7 +140,8 @@ export function ImportStructureDialog({
             No data changes until you confirm.
           </p>
           <p>
-            Unsupported versions, multiple palettes, entities, nonempty chests,
+            Single chests support 27 slots, four supported plain item IDs and stacks 1–64.
+            Unsupported versions, multiple palettes, entities, item components,
             other block-entity payloads and unknown fields are rejected. No conversion or silent
             removal. Input: 16 MiB; decompressed: 32 MiB; 100,000 explicit
             blocks, dimensions at most 2048 each. This is not a .schem,

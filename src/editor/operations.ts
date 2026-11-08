@@ -404,6 +404,24 @@ export function groupObjects(
   }
   return commit(document, result, catalog);
 }
+/** Explicitly release only the selected copy's wrapper; library assets are separate. */
+export function makeComponentsEditable(
+  document: EditorDocument,
+  ids: string[],
+  catalog: Material[],
+): EditorDocument {
+  validateDocument(document, catalog);
+  const objects = selected(document, ids);
+  if (objects.some((object) => object.kind !== "component"))
+    throw new Error("Select only component copies to make editable");
+  const chosen = new Set(ids);
+  return commit(document, document.objects.map((object) => {
+    if (!chosen.has(object.id)) return object;
+    const { componentId: _provenance, ...editable } = object;
+    return { ...editable, kind: object.children.length ? "group" :
+      object.cells.length === 1 ? "block" : "multiblock" };
+  }), catalog);
+}
 export function ungroupObjects(
   document: EditorDocument,
   ids: string[],

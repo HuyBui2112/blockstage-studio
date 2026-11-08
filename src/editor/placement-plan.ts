@@ -98,7 +98,7 @@ function contextState(
     notes.push(
       context === "slab"
         ? "Slab fluids are not simulated; merging is limited to exposed half surfaces of standalone same-ID slabs."
-        : "Stair shape, neighbors and fluids are not simulated.",
+        : "Context derives stair facing and half. Auto connections handles supported stair shapes separately; fluids are not simulated.",
     );
   }
   if (
