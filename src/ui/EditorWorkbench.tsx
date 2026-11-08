@@ -43,6 +43,8 @@ import { MaterialsPanel } from "./MaterialsPanel";
 import { useMaterialActions } from "../editor/useMaterialActions";
 import { useMirrorActions } from "../editor/useMirrorActions";
 import { MirrorActionPanel } from "./MirrorActionPanel";
+import { useWallActions } from "../editor/useWallActions";
+import { WallActionPanel } from "./WallActionPanel";
 import { usePrimitiveActions } from "../editor/usePrimitiveActions";
 import type { PrimitiveKind } from "../editor/primitive-plan";
 import {
@@ -905,6 +907,15 @@ export function EditorWorkbench({
     resourceKey: primitiveResourceKey,
     onCommit: session.commitMirror,
   });
+  const wallActions = useWallActions({
+    document, scope, revision: slot.revision, epoch: slot.epoch,
+    catalog: resources.catalog, state,
+    rules: session.autoConnections[scope] ? resources.profile?.neighborRules : undefined,
+    enabled: !readOnly && session.ready && resources.ready && !session.busy[scope] &&
+      !documentsOpen && !structureImportOpen && !exportSnapshot && libraryTab === "blocks",
+    resourceKey: primitiveResourceKey,
+    onCommit: session.commitWall,
+  });
   function protectionError(
     plan: { document: EditorDocument } | undefined | null,
   ) {
@@ -925,6 +936,7 @@ export function EditorWorkbench({
   }
   const materialPlan = protectedPlan(materialActions.result?.plan);
   const mirrorPlan = protectedPlan(mirrorActions.result?.plan);
+  const wallPlan = protectedPlan(wallActions.result?.plan);
   const selectedStates = useMemo(
     () => selectedCells.map((cell) => cell.state),
     [selectedCells],
@@ -935,7 +947,9 @@ export function EditorWorkbench({
     session.preview?.scope === scope ? session.preview.result : null;
   const ghost = useMemo(
     () =>
-      mirrorActions.active
+      wallActions.active
+        ? wallPlan ? { blocks: wallPlan.cells, valid: true } : undefined
+        : mirrorActions.active
         ? mirrorPlan ? { blocks: mirrorPlan.cells, valid: true } : undefined
         : materialActions.active
         ? materialPlan
@@ -955,6 +969,8 @@ export function EditorWorkbench({
                 ? { blocks: placementPlan.blocks, valid: placementPlan.valid }
                 : undefined,
     [
+      wallActions.active,
+      wallPlan,
       mirrorActions.active,
       mirrorPlan,
       materialActions.active,
@@ -976,6 +992,7 @@ export function EditorWorkbench({
     next: EditorViewportState["tool"],
     focusViewport = true,
   ) => {
+    wallActions.cancel();
     mirrorActions.cancel();
     materialActions.cancel();
     setMaterialsOpen(false);
@@ -1002,6 +1019,19 @@ export function EditorWorkbench({
   const beginMirror = () => {
     changeTool("select");
     mirrorActions.begin();
+    focusCopyCanvas();
+  };
+  const beginWall = () => {
+    changeTool("select");
+    wallActions.begin(placementHit?.pos ?? [0, layer, 0]);
+    focusCopyCanvas();
+  };
+  const completeWall = () => {
+    wallActions.confirm();
+    focusCopyCanvas();
+  };
+  const cancelWall = () => {
+    wallActions.cancel();
     focusCopyCanvas();
   };
   const completeMirror = () => {
@@ -1072,6 +1102,7 @@ export function EditorWorkbench({
         hit,
         { mode: placementMode, turns: placementTurns },
       ).object.cells[0].state;
+      wallActions.cancel();
       mirrorActions.cancel();
       materialActions.cancel();
       setMaterialsOpen(false);
@@ -1092,6 +1123,7 @@ export function EditorWorkbench({
     name: Parameters<EditorViewportState["onCommand"]>[0],
   ) {
     if (!loaded) return;
+    wallActions.cancel();
     mirrorActions.cancel();
     if (slot.entitySelection.length) {
       if (name === "delete" || name === "duplicate") {
@@ -1166,6 +1198,7 @@ export function EditorWorkbench({
           },
           selectableOwners,
           tool:
+            wallActions.active ||
             mirrorActions.active ||
             materialActions.active ||
             primitiveActions.active ||
@@ -1179,13 +1212,14 @@ export function EditorWorkbench({
           localYaw: active?.orientation ?? 0,
           ghost,
           placementSession:
+            wallActions.active?.id ??
             mirrorActions.active?.id ??
             materialActions.active?.id ??
             primitiveActions.active?.id ??
             copyActions.active?.id,
           onTool: changeTool,
           onSelect: (ids, toggle) => session.select(scope, ids, toggle),
-          onPlace: mirrorActions.active || materialActions.active
+          onPlace: wallActions.active || mirrorActions.active || materialActions.active
             ? noop
             : primitiveActions.active
               ? regionPlacement
@@ -1197,6 +1231,7 @@ export function EditorWorkbench({
           onPlacementRegionStart:
             tool === "place" &&
             libraryTab === "blocks" &&
+            !wallActions.active &&
             !mirrorActions.active &&
             !materialActions.active &&
             !primitiveActions.active &&
@@ -1211,7 +1246,7 @@ export function EditorWorkbench({
             setRegionDragging(false);
             if (cancel) changeTool("select");
           },
-          onPlacementHover: mirrorActions.active || materialActions.active
+          onPlacementHover: wallActions.active || mirrorActions.active || materialActions.active
             ? noop
             : primitiveActions.active
               ? regionPlacement
@@ -1225,13 +1260,16 @@ export function EditorWorkbench({
                   }
                 : setPlacementHit,
           onPlacementRotate:
+            wallActions.active ||
             mirrorActions.active ||
             materialActions.active ||
             primitiveActions.active ||
             copyActions.active
               ? noop
               : rotatePlacement,
-          onPlacementConfirm: mirrorActions.active
+          onPlacementConfirm: wallActions.active
+            ? completeWall
+            : mirrorActions.active
             ? completeMirror
             : materialActions.active
             ? () => {
@@ -1300,7 +1338,7 @@ export function EditorWorkbench({
   ];
   return (
     <div
-      className={`editor-workspace${materialsOpen || mirrorActions.active || materialActions.active || copyActions.active || (primitiveActions.active && !regionDragging) ? " copying" : ""}${!libraryOpen || readOnly ? " library-hidden" : ""}${!inspectorOpen || readOnly ? " inspector-hidden" : ""}`}
+      className={`editor-workspace${materialsOpen || wallActions.active || mirrorActions.active || materialActions.active || copyActions.active || (primitiveActions.active && !regionDragging) ? " copying" : ""}${!libraryOpen || readOnly ? " library-hidden" : ""}${!inspectorOpen || readOnly ? " inspector-hidden" : ""}`}
       data-region-dragging={regionDragging}
       data-editor-scope={scope}
       data-editor-ready={loaded}
@@ -1537,6 +1575,7 @@ export function EditorWorkbench({
                   hasClipboard={!!session.clipboard}
                   onAction={(action) => {
                     if (action === "copy") {
+                      wallActions.cancel();
                       mirrorActions.cancel();
                       materialActions.cancel();
                       setMaterialsOpen(false);
@@ -1553,6 +1592,7 @@ export function EditorWorkbench({
                 <PrimitiveActionMenu
                   enabled={loaded && libraryTab === "blocks"}
                   onAction={beginPrimitive}
+                  onWall={beginWall}
                 />
               )}
               {!readOnly && (
@@ -1751,6 +1791,7 @@ export function EditorWorkbench({
                   ""
                 }
                 onBegin={(intent) => {
+                  wallActions.cancel();
                   mirrorActions.cancel();
                   primitiveActions.cancel();
                   copyActions.cancel();
@@ -1772,6 +1813,19 @@ export function EditorWorkbench({
                   setMaterialsOpen(false);
                   focusCopyCanvas();
                 }}
+              />
+            )}
+            {wallActions.active && (
+              <WallActionPanel
+                key={wallActions.active.id}
+                intent={wallActions.active.intent}
+                onChange={wallActions.change}
+                valid={!!wallPlan}
+                error={protectionError(wallActions.result?.plan) || wallActions.result?.error || ""}
+                cells={wallPlan?.cost.addedCells ?? 0}
+                notes={wallPlan?.notes ?? []}
+                onCommit={completeWall}
+                onCancel={cancelWall}
               />
             )}
             {mirrorActions.active && (
@@ -1914,7 +1968,7 @@ export function EditorWorkbench({
                 Z
               </button>
             </div>
-            {!mirrorActions.active && !primitiveActions.active && tool === "place" && placementPlan && (
+            {!wallActions.active && !mirrorActions.active && !primitiveActions.active && tool === "place" && placementPlan && (
               <div
                 className={`placement-hud ${placementPlan.valid ? "valid" : "invalid"}`}
                 role="status"
@@ -2382,6 +2436,11 @@ export function EditorWorkbench({
         data-snapshot={mirrorPlan ? JSON.stringify({
           cells: mirrorPlan.cells.slice(0, 64), selection: mirrorPlan.selection,
           intent: mirrorPlan.intent, notes: mirrorPlan.notes,
+        }) : ""} />
+      <output hidden className="wall-action-diagnostics" data-valid={!!wallPlan}
+        data-snapshot={wallPlan ? JSON.stringify({
+          cells: wallPlan.cells.slice(0, 64), selection: wallPlan.selection,
+          addedCells: wallPlan.cost.addedCells, notes: wallPlan.notes,
         }) : ""} />
       <output
         hidden

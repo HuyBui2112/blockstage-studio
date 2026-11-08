@@ -78,6 +78,7 @@ import {
   type MaterialReplacementPlan,
 } from "./material-plan";
 import { applyMirrorPlan, type MirrorPlan } from "./mirror-plan";
+import { applyWallPlan, type WallPlan } from "./wall-plan";
 import { measurePhase } from "../core/measurement-phases";
 import { createTransformPreviewController } from "./transform-preview-controller";
 import { duplicateComponentAsset, renameComponentAsset, setComponentCategory } from "./component-library-operations";
@@ -803,6 +804,24 @@ export function useEditorSession(
         revision: slot.revision,
       }, catalog, autoConnections[scope] ? neighborRules : undefined);
       commit(scope, next, "Mirror objects", plan.selection, { notes: plan.notes });
+      return true;
+    } catch (error) {
+      setError(messageOf(error));
+      return false;
+    }
+  }
+  function commitWall(scope: EditorScope, plan: WallPlan) {
+    if (lifecycle.current.has(scope)) return false;
+    try {
+      if (plan.source.workspace !== scope)
+        throw new Error("Wall plan belongs to another workspace");
+      const slot = currentSlots.current[scope];
+      const next = applyWallPlan(plan, slot.history.document, {
+        documentId: slot.history.document.id,
+        sessionEpoch: slot.epoch,
+        revision: slot.revision,
+      }, catalog, autoConnections[scope] ? neighborRules : undefined);
+      commit(scope, next, "Build wall", plan.selection, { notes: plan.notes });
       return true;
     } catch (error) {
       setError(messageOf(error));
@@ -1535,6 +1554,7 @@ export function useEditorSession(
     commitPrimitive,
     commitMaterial,
     commitMirror,
+    commitWall,
     importStructure,
     restorePortable,
     draftStatus,

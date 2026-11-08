@@ -18,9 +18,11 @@ const axes = ["X", "Y", "Z"] as const;
 export function PrimitiveActionMenu({
   enabled,
   onAction,
+  onWall,
 }: {
   enabled: boolean;
   onAction: (kind: PrimitiveKind) => void;
+  onWall: () => void;
 }) {
   return (
     <details className="copy-action-menu primitive-action-menu">
@@ -45,6 +47,11 @@ export function PrimitiveActionMenu({
             {titles[kind]}
           </button>
         ))}
+        <button type="button" disabled={!enabled} aria-label="Build wall with openings"
+          onClick={(event) => {
+            event.currentTarget.closest("details")?.removeAttribute("open");
+            onWall();
+          }}>Wall with openings</button>
       </div>
     </details>
   );
