@@ -95,6 +95,11 @@ type Props = {
   command?: ViewCommand;
   frameKey?: string;
   previewMode?: boolean;
+  /** One-shot preview capture. Keep this request immutable until its callback. */
+  thumbnailCapture?: {
+    id: string;
+    onCapture: (blob: Blob | null, error?: string) => void;
+  };
   onMetrics?: (metrics: RenderMetrics) => void;
   resolver?: ModelResolver;
   editor?: EditorViewportState;
@@ -150,6 +155,7 @@ class ViewportController {
   animations: TextureAnimation[] = [];
   diagnosticsKey = "";
   metricsKey = "";
+  capturedThumbnailId: string | null = null;
   placementHoverKey = "";
   placementPointer: [number, number] | null = null;
   placementCameraKey = "";
@@ -352,6 +358,7 @@ class ViewportController {
     if (this.renderer.domElement.dataset.projection !== projection)
       this.renderer.domElement.dataset.projection = projection;
     this.renderer.render(this.scene, this.camera);
+    if (this.props.previewMode && this.props.thumbnailCapture) this.captureThumbnail();
     if (this.props.editor) {
       const cameraData = JSON.stringify({
         projection: new T.Matrix4()
@@ -392,6 +399,50 @@ class ViewportController {
       }
     }
   };
+  /** Copy the just-rendered WebGL buffer synchronously; encode only the small 2D copy. */
+  captureThumbnail() {
+    const request = this.props.thumbnailCapture;
+    if (!request || !request.id || !this.props.previewMode ||
+      this.capturedThumbnailId === request.id || this.textureImages.pendingCount > 0)
+      return;
+    this.capturedThumbnailId = request.id;
+    const props = this.props;
+    const current = () => !this.disposed && !this.contextLifecycle?.lost &&
+      this.props.previewMode && this.props.thumbnailCapture === request &&
+      this.props.blocks === props.blocks && this.props.packs === props.packs &&
+      this.props.profile === props.profile && this.props.catalog === props.catalog &&
+      this.props.resolver === props.resolver;
+    const finish = (blob: Blob | null, error?: string) => {
+      if (current()) request.onCapture(blob, error);
+    };
+    if (this.textureImages.failedCount > 0) {
+      finish(null, "One or more textures could not be decoded. No thumbnail was saved.");
+      return;
+    }
+    try {
+      const source = this.renderer.domElement;
+      if (!source.width || !source.height) {
+        finish(null, "The preview has no drawable size.");
+        return;
+      }
+      const canvas = document.createElement("canvas");
+      canvas.width = 192;
+      canvas.height = 144;
+      const context = canvas.getContext("2d");
+      if (!context) {
+        finish(null, "Thumbnail image encoding is unavailable.");
+        return;
+      }
+      context.fillStyle = "#232321";
+      context.fillRect(0, 0, canvas.width, canvas.height);
+      const scale = Math.min(canvas.width / source.width, canvas.height / source.height);
+      const width = source.width * scale, height = source.height * scale;
+      context.drawImage(source, (canvas.width - width) / 2, (canvas.height - height) / 2, width, height);
+      canvas.toBlob((blob) => finish(blob, blob ? undefined : "Thumbnail image encoding failed."), "image/png");
+    } catch (error) {
+      finish(null, error instanceof Error ? error.message : "Thumbnail capture failed.");
+    }
+  }
   disposeMeshes(clearCaches = true) {
     this.blockScene.clear();
     this.entityMeshes = [];
@@ -438,7 +489,10 @@ class ViewportController {
     const texture = this.textureImages.load(
       bytes,
       () => this.invalidate(),
-      () => this.props.onMessage(`Could not decode texture: ${path}`),
+      () => {
+        this.props.onMessage(`Could not decode texture: ${path}`);
+        this.invalidate();
+      },
     );
     texture.magFilter = T.NearestFilter;
     texture.minFilter = T.NearestFilter;
@@ -1251,9 +1305,15 @@ class ViewportController {
       .sub(this.controls.target)
       .normalize();
     this.controls.target.copy(center);
+    let distance = Math.max(...size) * 2 + 2;
+    if (this.props.previewMode && this.props.thumbnailCapture && this.camera instanceof T.PerspectiveCamera) {
+      const halfFov = T.MathUtils.degToRad(this.camera.fov / 2);
+      const limitingAngle = Math.min(halfFov, Math.atan(Math.tan(halfFov) * this.camera.aspect));
+      distance = new T.Vector3(...size).length() * 0.55 / Math.sin(limitingAngle);
+    }
     this.camera.position
       .copy(center)
-      .addScaledVector(direction, Math.max(...size) * 2 + 2);
+      .addScaledVector(direction, distance);
     if (this.camera instanceof T.OrthographicCamera) {
       this.camera.zoom = 1;
       this.camera.top = Math.max(...size);
@@ -1459,6 +1519,8 @@ class ViewportController {
     return measurePhase("viewport.props", () => this.updateInner(props));
   }
   updateInner(props: Props) {
+    const captureChanged = props.thumbnailCapture !== this.props.thumbnailCapture ||
+      props.previewMode !== this.props.previewMode;
     const resourcesChanged =
       props.packs !== this.props.packs ||
       props.profile !== this.props.profile ||
@@ -1527,6 +1589,7 @@ class ViewportController {
     }
     if (frame) this.frameBlocks(false);
     if (command) this.command(command.kind);
+    if (captureChanged && props.previewMode && props.thumbnailCapture) this.invalidate();
   }
   dispose() {
     this.releaseMeasurement?.();
@@ -1590,6 +1653,7 @@ export function Viewport(props: Props) {
       setError(
         "Could not start WebGL2. Enable graphics acceleration in your browser.",
       );
+      if (props.previewMode) props.thumbnailCapture?.onCapture(null, "Could not start WebGL2 for thumbnail rendering.");
     }
     return () => {
       view.current?.dispose();

@@ -3,6 +3,10 @@ import { Texture } from "three";
 /** Own image requests as well as textures: cache disposal cancels pending decodes. */
 export class TextureImages {
   private pending = new Set<() => void>();
+  private failures = 0;
+
+  get pendingCount(): number { return this.pending.size; }
+  get failedCount(): number { return this.failures; }
 
   load(bytes: Uint8Array, onLoad: () => void, onError: () => void): Texture {
     const texture = new Texture();
@@ -28,6 +32,7 @@ export class TextureImages {
     const failed = () => {
       if (!active) return;
       finish();
+      this.failures++;
       onError();
     };
     const cancel = () => {
@@ -44,5 +49,6 @@ export class TextureImages {
 
   clear() {
     for (const cancel of this.pending) cancel();
+    this.failures = 0;
   }
 }

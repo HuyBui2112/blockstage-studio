@@ -12,6 +12,8 @@ import { Icon } from "./Icon";
 import "./ComponentLibrary.css";
 import type { ResourceSession } from "../resources/useResources";
 import { ComponentPreviewDialog } from "./ComponentPreviewDialog";
+import { ComponentThumbnail, ComponentThumbnailRenderer } from "./ComponentThumbnail";
+import { useComponentThumbnails } from "./useComponentThumbnails";
 
 type Props = {
   assets: ComponentAsset[];
@@ -64,7 +66,9 @@ export function ComponentLibrary({
     () => queryComponentCatalogue(entries, query, sort, category),
     [entries, query, sort, category],
   );
-  const shown = results.slice(0, limit);
+  const shown = useMemo(() => results.slice(0, limit), [results, limit]);
+  const shownAssets = useMemo(() => shown.map((entry) => entry.asset), [shown]);
+  const thumbnails = useComponentThumbnails(shownAssets, resources);
   const changeQuery = (value: string) => {
     setQuery(value);
     setLimit(PAGE_SIZE);
@@ -167,7 +171,7 @@ export function ComponentLibrary({
               aria-pressed={selected === asset.id}
               onClick={() => onSelect(asset)}
             >
-              <Icon name="blocks" size={24} />
+              <ComponentThumbnail asset={asset} entry={thumbnails.entries.find((entry) => entry.asset === asset)} onVisibility={thumbnails.onVisibility} />
               <span>
                 <strong>{asset.name}</strong>
                 <small>{asset.size.join(" × ")} blocks</small>
@@ -314,6 +318,9 @@ export function ComponentLibrary({
       </label>
       {preview && <ComponentPreviewDialog key={preview.id} asset={preview} resources={resources}
         onClose={() => setPreviewId(null)} onResources={() => { setPreviewId(null); onResources(); }} />}
+      {!preview && thumbnails.job && <ComponentThumbnailRenderer key={thumbnails.job.requestId}
+        entry={thumbnails.job} resources={resources}
+        onCapture={(blob, error) => void thumbnails.complete(thumbnails.job!, blob, error)} />}
     </>
   );
 }

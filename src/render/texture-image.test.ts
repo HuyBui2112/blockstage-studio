@@ -65,8 +65,12 @@ describe("texture image lifetime", () => {
       loaded = vi.fn(),
       failed = vi.fn();
     const texture = loader.load(new Uint8Array([0]), loaded, failed);
+    expect(loader.pendingCount).toBe(1);
     TestImage.instances[0].dispatchEvent(new Event("error"));
+    expect(loader.pendingCount).toBe(0);
+    expect(loader.failedCount).toBe(1);
     loader.clear();
+    expect(loader.failedCount).toBe(0);
     expect(failed).toHaveBeenCalledOnce();
     expect(loaded).not.toHaveBeenCalled();
     expect(texture.version).toBe(0);
