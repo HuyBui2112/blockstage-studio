@@ -58,3 +58,35 @@
   color: var(--danger, #ffb4ab);
   font-size: 11px;
 }
+.component-preview-dialog {
+  width: min(880px, calc(100vw - 28px));
+  max-height: calc(100dvh - 28px);
+}
+.component-preview-content {
+  padding: 16px;
+  overflow: auto;
+  min-height: 0;
+}
+.component-preview-heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  font-size: 11px;
+  margin-bottom: 12px;
+}
+.component-preview-heading strong { overflow-wrap: anywhere; }
+.component-preview-heading [role="status"] { color: var(--muted); }
+.component-preview-heading button { margin-left: auto; }
+.component-preview-canvas {
+  height: min(420px, 48dvh);
+  min-height: 160px;
+  position: relative;
+  background: #1b1d1f;
+  border: 1px solid var(--border);
+}
+.component-preview-canvas > .viewport { position: absolute; inset: 0; }
+.component-preview-content > small { display: block; color: var(--muted); margin-top: 10px; font-size: 10px; }
+.component-preview-issues { margin-top: 12px; font-size: 11px; }
+.component-preview-issues ul { max-height: 140px; overflow: auto; overflow-wrap: anywhere; padding-left: 18px; }
+.component-asset-actions { flex-wrap: wrap; }

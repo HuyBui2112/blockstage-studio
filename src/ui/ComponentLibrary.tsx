@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   indexComponentCatalogue,
   COMPONENT_CATEGORIES,
@@ -10,6 +10,8 @@ import type { ComponentAsset, ComponentCategory } from "../editor/model";
 import { download } from "../io/storage";
 import { Icon } from "./Icon";
 import "./ComponentLibrary.css";
+import type { ResourceSession } from "../resources/useResources";
+import { ComponentPreviewDialog } from "./ComponentPreviewDialog";
 
 type Props = {
   assets: ComponentAsset[];
@@ -21,6 +23,8 @@ type Props = {
   onRename: (id: string, name: string) => Promise<boolean>;
   onDuplicate: (id: string) => Promise<boolean>;
   onCategory: (id: string, category: ComponentCategory) => Promise<boolean>;
+  resources: ResourceSession;
+  onResources: () => void;
 };
 const PAGE_SIZE = 24;
 
@@ -34,7 +38,18 @@ export function ComponentLibrary({
   onRename,
   onDuplicate,
   onCategory,
+  resources,
+  onResources,
 }: Props) {
+  const [previewId, setPreviewId] = useState<string | null>(null);
+  const preview = assets.find((asset) => asset.id === previewId);
+  const previewTrigger = useRef<HTMLButtonElement | null>(null);
+  useEffect(() => {
+    if (!preview && previewTrigger.current) {
+      if (previewTrigger.current.isConnected) previewTrigger.current.focus();
+      previewTrigger.current = null;
+    }
+  }, [preview]);
   const [renaming, setRenaming] = useState<string | null>(null);
   const [name, setName] = useState("");
   const [pending, setPending] = useState(false);
@@ -44,6 +59,7 @@ export function ComponentLibrary({
   const [category, setCategory] = useState<ComponentCategory | "all">("all");
   const [limit, setLimit] = useState(PAGE_SIZE);
   const entries = useMemo(() => indexComponentCatalogue(assets), [assets]);
+  const registryIds = useMemo(() => new Set(resources.catalog.map((material) => material.id)), [resources.catalog]);
   const results = useMemo(
     () => queryComponentCatalogue(entries, query, sort, category),
     [entries, query, sort, category],
@@ -140,7 +156,7 @@ export function ComponentLibrary({
       </div>
       <div className="component-assets">
         {error && <div className="component-library-error" role="alert">{error}</div>}
-        {shown.map(({ asset, cells }) => (
+        {shown.map(({ asset, cells, blockIds }) => (
           <article
             className={`component-asset${selected === asset.id ? " chosen" : ""}`}
             data-component-id={asset.id}
@@ -158,6 +174,7 @@ export function ComponentLibrary({
                 <small title="Stored block cells, including explicit air; not a survival item count">
                   {cells.toLocaleString()} {cells === 1 ? "cell" : "cells"}
                 </small>
+                {blockIds.some((id) => !registryIds.has(id)) && <small>Missing registry entries · check Preview</small>}
               </span>
             </button>
             <label className="component-category">
@@ -205,6 +222,11 @@ export function ComponentLibrary({
             )}
             <div className="component-asset-actions">
               <button onClick={() => onEdit(asset)}>Edit</button>
+              <button type="button" aria-label={`Preview component ${asset.name}`}
+                disabled={pending} onClick={(event) => {
+                  previewTrigger.current = event.currentTarget;
+                  setPreviewId(asset.id);
+                }}>Preview</button>
               <button
                 aria-label={`Rename component ${asset.name}`}
                 title="Rename component"
@@ -290,6 +312,8 @@ export function ComponentLibrary({
           }}
         />
       </label>
+      {preview && <ComponentPreviewDialog key={preview.id} asset={preview} resources={resources}
+        onClose={() => setPreviewId(null)} onResources={() => { setPreviewId(null); onResources(); }} />}
     </>
   );
 }

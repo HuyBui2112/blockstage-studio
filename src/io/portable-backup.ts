@@ -9,28 +9,12 @@ import {
 import type { GameProfile } from "../core/profile";
 import { validateState, type Material } from "../core/catalog";
 import { orderedPacks, type ResourcePack } from "./resources";
+import { resourceManifestSchema as manifestSchema } from "../core/resource-manifest";
+export type { ResourceManifest } from "../core/resource-manifest";
+import type { ResourceManifest } from "../core/resource-manifest";
+import { compareResourceManifest } from "../resources/compatibility";
 
 export const PORTABLE_MAX_BYTES = 32 * 1024 ** 2;
-const hash = z.string().regex(/^[a-f0-9]{64}$/);
-const packSchema = z
-  .object({
-    name: z.string().min(1).max(240),
-    fingerprint: hash.nullable(),
-    source: z.enum(["client", "resource", "unknown"]),
-    enabled: z.boolean(),
-  })
-  .strict();
-const manifestSchema = z
-  .object({
-    profile: z
-      .object({ sourceSha1: z.string().regex(/^[a-f0-9]{40}$/), sha256: hash })
-      .strict()
-      .nullable(),
-    packs: z.array(packSchema).max(256),
-    adapter: z.literal("blockstage-editor-v2-copy"),
-  })
-  .strict();
-export type ResourceManifest = z.infer<typeof manifestSchema>;
 const bundleSchema = z
   .object({
     format: z.literal("blockstage-portable"),
@@ -80,6 +64,8 @@ function boundInput(value: unknown) {
         stack.push({ value: item, depth: entry.depth + 1 });
     } else
       for (const [key, item] of Object.entries(entry.value)) {
+        if (key === "packs" && Array.isArray(item) && item.length > 256)
+          throw new Error("Resource manifest exceeds 256 packs");
         if (key === "cells" && Array.isArray(item)) cells += item.length;
         if (key === "objects" && Array.isArray(item)) objects += item.length;
         if (key === "children" && Array.isArray(item)) objects += item.length;
@@ -216,6 +202,15 @@ export function reportPortableBackup(
   for (const asset of bundle.components) walk(asset.objects, inspect);
   if (!wanted.length)
     issue("No enabled resource packs were recorded; appearance is unverified.");
+  if (bundle.document.resources) {
+    const recorded = compareResourceManifest(bundle.document.resources, current);
+    if (recorded.profile !== "matched")
+      issue(`Recorded document profile: ${recorded.profile}. The original resource record is preserved.`);
+    for (const pack of recorded.packs)
+      if (pack.status !== "matched") issue(`Recorded document pack ${pack.name}: ${pack.status}.`);
+    if (!recorded.orderMatches)
+      issue("Recorded document resource order/content differs; restore preserves its original resource record.");
+  }
   return {
     issues,
     totalIssues,
@@ -258,6 +253,7 @@ export function planPortableRestore(
     }));
   const document = {
     ...bundle.document,
+    resources: bundle.document.resources ?? bundle.resources,
     id: fresh(),
     objects: remap(bundle.document.objects),
     entities: bundle.document.entities.map((entity) => ({

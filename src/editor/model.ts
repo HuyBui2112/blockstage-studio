@@ -13,6 +13,7 @@ import { instantiate } from "../core/assembly";
 import { createStateValidator, type Material } from "../core/catalog";
 import { logicalCellGroups, validateLogicalFootprints } from "./placement";
 import { measurePhase } from "../core/measurement-phases";
+import { resourceManifestSchema, type ResourceManifest } from "../core/resource-manifest";
 
 export type QuarterTurn = 0 | 1 | 2 | 3;
 export type PivotMode = "active" | "selection" | "individual";
@@ -35,6 +36,7 @@ export type EditorDocument = {
   target: { gameVersion: "26.2"; dataVersion: 4903 };
   objects: EditorObject[];
   entities: SceneEntity[];
+  resources?: ResourceManifest;
 };
 export type ComponentAsset = {
   schemaVersion: 1;
@@ -186,6 +188,7 @@ export const editorDocumentSchema: z.ZodType<EditorDocument> = z
       .strict(),
     objects: objectsSchema,
     entities: z.array(entitySchema).max(1000),
+    resources: resourceManifestSchema.optional(),
   })
   .strict()
   .superRefine((document, context) => {

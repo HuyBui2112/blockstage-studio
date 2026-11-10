@@ -1,4 +1,4 @@
-import type { ResourceManifest } from "../io/portable-backup";
+import type { ResourceManifest } from "../core/resource-manifest";
 
 export type ResourceCompatibility = {
   profile: "matched" | "missing" | "different" | "unrecorded";

@@ -10,6 +10,8 @@ import "./documents.css";
 import { RecoveryList, type RecoveryProps } from "./RecoveryList";
 import { StorageHealthPanel } from "./StorageHealthPanel";
 import { PortableBackupPanel, type BackupProps } from "./PortableBackupPanel";
+import { DocumentResourcesPanel } from "./DocumentResourcesPanel";
+import type { ResourceManifest } from "../core/resource-manifest";
 
 type Props = RecoveryProps &
   Pick<BackupProps, "components" | "resources" | "onRestoreBackup"> & {
@@ -32,6 +34,7 @@ type Props = RecoveryProps &
     onClose: () => void;
     recoveryCount: number;
     initialRecovery?: boolean;
+    onRecordResources: (current: EditorDocument, resources: ResourceManifest) => boolean;
   };
 type Pending =
   | {
@@ -62,6 +65,7 @@ export function DocumentManager({
   components,
   resources,
   onRestoreBackup,
+  onRecordResources,
   ...recovery
 }: Props) {
   const [records, setRecords] = useState<StoredEditorDocument[]>([]);
@@ -73,7 +77,7 @@ export function DocumentManager({
   const [limit, setLimit] = useState(40);
   const [pending, setPending] = useState<Pending | null>(null);
   const [name, setName] = useState("");
-  const [tab, setTab] = useState<"saved" | "recovery" | "storage" | "backup">(
+  const [tab, setTab] = useState<"saved" | "recovery" | "storage" | "backup" | "resources">(
     initialRecovery ? "recovery" : "saved",
   );
   const confirmation = useRef<HTMLElement>(null);
@@ -231,8 +235,14 @@ export function DocumentManager({
           >
             Backup
           </button>
+          <button aria-label="Document resources tab" disabled={working}
+            className={tab === "resources" ? "active" : ""}
+            onClick={() => setTab("resources")}>Resources</button>
         </nav>
-        {tab === "backup" ? (
+        {tab === "resources" ? (
+          <DocumentResourcesPanel document={document} resources={resources}
+            onRecord={onRecordResources} disabled={working} />
+        ) : tab === "backup" ? (
           <PortableBackupPanel
             document={document}
             components={components}

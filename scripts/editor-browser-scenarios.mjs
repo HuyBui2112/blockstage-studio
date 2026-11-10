@@ -30,6 +30,8 @@ import { runBuildingToolsScenarios } from "./building-tools-browser-scenarios.mj
 import { runMirrorScenarios } from "./mirror-browser-scenarios.mjs";
 import { runWallScenarios } from "./wall-browser-scenarios.mjs";
 import { runMakeEditableScenarios } from "./make-editable-browser-scenarios.mjs";
+import { runDocumentResourcesScenarios } from "./document-resources-browser-scenarios.mjs";
+import { runComponentPreviewScenarios } from "./component-preview-browser-scenarios.mjs";
 
 /** Real input integration scenarios, called by the existing isolated-browser harness. */
 export async function runEditorScenarios({
@@ -46,6 +48,10 @@ export async function runEditorScenarios({
   profilePath,
   createPeer,
 }) {
+  if (process.env.BLOCKSTAGE_EDITOR_SLICE === "component-preview")
+    return runComponentPreviewScenarios({command,evaluate,until,click,aria,input,upload,key,screenshot,directory});
+  if (process.env.BLOCKSTAGE_EDITOR_SLICE === "document-resources")
+    return runDocumentResourcesScenarios({command,evaluate,until,click,aria,input,upload,key,screenshot,directory});
   if (process.env.BLOCKSTAGE_EDITOR_SLICE === "make-editable")
     return runMakeEditableScenarios({command,evaluate,until,click,aria,input,upload,key,screenshot,directory});
   if (process.env.BLOCKSTAGE_EDITOR_SLICE === "wall")
@@ -1143,6 +1149,8 @@ export async function runEditorScenarios({
   await runMirrorScenarios({ command, evaluate, until, click, aria, input, upload, key, screenshot, directory, profilePath });
   await runWallScenarios({ command, evaluate, until, click, aria, input, upload, key, screenshot, directory });
   await runMakeEditableScenarios({ command, evaluate, until, click, aria, input, upload, key, screenshot, directory });
+  await runDocumentResourcesScenarios({ command, evaluate, until, click, aria, input, upload, key, screenshot, directory });
+  await runComponentPreviewScenarios({ command, evaluate, until, click, aria, input, upload, key, screenshot, directory });
   await runDataSafetyScenarios({
     command,
     evaluate,

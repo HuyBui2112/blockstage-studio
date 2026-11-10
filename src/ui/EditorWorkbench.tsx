@@ -1290,6 +1290,7 @@ export function EditorWorkbench({
           onCommand: editorCommand,
         };
   function saveShortcut(event: KeyboardEvent) {
+    if (event.target instanceof Element && event.target.closest(".component-preview-dialog")) return;
     if (exportSnapshot || documentsOpen || structureImportOpen) return;
     if (
       stagedEntity &&
@@ -1543,6 +1544,8 @@ export function EditorWorkbench({
             ) : (
               <ComponentLibrary
                 assets={session.components}
+                resources={resources}
+                onResources={onResources}
                 selected={componentId}
                 onSelect={(component) => {
                   setComponentId(component.id);
@@ -2377,6 +2380,7 @@ export function EditorWorkbench({
             components={session.components}
             resources={resources}
             onRestoreBackup={session.restorePortable}
+            onRecordResources={(current, manifest) => session.recordResources(scope, current, manifest)}
             key={scope}
             document={document}
             saved={slot.saved}

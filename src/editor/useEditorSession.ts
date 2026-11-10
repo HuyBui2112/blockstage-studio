@@ -80,6 +80,7 @@ import {
 } from "./material-plan";
 import { applyMirrorPlan, type MirrorPlan } from "./mirror-plan";
 import { applyWallPlan, type WallPlan } from "./wall-plan";
+import type { ResourceManifest } from "../core/resource-manifest";
 import { measurePhase } from "../core/measurement-phases";
 import { createTransformPreviewController } from "./transform-preview-controller";
 import { duplicateComponentAsset, renameComponentAsset, setComponentCategory } from "./component-library-operations";
@@ -1050,6 +1051,19 @@ export function useEditorSession(
       ),
     );
   }
+  function recordResources(scope: EditorScope, current: EditorDocument, resources: ResourceManifest) {
+    if (lifecycle.current.has(scope)) return false;
+    try {
+      if (currentSlots.current[scope].history.document !== current)
+        throw new Error("The document changed. Review its resources again.");
+      const next = editorDocumentSchema.parse({ ...current, resources });
+      commit(scope, next, "Record document resources", undefined, { notes: [] });
+      return true;
+    } catch (error) {
+      setError(messageOf(error));
+      return false;
+    }
+  }
   function rename(scope: EditorScope, name: string) {
     perform(scope, "Rename document", (document) => ({
       ...document,
@@ -1604,6 +1618,7 @@ export function useEditorSession(
     move,
     rotate,
     rename,
+    recordResources,
     save,
     newDocument,
     open,
