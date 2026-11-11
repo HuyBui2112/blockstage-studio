@@ -612,7 +612,7 @@ export function EditorWorkbench({
     return candidates.filter((entity) => resolve(entity).drawn);
   }, [stagedEntity, document.entities, viewState]);
   const occupied = useMemo(
-    () => new Set(blocks.map((block) => block.pos.join(","))),
+    () => new Map(blocks.map((block) => [block.pos.join(","), block])),
     [blocks],
   );
   const materials = useMemo(
@@ -671,6 +671,7 @@ export function EditorWorkbench({
             { mode: placementMode, turns: placementTurns },
             document.objects.find((root) => root.kind === "block" && root.cells.length === 1 &&
               placementHit.target && root.cells[0].pos.every((value, axis) => value === placementHit.target![axis])),
+            occupied,
           );
       const replaceObjectId = "replaceObjectId" in plan ? plan.replaceObjectId : undefined;
       const candidateDocument = { ...document, objects: replaceObjectId

@@ -15,7 +15,7 @@ export async function runPlacementScenarios({ command, evaluate, until, click, a
   const snapshot = () => evaluate(`JSON.parse(document.querySelector('.editor-diagnostics').dataset.snapshot)`)
   const history = () => evaluate(`document.querySelector('.editor-diagnostics').dataset.history`)
   const ghost = () => evaluate(`JSON.parse(document.querySelector('.editor-placement-diagnostics').dataset.snapshot)`)
-  const focus = () => evaluate(`document.querySelector('canvas').focus()`)
+  const focus = () => evaluate(`document.querySelector('.editor-workspace canvas[data-editor-camera]').focus()`)
   async function importDocument(document) {
     const file = join(directory, `${document.id}.json`)
     await writeFile(file, JSON.stringify(document))
@@ -30,7 +30,7 @@ export async function runPlacementScenarios({ command, evaluate, until, click, a
   }
   async function point(world) {
     await evaluate('new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))')
-    return evaluate(`(() => {const m=JSON.parse(document.querySelector('canvas').dataset.editorCamera).projection,p=${JSON.stringify(world)},q=[0,0,0,0];for(let r=0;r<4;r++)q[r]=m[r]*p[0]+m[4+r]*p[1]+m[8+r]*p[2]+m[12+r];const b=document.querySelector('canvas').getBoundingClientRect();return {x:b.x+(q[0]/q[3]+1)*b.width/2,y:b.y+(1-q[1]/q[3])*b.height/2};})()`)
+    return evaluate(`(() => {const canvas=document.querySelector('.editor-workspace canvas[data-editor-camera]'),m=JSON.parse(canvas.dataset.editorCamera).projection,p=${JSON.stringify(world)},q=[0,0,0,0];for(let r=0;r<4;r++)q[r]=m[r]*p[0]+m[4+r]*p[1]+m[8+r]*p[2]+m[12+r];const b=canvas.getBoundingClientRect();return {x:b.x+(q[0]/q[3]+1)*b.width/2,y:b.y+(1-q[1]/q[3])*b.height/2};})()`)
   }
   async function hover(world) {
     const position = await point(world)
@@ -135,7 +135,7 @@ export async function runPlacementScenarios({ command, evaluate, until, click, a
   await command('Input.dispatchMouseEvent', { type: 'mouseMoved', x: 1, y: 1 })
   await delay(500)
   const animationBefore = await snapshot(), animationHistory = await history()
-  const clip = await evaluate(`(() => {const r=document.querySelector('canvas').getBoundingClientRect();return {x:r.x+2,y:r.y+2,width:r.width-4,height:r.height-4,scale:1}})()`)
+  const clip = await evaluate(`(() => {const r=document.querySelector('.editor-workspace canvas[data-editor-camera]').getBoundingClientRect();return {x:r.x+2,y:r.y+2,width:r.width-4,height:r.height-4,scale:1}})()`)
   const frames = new Set()
   for (let frame = 0; frame < 4; frame++) {
     frames.add((await command('Page.captureScreenshot', { format: 'png', clip })).data)
@@ -187,7 +187,7 @@ export async function runPlacementScenarios({ command, evaluate, until, click, a
   assert.equal(await history(), beforeYawHistory)
   await screenshot('editor-context-placement')
   await key('Escape', 'Escape')
-  await until(`document.querySelector('canvas').dataset.editorTool === 'select'`)
+  await until(`document.querySelector('.editor-workspace canvas[data-editor-camera]').dataset.editorTool === 'select'`)
   assert.equal(await history(), beforeYawHistory)
   // Unsupported context preserves the palette state with an honest detail.
   await palette('glass'); await hover([.5, .75, 0])

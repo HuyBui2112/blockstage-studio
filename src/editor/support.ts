@@ -1,5 +1,5 @@
 import { validateState, type Material } from "../core/catalog";
-import { key, type Block, type Vec3 } from "../core/schema";
+import { key, type Block, type BlockState, type Vec3 } from "../core/schema";
 import { blockAdapter, CONTEXT_CHAIN_IDS, WOOD_TYPES } from "../core/adapter-registry";
 
 export type SupportIssue = {
@@ -33,6 +33,28 @@ const solidSupport = vanilla(
 const knownNonSupport = vanilla(
   "water lava short_grass fern dead_bush torch redstone_torch soul_torch",
 );
+// Explicit 26.2 CENTER support fixtures, not render boxes or generic full-cube
+// assumptions. Plain pillar and slab IDs come from the exact runtime adapters.
+const lanternSolidSupport = new Set([...solidSupport, ...vanilla(
+  "andesite polished_andesite diorite polished_diorite granite polished_granite deepslate cobbled_deepslate polished_deepslate " +
+  "deepslate_bricks deepslate_tiles bricks sandstone smooth_sandstone cut_sandstone red_sandstone smooth_red_sandstone " +
+  "cut_red_sandstone quartz_block quartz_pillar smooth_quartz chiseled_quartz_block blackstone polished_blackstone " +
+  "polished_blackstone_bricks obsidian crying_obsidian iron_block gold_block copper_block glass soul_sand " +
+  "basalt bone_block hay_block muddy_mangrove_roots ochre_froglight pearlescent_froglight polished_basalt purpur_pillar verdant_froglight",
+)]);
+const lanternStairs = vanilla("oak_stairs spruce_stairs birch_stairs stone_brick_stairs");
+function lanternAttachment(state: BlockState, hanging: boolean): boolean | undefined {
+  if (lanternSolidSupport.has(state.name) || blockAdapter(state.name)?.context === "pillar") return true;
+  if (CONTEXT_CHAIN_IDS.has(state.name)) return state.properties.axis === "y";
+  if (blockAdapter(state.name)?.context === "slab")
+    return state.properties.type === "double" || state.properties.type === (hanging ? "bottom" : "top");
+  if (lanternStairs.has(state.name)) return state.properties.half === (hanging ? "bottom" : "top");
+  if (state.name === "minecraft:oak_fence") return true;
+  if (state.name === "minecraft:stone_brick_wall" || state.name === "minecraft:cobblestone_wall")
+    return state.properties.up === "true" || ["north", "east", "south", "west"].some((side) => state.properties[side] !== "none");
+  if (state.name === "minecraft:honey_block") return hanging;
+  return undefined;
+}
 /** Cache occupancy and registry indexes for an immutable committed scene. Each
  * call assesses the supplied subjects and overlays their cells for support lookup,
  * so component previews can provide their own floor without copying the scene.
@@ -139,27 +161,20 @@ export function createSupportChecker(
         }
         if (
           block.state.properties.waterlogged !== "false" ||
-          (CONTEXT_CHAIN_IDS.has(support.state.name) &&
-            support.state.properties.waterlogged !== "false")
+          support.state.properties.waterlogged === "true"
         ) {
           report(
             block,
             supportPos,
             "support_unknown",
-            "waterlogged lantern/chain attachment is outside the verified dry support fixtures",
+            "waterlogged lantern/support attachment is outside the verified dry support fixtures",
           );
           continue;
         }
-        if (support.state.name === "minecraft:stone") continue;
-        if (CONTEXT_CHAIN_IDS.has(support.state.name)) {
-          if (support.state.properties.axis !== "y")
-            report(
-              block,
-              supportPos,
-              "invalid_support",
-              `${support.state.name} with axis=${support.state.properties.axis} cannot support a lantern on its vertical faces`,
-            );
-        } else
+        const supported = lanternAttachment(support.state, block.state.properties.hanging === "true");
+        if (supported === false)
+          report(block, supportPos, "invalid_support", `${support.state.name} does not provide the required ${block.state.properties.hanging === "true" ? "lower" : "upper"} CENTER attachment`);
+        else if (supported === undefined)
           report(
             block,
             supportPos,

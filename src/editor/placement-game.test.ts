@@ -2,7 +2,8 @@ import { existsSync, readFileSync } from "node:fs";
 import { beforeAll, describe, expect, it } from "vitest";
 import { defaultState, type Material } from "../core/catalog";
 import { gameProfileSchema, profileMaterials } from "../core/profile";
-import type { BlockState, Vec3 } from "../core/schema";
+import { key, type Block, type BlockState, type Vec3 } from "../core/schema";
+import { DOOR_FULL_CUBE_IDS, doorCollisionFullBlock } from "./door-hinge";
 import { CONTEXT_CHAIN_IDS, planBlockPlacement } from "./placement-plan";
 import { assessSupport } from "./support";
 
@@ -36,6 +37,8 @@ type LanternAttachmentCase = Omit<PlacementCase, "state"> & {
   ticks: number;
 };
 type Oracle = {
+  doorHingeCases: { block: string; target: Vec3; point: Vec3; look: Vec3; input: Block[]; state: BlockState; scenario: number }[];
+  doorCollisionCases: { state: BlockState; full: boolean }[];
   gameVersion: string;
   dataVersion: number;
   verifiedClientSha1: string;
@@ -70,6 +73,28 @@ describe.skipIf(!existsSync(oracleFile) || !existsSync(profileFile))(
       expect(oracle.gameVersion).toBe("26.2");
       expect(oracle.dataVersion).toBe(4903);
       expect(oracle.enabledFeatures).toEqual(["minecraft:vanilla"]);
+    });
+
+    it("matches the finite door collision predicates and actual neighbor-aware hinge in all facings", () => {
+      expect(oracle.doorHingeCases).toHaveLength(276);
+      const verified = new Set<string>();
+      for (const fixture of oracle.doorCollisionCases) {
+        const actual = doorCollisionFullBlock(fixture.state);
+        if (actual === undefined) continue;
+        expect(actual, JSON.stringify(fixture.state)).toBe(fixture.full);
+        verified.add(fixture.state.name);
+      }
+      for (const id of DOOR_FULL_CUBE_IDS) expect(verified.has(id), id).toBe(true);
+      for (const fixture of oracle.doorHingeCases) {
+        const plan = planBlockPlacement(defaultState(fixture.block, catalog), fixture.target, catalog,
+          { pos: fixture.target, face: [0, 1, 0], point: fixture.point, look: fixture.look },
+          { mode: "context", turns: 0 }, undefined, new Map(fixture.input.map((cell) => [key(cell.pos), cell])));
+        expect(plan.notes.some((note) => note.includes("selected hinge is preserved"))).toBe(false);
+        for (const cell of plan.object.cells) {
+          expect(cell.state.properties.hinge, JSON.stringify(fixture)).toBe(fixture.state.properties.hinge);
+          expect(cell.state.properties.facing).toBe(fixture.state.properties.facing);
+        }
+      }
     });
 
     it("matches actual getStateForPlacement for every derived axis/half/facing field", () => {

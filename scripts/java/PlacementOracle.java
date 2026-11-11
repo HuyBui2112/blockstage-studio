@@ -226,6 +226,9 @@ public class PlacementOracle {
       report.put("policy", "Actual getStateForPlacement using ServerPlayer BlockPlaceContext; dry empty unpowered neighborhood unless noted. Does not prove arbitrary neighbor updates or modded placement.");
       report.put("families", families); report.put("placementCases", cases); report.put("supportCases", support(level));
       report.put("lanternAttachmentCases", lanternAttachments(level, player));
+      report.put("lanternSupportCases", LanternSupportCases.collect(level));
+      report.put("doorHingeCases", DoorHingeCases.collect(level, player));
+      report.put("doorCollisionCases", DoorHingeCases.collisions(level));
       report.put("neighborCases", neighborCases(level));
       var vegetationSupportIds = new ArrayList<String>();
       for (Block block : BuiltInRegistries.BLOCK) if (block.defaultBlockState().is(BlockTags.SUPPORTS_VEGETATION)) vegetationSupportIds.add(BuiltInRegistries.BLOCK.getKey(block).toString());

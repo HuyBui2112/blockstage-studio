@@ -9,6 +9,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { Material } from "../core/catalog";
 import type { NeighborRules } from "../core/profile";
 import { planNeighborConnections } from "./neighbors";
+import { isDoorBlock } from "./placement";
 import { projectSchema, type Vec3 } from "../core/schema";
 import { storage } from "../io/storage";
 import {
@@ -29,6 +30,7 @@ import {
   editorDocumentSchema,
   fromLegacyProject,
   newEditorDocument,
+  sceneBlocks,
   validateDocument,
   type ComponentAsset,
   type CoordinateSpace,
@@ -940,7 +942,9 @@ export function useEditorSession(
       const before = slots[scope].history.document;
       const target = hit?.target && before.objects.find((root) => root.kind === "block" &&
         root.cells.length === 1 && root.cells[0].pos.every((value, axis) => value === hit.target![axis]));
-      const { object, replaceObjectId } = planBlockPlacement(state, pos, catalog, hit, options, target || undefined);
+      const { object, replaceObjectId } = planBlockPlacement(state, pos, catalog, hit, options, target || undefined,
+        options.mode === "context" && isDoorBlock(state.name)
+          ? new Map(sceneBlocks(before).map((block) => [block.pos.join(","), block])) : undefined);
       const next = replaceObjectId ? { ...before, objects: before.objects.map((root) => root.id === replaceObjectId ? object : root) }
         : insertObject(before, object, catalog);
       commit(

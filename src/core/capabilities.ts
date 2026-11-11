@@ -68,7 +68,7 @@ type BlockOptions = {
 const demoRegistry = new Map(DEMO_MATERIALS.map((material) => [material.id, material]));
 const contextProperties = {
   pillar: ["axis"], chain: ["axis"], lantern: ["hanging"], slab: ["type"],
-  stairs: ["half", "facing"], bed: ["facing"], door: ["facing"],
+  stairs: ["half", "facing"], bed: ["facing"], door: ["facing", "hinge"],
 } as const;
 
 /** Shared with actual yaw operations. This is a string-state adapter, not a mesh rotation. */
@@ -161,8 +161,10 @@ export function resolveBlockCapability(
     if (!kind)
       return result("unsupported", "No verified Context adapter; selected state is preserved.", "blockstage:context-fallback-v1");
     const derived: readonly string[] = contextProperties[kind];
-    return result("partial", "Derives supported orientation/half fields from a surface hit; other states remain explicit. Support, fluids and power are separate.", `blockstage:context-${kind}-v1`, {
-      requiredContext: ["surface hit", ...(derived.includes("facing") ? ["horizontal camera direction"] : [])],
+    return result("partial", kind === "door"
+      ? "Derives facing and a finite neighbor/hit-side hinge after placement yaw; unknown collision predicates preserve the selected hinge. Open and power remain explicit."
+      : "Derives supported orientation/half fields from a surface hit; other states remain explicit. Support, fluids and power are separate.", `blockstage:context-${kind}-v1`, {
+      requiredContext: ["surface hit", ...(derived.includes("facing") ? ["horizontal camera direction"] : []), ...(kind === "door" ? ["full scene occupancy", "scene collision predicates"] : [])],
       derivedProperties: derived,
       preservedProperties: Object.keys(state.properties).filter((property) => !derived.includes(property)),
     });

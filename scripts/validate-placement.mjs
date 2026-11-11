@@ -30,11 +30,11 @@ await writeFile(join(output, 'invocation.json'), JSON.stringify({
   runtime: 'vanilla GameTestServer ServerLevel; real ServerPlayer BlockPlaceContext; default vanilla feature flags',
 }, null, 2))
 function run(program, args) {
-  const result = spawnSync(executable(program), args, { cwd: output, stdio: 'inherit', windowsHide: true, timeout: 180_000 })
+  const result = spawnSync(executable(program), args, { cwd: output, stdio: 'inherit', windowsHide: true, timeout: 300_000 })
   if (result.error) throw result.error
   if (result.status !== 0) throw new Error(`${program} failed (${result.status}); evidence: ${output}`)
 }
-run('javac', ['-cp', classpath, '-d', cache, resolve('scripts/java/PlacementOracle.java')])
+run('javac', ['-cp', classpath, '-d', cache, ...['PlacementOracle', 'DoorHingeCases', 'LanternSupportCases'].map(name=>resolve(`scripts/java/${name}.java`))])
 run('java', ['-Xmx2G', '-Djava.awt.headless=true', '-cp', [cache, classpath].join(delimiter), 'PlacementOracle', output])
 const report = JSON.parse(await readFile(join(output, 'placement-oracle.json'), 'utf8'))
 assert.equal(report.gameVersion, '26.2')
@@ -44,6 +44,9 @@ assert.ok(report.placementCases.length >= 50)
 assert.equal(report.families.chain.length, 9)
 assert.equal(report.families.lantern.length, 10)
 assert.equal(report.lanternAttachmentCases.length, 336)
+assert.equal(report.doorHingeCases.length, 276)
+assert.ok(report.doorCollisionCases.length > 1000)
+assert.ok(report.lanternSupportCases.length > 100)
 assert.ok(report.neighborCases.length > 400)
 for(const fixture of report.neighborCases){assert.equal(fixture.ticks,20);assert.deepEqual(fixture.afterTicks,fixture.readback)}
 for (const fixture of report.lanternAttachmentCases) {
@@ -59,4 +62,4 @@ assert.equal(report.supportCases.find(entry => entry.name === 'floating-bed-pair
 report.verifiedClientSha1 = metadata.downloads.client.sha1
 await writeFile(join(output, 'placement-oracle.json'), JSON.stringify(report, null, 2))
 await writeFile(join(cache, 'placement-oracle.json'), JSON.stringify(report, null, 2))
-console.log(`Verified ${report.placementCases.length} actual placement contexts, ${report.supportCases.length} survival, ${report.lanternAttachmentCases.length} lantern and ${report.neighborCases.length} neighbor readback fixtures. Evidence: ${output}`)
+console.log(`Verified ${report.placementCases.length} placement contexts, ${report.supportCases.length} survival, ${report.lanternAttachmentCases.length} lantern attachment, ${report.lanternSupportCases.length} lantern support, ${report.doorHingeCases.length} door hinge, ${report.doorCollisionCases.length} collision predicates and ${report.neighborCases.length} neighbor fixtures. Evidence: ${output}`)

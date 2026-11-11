@@ -27,6 +27,10 @@ const catalog = [
   material("sunflower", { half: ["lower", "upper"] }),
   material("red_bed", { part: ["foot", "head"] }),
   material("small_dripleaf", { half: ["lower", "upper"] }),
+  material("stripped_warped_hyphae", { axis: ["x", "y", "z"] }),
+  material("honey_block"), material("soul_sand"), material("fake_slab", { type: ["bottom", "top", "double"] }),
+  material("oak_fence", { north: ["true", "false"], east: ["true", "false"], south: ["true", "false"], west: ["true", "false"], waterlogged: ["false", "true"] }),
+  ...["stone_brick_wall", "cobblestone_wall"].map((id) => material(id, { north: ["none", "low", "tall"], east: ["none", "low", "tall"], south: ["none", "low", "tall"], west: ["none", "low", "tall"], up: ["true", "false"], waterlogged: ["false", "true"] })),
   ...["lantern", "soul_lantern", "copper_lantern"].map((id) =>
     material(id, {
       hanging: ["false", "true"],
@@ -102,8 +106,7 @@ describe("bounded scene support diagnostics", () => {
         expect(
           assessSupport([lamp, block("mystery_cube", supportPos)], catalog),
         ).toMatchObject([{ code: "support_unknown" }]);
-        expect(
-          assessSupport(
+        const slabIssues = assessSupport(
             [
               lamp,
               block("stone_brick_slab", supportPos, {
@@ -112,8 +115,9 @@ describe("bounded scene support diagnostics", () => {
               }),
             ],
             catalog,
-          ),
-        ).toMatchObject([{ code: "support_unknown" }]);
+          );
+        if (hanging === "false") expect(slabIssues).toEqual([]);
+        else expect(slabIssues).toMatchObject([{ code: "invalid_support" }]);
         const wetChain = block("iron_chain", supportPos, {
           axis: "y",
           waterlogged: "true",
@@ -124,6 +128,41 @@ describe("bounded scene support diagnostics", () => {
       }
     },
   );
+
+  it("checks dry common building supports using CENTER, not a full-cube or visual rule", () => {
+    for (const hanging of ["false", "true"]) {
+      const lamp = block("lantern", [0, 1, 0], { hanging, waterlogged: "false" });
+      const pos: Vec3 = [0, hanging === "true" ? 2 : 0, 0];
+      for (const id of ["oak_planks", "glass", "soul_sand"])
+        expect(assessSupport([lamp, block(id, pos)], catalog)).toEqual([]);
+      for (const axis of ["x", "y", "z"])
+        expect(assessSupport([lamp, block("stripped_warped_hyphae", pos, { axis })], catalog)).toEqual([]);
+      for (const type of ["bottom", "top", "double"]) {
+        const issues = assessSupport([lamp, block("stone_brick_slab", pos, { type, waterlogged: "false" })], catalog);
+        if (type === "double" || type === (hanging === "true" ? "bottom" : "top")) expect(issues).toEqual([]);
+        else expect(issues).toMatchObject([{ code: "invalid_support", supportPos: pos }]);
+      }
+      for (const half of ["bottom", "top"]) for (const shape of ["straight", "inner_left", "inner_right", "outer_left", "outer_right"]) {
+        const support = block("oak_stairs", pos, { half, shape, facing: "east", waterlogged: "false" });
+        const issues = assessSupport([lamp, support], catalog);
+        if (half === (hanging === "true" ? "bottom" : "top")) expect(issues).toEqual([]);
+        else expect(issues).toMatchObject([{ code: "invalid_support" }]);
+      }
+      const honeyIssues = assessSupport([lamp, block("honey_block", pos)], catalog);
+      if (hanging === "true") expect(honeyIssues).toEqual([]);
+      else expect(honeyIssues).toMatchObject([{ code: "invalid_support" }]);
+      const fence = block("oak_fence", pos, { north: "false", east: "false", south: "false", west: "false", waterlogged: "false" });
+      expect(assessSupport([lamp, fence], catalog)).toEqual([]);
+      for (const id of ["stone_brick_wall", "cobblestone_wall"]) {
+        const wall = block(id, pos, { north: "none", east: "none", south: "none", west: "none", up: "false", waterlogged: "false" });
+        expect(assessSupport([lamp, wall], catalog)).toMatchObject([{ code: "invalid_support" }]);
+        for (const properties of [{ ...wall.state.properties, up: "true" }, { ...wall.state.properties, east: "low" }])
+          expect(assessSupport([lamp, { ...wall, state: { ...wall.state, properties } }], catalog)).toEqual([]);
+      }
+      expect(assessSupport([lamp, block("fake_slab", pos, { type: "double" })], catalog)).toMatchObject([{ code: "support_unknown" }]);
+      expect(assessSupport([lamp, block("stone_brick_slab", pos, { type: "double", waterlogged: "true" })], catalog)).toMatchObject([{ code: "support_unknown" }]);
+    }
+  });
 
   it("overlays preview lantern support and keeps unverified wet states and other lantern IDs outside the adapter", () => {
     const lamp = block("lantern", [0, 1, 0], {

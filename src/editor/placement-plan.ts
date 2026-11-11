@@ -1,7 +1,8 @@
 import { blockAdapter } from "../core/adapter-registry";
 import { bounds, rotatePos } from "../core/assembly";
 import { validateState, type Material } from "../core/catalog";
-import type { BlockState, Vec3 } from "../core/schema";
+import type { Block, BlockState, Vec3 } from "../core/schema";
+import { contextDoorHinge } from "./door-hinge";
 import {
   newEditorDocument,
   objectCells,
@@ -117,13 +118,14 @@ function contextState(
     notes.push("Bed occupancy and neighbor updates are not simulated.");
   if (isDoorBlock(state.name))
     notes.push(
-      "Door hinge, open state and power remain explicit; neighbors and power are not simulated.",
+      "Door open state and power remain explicit; power is not simulated.",
     );
   return result;
 }
 
 /** One plan supplies both the ghost and the atomic insertion. Context derives
- * only verified orientation/half fields; explicit remaining properties survive. */
+ * verified orientation/half fields and finite door hinges; explicit remaining
+ * properties survive. Door occupancy is the whole scene, including hidden roots. */
 export function planBlockPlacement(
   state: BlockState,
   pos: Vec3,
@@ -131,6 +133,7 @@ export function planBlockPlacement(
   hit: PlacementHit | undefined,
   options: PlacementOptions,
   target?: EditorObject,
+  occupied?: ReadonlyMap<string, Block>,
 ): BlockPlacementPlan {
   validTurns(options.turns);
   validateState(state, catalog);
@@ -181,6 +184,12 @@ export function planBlockPlacement(
       "active",
       catalog,
     ).objects[0];
+  }
+  if (options.mode === "context" && hit && isDoorBlock(state.name)) {
+    const hinge = occupied && contextDoorHinge(object.cells[0].state.properties.facing, pos, hit.point, occupied, catalog);
+    if (hinge) object = { ...object, cells: object.cells.map((cell) => ({ ...cell,
+      state: { ...cell.state, properties: { ...cell.state.properties, hinge } } })) };
+    else notes.push("Door hinge Context needs known collision predicates and scene occupancy; selected hinge is preserved.");
   }
   return { object, notes };
 }

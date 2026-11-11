@@ -60,8 +60,10 @@ describe("versioned action capability resolver", () => {
     for (const state of invalidStates) for (const action of ["registry", "design", "context", "yaw", "structure-export"] as const)
       expect(resolver.block(state, action).supported).toBe(false);
     const context = resolver.block(defaultState(door.id, catalog), "context");
-    expect(context).toMatchObject({ supported: true, status: "partial", derivedProperties: ["facing"] });
-    expect(context.preservedProperties).toContain("hinge");
+    expect(context).toMatchObject({ supported: true, status: "partial", derivedProperties: ["facing", "hinge"] });
+    expect(context.preservedProperties).not.toContain("hinge");
+    expect(context.preservedProperties).toEqual(["half"]);
+    expect(context.requiredContext).toContain("scene collision predicates");
     expect(context.evidence).toContain("world-readback:unverified");
     expect(resolver.block(defaultState("minecraft:oak_log"), "mirror").supported).toBe(true);
   });
