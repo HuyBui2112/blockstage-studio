@@ -33,6 +33,7 @@ import { runMakeEditableScenarios } from "./make-editable-browser-scenarios.mjs"
 import { runDocumentResourcesScenarios } from "./document-resources-browser-scenarios.mjs";
 import { runComponentPreviewScenarios } from "./component-preview-browser-scenarios.mjs";
 import { runDoorHingeScenarios } from "./door-hinge-browser-scenarios.mjs";
+import { runFoliageScenarios } from "./foliage-browser-scenarios.mjs";
 
 /** Real input integration scenarios, called by the existing isolated-browser harness. */
 export async function runEditorScenarios({
@@ -49,6 +50,8 @@ export async function runEditorScenarios({
   profilePath,
   createPeer,
 }) {
+  if (process.env.BLOCKSTAGE_EDITOR_SLICE === "foliage")
+    return runFoliageScenarios({command,evaluate,until,click,aria,input,upload,screenshot,directory,profilePath});
   if (process.env.BLOCKSTAGE_EDITOR_SLICE === "door-hinge")
     return runDoorHingeScenarios({command,evaluate,until,click,aria,input,upload,key,screenshot,directory,profilePath});
   if (process.env.BLOCKSTAGE_EDITOR_SLICE === "component-preview")

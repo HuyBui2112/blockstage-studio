@@ -367,6 +367,16 @@ export class EditorInteraction {
     for (const mesh of this.ghost.children) (mesh as T.InstancedMesh).dispose();
     this.ghost.clear();
   }
+  /** Resource color decode can settle after clones were made; retain owned
+   * clones, opacity and invalid tint without rebuilding any instance buffers. */
+  refreshGhostMaterialColors(sources: ReadonlySet<T.MeshLambertMaterial | T.MeshBasicMaterial>) {
+    for (const source of sources) {
+      const variants = this.ghostMaterials.get(source);
+      if (!variants) continue;
+      variants.valid.color.copy(source.color);
+      variants.invalid.color.copy(source.color).lerp(new T.Color("#ff6c69"), 0.65);
+    }
+  }
   clearGhostMaterials() {
     this.clearGhostMeshes();
     this.ghostState = undefined;

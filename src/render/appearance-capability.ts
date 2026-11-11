@@ -5,6 +5,7 @@ import type { GameProfile } from "../core/profile";
 import type { BlockState } from "../core/schema";
 import type { ModelResolver } from "./models";
 import { specialBlockSupport } from "./special-blocks";
+import { FOLIAGE_COLORMAP, FOLIAGE_PREVIEW_LABEL, inspectFoliageColormap } from "./foliage-tint";
 
 export type AppearanceAssessment = CapabilityDecision & { label: string };
 type AppearanceInput = {
@@ -47,6 +48,13 @@ export function assessAppearance(input: AppearanceInput): AppearanceAssessment {
     return result("Static model", "appearance:entity-static", "partial",
       "Static default pose is available. Animation, equipment and runtime variants are not supported.");
   }
+  if (["minecraft:air", "minecraft:cave_air", "minecraft:void_air"].includes(id)) {
+    if (state.name !== id || Object.keys(state.properties).length)
+      return result("Invalid air state", "appearance:air", "unsupported",
+        "Air appearance requires its exact ID and an empty property set.");
+    return result("Invisible air", "appearance:air", "supported",
+      "Air has an intentional empty appearance; no block model or texture is required.");
+  }
   if (id === "minecraft:water" || id === "minecraft:lava")
     return result("Fluid preview unavailable", "appearance:fluid", "unsupported",
       "Fluid rendering is not supported. Registry data remains available.");
@@ -77,11 +85,15 @@ export function assessAppearance(input: AppearanceInput): AppearanceAssessment {
   // A resource pack can supply a JSON model even when a chest layer is unavailable.
   try {
     const resolved = resolver.resolve(state);
-    let faces = 0;
+    let faces = 0, foliageTint = false, unknownFoliageTint = false;
     for (const part of resolved.parts)
       for (const element of part.model.elements ?? [])
         for (const face of Object.values(element.faces)) {
           resolver.texture(part.model, face.texture);
+          if (id === "minecraft:oak_leaves" && face.tintindex !== undefined && face.tintindex >= 0) {
+            if (face.tintindex === 0) foliageTint = true;
+            else unknownFoliageTint = true;
+          }
           faces++;
         }
     if (!faces && !resolved.parts.length && !resolved.warnings.length &&
@@ -97,6 +109,16 @@ export function assessAppearance(input: AppearanceInput): AppearanceAssessment {
     if (!faces)
       return result("Partial appearance", "appearance:block-json", "unsupported",
         missingBinding || "No model faces resolved. A special renderer may be required.");
+    if (foliageTint || unknownFoliageTint) {
+      const map = foliageTint ? inspectFoliageColormap(resolver.files.get(FOLIAGE_COLORMAP)) : { valid: true };
+      const notes = [...resolved.warnings, FOLIAGE_PREVIEW_LABEL];
+      if (!map.valid) notes.push(`${map.reason ?? "Foliage colormap unavailable"} Showing untinted foliage; import or enable a matching resource pack.`);
+      if (unknownFoliageTint) notes.push("Only oak foliage tint index 0 is supported; other tint indices remain untinted.");
+      notes.push("Colors use fixed preview conditions and studio lighting.");
+      return result(!map.valid ? "Untinted foliage preview" : unknownFoliageTint ? "Partial foliage preview" : "Model available",
+        "appearance:block-json", !map.valid || unknownFoliageTint || resolved.warnings.length ? "partial" : "supported",
+        notes.join(" "), !map.valid ? ["resource-pack:foliage-colormap"] : []);
+    }
     return result("Model available", "appearance:block-json",
       resolved.warnings.length ? "partial" : "supported",
       resolved.warnings.length

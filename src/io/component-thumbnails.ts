@@ -12,7 +12,7 @@ const png = [137, 80, 78, 71, 13, 10, 26, 10];
 export async function thumbnailKey(asset: ComponentAsset, manifest: ResourceManifest): Promise<string | null> {
   const enabled = manifest.packs.filter((pack) => pack.enabled);
   if (!manifest.profile || !enabled.length || enabled.some((pack) => !pack.fingerprint)) return null;
-  const text = JSON.stringify({ renderer: "component-thumbnail-v1", objects: asset.objects,
+  const text = JSON.stringify({ renderer: "component-thumbnail-v2-foliage", objects: asset.objects,
     size: asset.size, pivot2: asset.pivot2, orientation: asset.orientation,
     profile: manifest.profile,
     packs: manifest.packs.map(({ fingerprint, enabled }) => ({ fingerprint, enabled })),

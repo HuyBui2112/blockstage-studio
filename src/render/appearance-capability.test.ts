@@ -6,6 +6,7 @@ import type { EntityModelPart, GameProfile } from "../core/profile";
 import type { BlockState } from "../core/schema";
 import { assessAppearance } from "./appearance-capability";
 import { ModelResolver } from "./models";
+import { FOLIAGE_COLORMAP, FOLIAGE_PREVIEW_LABEL } from "./foliage-tint";
 
 const part: EntityModelPart = {
   position: [0, 0, 0], rotation: [0, 0, 0], scale: [1, 1, 1],
@@ -26,7 +27,7 @@ function resolver(files: Record<string, Uint8Array> = {}) {
     counts: { textures: 0, models: 0, blockstates: 0, entityTextures: 0 },
   }]);
 }
-function jsonModel(id: string): Record<string, Uint8Array> {
+function jsonModel(id: string, tintindex?: number): Record<string, Uint8Array> {
   const path = id.replace(":", "/");
   return {
     [`assets/${path.split("/")[0]}/blockstates/${path.split("/")[1]}.json`]: strToU8(JSON.stringify({
@@ -34,7 +35,7 @@ function jsonModel(id: string): Record<string, Uint8Array> {
     })),
     [`assets/${id.split(":")[0]}/models/block/${id.split(":")[1]}.json`]: strToU8(JSON.stringify({
       textures: { all: "fixture:block/plain" },
-      elements: [{ from: [0, 0, 0], to: [16, 16, 16], faces: { north: { texture: "#all" } } }],
+      elements: [{ from: [0, 0, 0], to: [16, 16, 16], faces: { north: { texture: "#all", tintindex } } }],
     })),
     "assets/fixture/textures/block/plain.png": new Uint8Array([1]),
   };
@@ -42,6 +43,47 @@ function jsonModel(id: string): Record<string, Uint8Array> {
 const state = (id: string, properties: Record<string, string> = {}): BlockState => ({ name: id, properties });
 
 describe("resource-dependent appearance capabilities", () => {
+  it("recognizes only the three exact empty air states without assets", () => {
+    for (const id of ["minecraft:air", "minecraft:cave_air", "minecraft:void_air"]) {
+      const input = { kind: "block" as const, id, state: state(id), profile: null, resolver: resolver(),
+        material: { ...DEMO_MATERIALS[0], id, renderShape: "INVISIBLE" } };
+      expect(assessAppearance(input)).toMatchObject({ status: "supported", label: "Invisible air" });
+      expect(assessAppearance({ ...input, state: state(id, { invented: "true" }) }).status).toBe("unsupported");
+      expect(assessAppearance({ ...input, state: state("minecraft:stone") }).status).toBe("unsupported");
+    }
+    expect(assessAppearance({ kind: "block", id: "fixture:air", state: state("fixture:air"),
+      profile: null, resolver: resolver() }).status).toBe("unsupported");
+  });
+
+  it("requires the effective foliage colormap only for supported tinted oak faces", () => {
+    const oak = state("minecraft:oak_leaves", { distance: "7", persistent: "true", waterlogged: "false" });
+    const input = { kind: "block" as const, id: oak.name, state: oak, profile: null };
+    const assets = jsonModel(oak.name, 0);
+    const missing = assessAppearance({ ...input, resolver: resolver(assets) });
+    expect(missing).toMatchObject({ status: "partial", supported: true, label: "Untinted foliage preview" });
+    expect(missing.reason).toContain("untinted");
+    expect(missing.reason).toContain(FOLIAGE_PREVIEW_LABEL);
+    expect(missing.requiredContext).toContain("resource-pack:foliage-colormap");
+    expect(assessAppearance({ ...input, resolver: resolver({ ...assets, [FOLIAGE_COLORMAP]: new Uint8Array([1, 2, 3]) }) }).status).toBe("partial");
+    // Availability inspection checks the bounded PNG header; native decode is a viewport concern.
+    const header = new Uint8Array(33);
+    header.set([137, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 13, 73, 72, 68, 82]);
+    const view = new DataView(header.buffer); view.setUint32(16, 256); view.setUint32(20, 256);
+    header[24] = 8; header[25] = 6;
+    const available = assessAppearance({ ...input, resolver: resolver({ ...assets, [FOLIAGE_COLORMAP]: header }) });
+    expect(available.status).toBe("supported");
+    expect(available.reason).toContain(FOLIAGE_PREVIEW_LABEL);
+    expect(available.evidence).toContain("pixel-parity:unverified");
+    const untinted = assessAppearance({ ...input, resolver: resolver(jsonModel(oak.name)) });
+    expect(untinted.status).toBe("supported");
+    expect(untinted.requiredContext).not.toContain("resource-pack:foliage-colormap");
+    const unsupportedIndex = assessAppearance({ ...input, resolver: resolver(jsonModel(oak.name, 2)) });
+    expect(unsupportedIndex.status).toBe("partial");
+    expect(unsupportedIndex.reason).toContain("other tint indices remain untinted");
+    const missingTexture = { ...assets }; delete missingTexture["assets/fixture/textures/block/plain.png"];
+    expect(assessAppearance({ ...input, resolver: resolver(missingTexture) }).status).toBe("unsupported");
+  });
+
   it("keeps model availability separate from legal placement and world proof", () => {
     const stone = state("minecraft:stone");
     const input = { kind: "block" as const, id: stone.name, state: stone, profile: null };

@@ -47,6 +47,21 @@ const root = {
   "assets/minecraft/textures/block/stone.png": true,
 };
 describe("model resource graph", () => {
+  it("keeps distinct tint indices so unsupported indices cannot inherit foliage color", () => {
+    const resolver = new ModelResolver([pack({ ...root,
+      "assets/minecraft/blockstates/oak_leaves.json": { variants: { "": { model: "block/leaf" } } },
+      "assets/minecraft/models/block/leaf.json": { textures: { all: "block/stone" }, elements: [{
+        from: [0, 0, 0], to: [16, 16, 16], faces: {
+          north: { texture: "#all", tintindex: 0 }, south: { texture: "#all", tintindex: 1 },
+          up: { texture: "#all" },
+        },
+      }] },
+    })]);
+    const baked = bakeBlock(resolver.resolve({ name: "minecraft:oak_leaves", properties: {} }), resolver);
+    expect(baked.surfaces.map((surface) => surface.tintIndex)).toEqual([undefined, 0, 1]);
+    expect(baked.surfaces.map((surface) => surface.tint)).toEqual([false, true, true]);
+    baked.geometry.dispose();
+  });
   it("resolves parent elements and child texture overrides through aliases", () => {
     const resolver = new ModelResolver([
       pack({

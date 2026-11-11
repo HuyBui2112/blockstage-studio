@@ -17,6 +17,7 @@ import type {
 export type Surface = {
   texture: string;
   tint: boolean;
+  tintIndex?: number;
   shade: boolean;
   translucent?: boolean;
   singleSided?: boolean;
@@ -236,6 +237,7 @@ export function bakeBlock(
           texture: texture.path,
           translucent: texture.translucent,
           tint: (face.tintindex ?? -1) >= 0,
+          ...((face.tintindex ?? -1) >= 0 ? { tintIndex: face.tintindex } : {}),
           shade: element.shade !== false,
         };
         // Opposite faces of a zero-thickness element already provide both visible

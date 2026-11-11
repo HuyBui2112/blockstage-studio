@@ -4,7 +4,7 @@ import { createHash } from "node:crypto";
 import { beforeAll, describe, expect, it } from "vitest";
 import { gunzipSync, unzipSync } from "fflate";
 import { z } from "zod";
-import { gameProfileSchema, profileMaterials } from "./profile";
+import { gameProfileSchema, profileMaterials, type GameProfile } from "./profile";
 import { validateState, type Material } from "./catalog";
 import type { BlockState } from "./schema";
 import { newEditorDocument, sceneBlocks } from "../editor/model";
@@ -18,6 +18,7 @@ import { inspectStructure } from "../io/structure-import";
 import { readNbt } from "../io/nbt-reader";
 import { ModelResolver } from "../render/models";
 import { bakeBlock } from "../render/block-mesh";
+import { assessAppearance } from "../render/appearance-capability";
 
 // This is a release QA target, deliberately not an application palette filter.
 const namespaced = z.string().regex(/^minecraft:[a-z0-9_]+$/);
@@ -104,9 +105,9 @@ const profilePath = "public/generated/26.2.profile.json",
 describe.skipIf(!existsSync(profilePath) || !existsSync(jarPath))(
   "R1 candidate against user supplied 26.2 profile/assets (not world proof)",
   () => {
-    let catalog: Material[], resolver: ModelResolver;
+    let catalog: Material[], resolver: ModelResolver, profile: GameProfile;
     beforeAll(() => {
-      const profile = gameProfileSchema.parse(
+      profile = gameProfileSchema.parse(
         JSON.parse(readFileSync(profilePath, "utf8")),
       );
       expect({
@@ -121,7 +122,7 @@ describe.skipIf(!existsSync(profilePath) || !existsSync(jarPath))(
       );
       const files = unzipSync(bytes, {
         filter: (entry) =>
-          /^assets\/minecraft\/(blockstates\/|models\/block\/|textures\/block\/)/.test(
+          /^assets\/minecraft\/(blockstates\/|models\/block\/|textures\/(block|colormap)\/)/.test(
             entry.name,
           ),
       });
@@ -218,6 +219,16 @@ describe.skipIf(!existsSync(profilePath) || !existsSync(jarPath))(
         }
       },
     );
+    it("reports intentional air and every finite target state available under the explicit preview environment", () => {
+      let count = 0;
+      for (const { id, restrictions } of entries) for (const state of states(id, restrictions)) {
+        const result = assessAppearance({ kind: "block", id, state, profile, resolver,
+          material: catalog.find((item) => item.id === id) });
+        expect(result.status, `${JSON.stringify(state)}: ${result.reason}`).toBe("supported");
+        count++;
+      }
+      expect(count).toBe(461);
+    });
     it.each(entries.filter((entry) => entry.id !== "minecraft:air"))(
       "$id: finite states resolve geometry and actual textures without fallback",
       ({ id, restrictions }) => {

@@ -605,6 +605,13 @@ describe("grid-safe editor viewport input", () => {
     expect(canvas.dataset.editorGhostOpacity).toBe("0.45");
     expect(editor.outlines.children).toHaveLength(1);
     expect(blocks[0].pos).toEqual([0, 0, 0]);
+    const instance = editor.ghost.children[0];
+    material.color.set("#2255aa");
+    editor.refreshGhostMaterialColors(new Set([material]));
+    expect(valid.color.equals(material.color)).toBe(true);
+    expect(invalid.color.equals(material.color.clone().lerp(new T.Color("#ff6c69"), 0.65))).toBe(true);
+    expect(editor.ghost.children[0]).toBe(instance);
+    expect(valid.opacity).toBe(0.45);
     const validDispose = vi.spyOn(valid, "dispose"),
       invalidDispose = vi.spyOn(invalid, "dispose");
     const sourceDispose = vi.spyOn(material, "dispose"),

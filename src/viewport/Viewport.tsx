@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { flushSync } from "react-dom";
 import * as T from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
@@ -23,6 +23,7 @@ import {
   type ViewCommandKind,
 } from "./view-commands";
 import { TextureImages } from "../render/texture-image";
+import { FOLIAGE_COLORMAP, FOLIAGE_PREVIEW_LABEL, PreviewFoliageTint } from "../render/foliage-tint";
 import {
   textureAnimation,
   updateTextureAnimation,
@@ -135,6 +136,19 @@ class ViewportController {
   >();
   geometryCache = new Map<string, T.BufferGeometry>();
   textureImages = new TextureImages();
+  foliageMaterials = new Set<T.MeshLambertMaterial | T.MeshBasicMaterial>();
+  foliageRequested = false;
+  foliageIssue: string | undefined;
+  baseDiagnostics: RenderDiagnostics | undefined;
+  foliageTint = new PreviewFoliageTint((error) => {
+    if (this.disposed) return;
+    for (const material of this.foliageMaterials) material.color.set(this.foliageTint.color);
+    this.editorInteraction.refreshGhostMaterialColors(this.foliageMaterials);
+    this.foliageIssue = error;
+    this.publishDiagnostics();
+    if (error) this.props.onMessage(error);
+    this.invalidate();
+  });
   props: Props;
   observer: ResizeObserver;
   frame = 0;
@@ -357,6 +371,16 @@ class ViewportController {
         : "perspective";
     if (this.renderer.domElement.dataset.projection !== projection)
       this.renderer.domElement.dataset.projection = projection;
+    if (this.foliageRequested) {
+      const status = this.foliageTint.pending ? "pending" : this.foliageTint.failed ? "unavailable" : "ready";
+      if (this.renderer.domElement.dataset.foliageTint !== this.foliageTint.color)
+        this.renderer.domElement.dataset.foliageTint = this.foliageTint.color;
+      if (this.renderer.domElement.dataset.foliageStatus !== status)
+        this.renderer.domElement.dataset.foliageStatus = status;
+    } else {
+      if (this.renderer.domElement.dataset.foliageTint !== undefined) delete this.renderer.domElement.dataset.foliageTint;
+      if (this.renderer.domElement.dataset.foliageStatus !== undefined) delete this.renderer.domElement.dataset.foliageStatus;
+    }
     this.renderer.render(this.scene, this.camera);
     if (this.props.previewMode && this.props.thumbnailCapture) this.captureThumbnail();
     if (this.props.editor) {
@@ -403,7 +427,7 @@ class ViewportController {
   captureThumbnail() {
     const request = this.props.thumbnailCapture;
     if (!request || !request.id || !this.props.previewMode ||
-      this.capturedThumbnailId === request.id || this.textureImages.pendingCount > 0)
+      this.capturedThumbnailId === request.id || this.textureImages.pendingCount > 0 || this.foliageTint.pending)
       return;
     this.capturedThumbnailId = request.id;
     const props = this.props;
@@ -415,7 +439,7 @@ class ViewportController {
     const finish = (blob: Blob | null, error?: string) => {
       if (current()) request.onCapture(blob, error);
     };
-    if (this.textureImages.failedCount > 0) {
+    if (this.textureImages.failedCount > 0 || this.foliageTint.failed) {
       finish(null, "One or more textures could not be decoded. No thumbnail was saved.");
       return;
     }
@@ -449,6 +473,11 @@ class ViewportController {
     this.group.clear();
     this.animations = [];
     if (!clearCaches) return;
+    this.foliageTint.clear();
+    this.foliageMaterials.clear();
+    this.foliageRequested = false;
+    this.foliageIssue = undefined;
+    this.baseDiagnostics = undefined;
     this.editorInteraction.clearGhostMaterials();
     this.textureImages.clear();
     this.geometryCache.forEach((g) => g.dispose());
@@ -516,6 +545,13 @@ class ViewportController {
     return texture;
   }
   modelMaterials(surfaces: Surface[], state: BlockState) {
+    const oakFoliage = state.name === "minecraft:oak_leaves";
+    const supportedTint = (s: Surface) => oakFoliage && s.tint && s.tintIndex === 0 && !s.color;
+    const needsFoliage = surfaces.some(supportedTint);
+    if (needsFoliage && !this.foliageRequested) {
+      this.foliageRequested = true;
+      this.foliageTint.load(this.resolver.files.get(FOLIAGE_COLORMAP));
+    }
     const tint = /leaves|vine/.test(state.name)
       ? "#77ab2f"
       : /grass|fern|stem|lily_pad|sugar_cane/.test(state.name)
@@ -525,20 +561,22 @@ class ViewportController {
       /glass(?!_pane)|stained_glass|ice|slime|honey|nether_portal/.test(
         state.name,
       );
-    const key = JSON.stringify([surfaces, tint, transparent]);
+    const key = JSON.stringify([surfaces, oakFoliage ? "plains-foliage-v1" : tint, transparent]);
     const cached = this.materialCache.get(key);
     if (cached) return cached;
     const materials = surfaces.map((s) => {
       const settings = {
         map: this.texture(s.texture),
-        color: s.color ?? (s.tint ? tint : "white"),
+        color: s.color ?? (supportedTint(s) ? this.foliageTint.color : oakFoliage ? "white" : s.tint ? tint : "white"),
         alphaTest: 0.1,
         transparent: transparent || s.translucent,
         side: s.singleSided ? T.FrontSide : T.DoubleSide,
       };
-      return s.shade
+      const material = s.shade
         ? new T.MeshLambertMaterial(settings)
         : new T.MeshBasicMaterial(settings);
+      if (supportedTint(s)) this.foliageMaterials.add(material);
+      return material;
     });
     this.materialCache.set(key, materials);
     return materials;
@@ -842,11 +880,8 @@ class ViewportController {
       }
     }
     diagnostics.issues = [...issues];
-    const diagnosticsKey = JSON.stringify(diagnostics);
-    if (diagnosticsKey !== this.diagnosticsKey) {
-      this.diagnosticsKey = diagnosticsKey;
-      this.props.onDiagnostics(diagnostics);
-    }
+    this.baseDiagnostics = diagnostics;
+    this.publishDiagnostics();
     this.grid.position.y = this.props.layer - 0.005;
     this.highlight();
     this.editorInteraction.update(
@@ -857,6 +892,18 @@ class ViewportController {
     this.entityInteraction.update(this.props.previewMode ? undefined : this.props.editor?.entities);
     this.refreshAnimations();
     this.invalidate();
+  }
+  publishDiagnostics() {
+    if (!this.baseDiagnostics) return;
+    const foliageVisible = this.foliageIssue && (this.props.blocks.some((block) => block.state.name === "minecraft:oak_leaves") ||
+      this.props.editor?.ghost?.blocks.some((block) => block.state.name === "minecraft:oak_leaves"));
+    const diagnostics = foliageVisible ? { ...this.baseDiagnostics,
+      issues: [...this.baseDiagnostics.issues, `${this.foliageIssue} Showing untinted foliage.`].slice(0, 100) } : this.baseDiagnostics;
+    const diagnosticsKey = JSON.stringify(diagnostics);
+    if (diagnosticsKey !== this.diagnosticsKey) {
+      this.diagnosticsKey = diagnosticsKey;
+      this.props.onDiagnostics(diagnostics);
+    }
   }
   highlight() {
     if (this.props.previewMode || this.props.editor) {
@@ -1643,6 +1690,8 @@ class ViewportController {
 }
 
 export function Viewport(props: Props) {
+  const foliage = useMemo(() => props.blocks.some((block) => block.state.name === "minecraft:oak_leaves") ||
+    !!props.editor?.ghost?.blocks.some((block) => block.state.name === "minecraft:oak_leaves"), [props.blocks, props.editor?.ghost?.blocks]);
   const host = useRef<HTMLDivElement>(null),
     view = useRef<ViewportController | null>(null);
   const [error, setError] = useState("");
@@ -1667,6 +1716,8 @@ export function Viewport(props: Props) {
   });
   return (
     <div className="viewport" ref={host}>
+      {foliage && !props.thumbnailCapture && <span className="viewport-environment"
+        title="Fixed plains foliage color (temperature 0.8, humidity 0.4) from enabled resource packs; studio lighting. This view does not change document or world settings.">{FOLIAGE_PREVIEW_LABEL}</span>}
       {error && <div className="viewport-error">{error}</div>}
     </div>
   );
